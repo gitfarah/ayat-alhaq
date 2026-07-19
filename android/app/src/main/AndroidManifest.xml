@@ -3,6 +3,8 @@
          for prayer times (never in the background). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Keeps recitation playing with the screen off (audio stayAwake). -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <application
         android:label="آيات الحق"
         android:name="${applicationName}"

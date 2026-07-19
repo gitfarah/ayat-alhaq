@@ -4,6 +4,10 @@
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>يُستخدم موقعك لحساب مواقيت الصلاة لمدينتك فقط.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>آيات الحق</string>
 	<key>CFBundleDevelopmentRegion</key>

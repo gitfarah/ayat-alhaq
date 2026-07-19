@@ -195,6 +195,34 @@ class QuranService {
     return text;
   }
 
+  /// Normalizes Arabic to bare letters word-by-word (public form of
+  /// [_bareLetters] for multi-word strings).
+  static String normalizeArabic(String s) =>
+      s.trim().split(RegExp(r'\s+')).map(_bareLetters).join(' ');
+
+  /// Finds surahs whose name matches [query] — offline, diacritic- and
+  /// prefix-insensitive, so typing "الفاتحة" or "سورة الفاتحة" or
+  /// "فاتحة" all find سُورَةُ ٱلْفَاتِحَةِ.
+  static Future<List<Surah>> searchSurahs(String query) async {
+    await _ensureLoaded();
+    var q = normalizeArabic(query);
+    q = q.replaceFirst(RegExp(r'^سورة\s*'), '');
+    if (q.isEmpty) return [];
+    final qNoAl = q.replaceFirst(RegExp(r'^ال'), '');
+    final results = <Surah>[];
+    for (final s in _surahCache!) {
+      final name =
+          normalizeArabic(s.name).replaceFirst(RegExp(r'^سورة\s*'), '');
+      final nameNoAl = name.replaceFirst(RegExp(r'^ال'), '');
+      if (name.contains(q) ||
+          (qNoAl.isNotEmpty && nameNoAl.contains(qNoAl)) ||
+          s.englishName.toLowerCase().contains(query.trim().toLowerCase())) {
+        results.add(s);
+      }
+    }
+    return results;
+  }
+
   /// Full-text ayah search over the BUNDLED text — works offline.
   /// Both the query and the ayah text are reduced to bare letters, so
   /// plain keyboard input like "الرحمن" matches the vocalized text.

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/surah.dart';
 import '../services/quran_service.dart';
 import '../services/settings_service.dart';
 import '../theme.dart';
@@ -21,6 +22,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
   late final TextEditingController _controller;
   Timer? _debounce;
   List<AyahSearchResult> _results = [];
+  List<Surah> _surahResults = [];
   bool _searching = false;
   bool _searchedOnce = false;
   String? _error;
@@ -49,6 +51,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
     if (q.length < 2) {
       setState(() {
         _results = [];
+        _surahResults = [];
         _searchedOnce = false;
         _error = null;
       });
@@ -59,10 +62,16 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
       _error = null;
     });
     try {
-      final results = await QuranService.searchAyahs(q);
+      // Surah-name matches surface FIRST — typing a surah's name should
+      // find the surah itself, not just ayahs containing those words.
+      final results = await Future.wait([
+        QuranService.searchSurahs(q),
+        QuranService.searchAyahs(q),
+      ]);
       if (!mounted || _controller.text.trim() != q) return;
       setState(() {
-        _results = results;
+        _surahResults = results[0] as List<Surah>;
+        _results = results[1] as List<AyahSearchResult>;
         _searching = false;
         _searchedOnce = true;
       });
@@ -92,6 +101,46 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
   String _ar(int n) {
     const d = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
     return n.toString().split('').map((c) => d[int.parse(c)]).join();
+  }
+
+  /// A matched surah — shown above ayah matches with a distinct accent
+  /// so "typing a surah name" visibly finds the surah itself.
+  Widget _surahTile(Surah s, bool isDark) {
+    final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: primary.withValues(alpha: 0.55))),
+      child: ListTile(
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => ReaderScreen(surah: s))),
+        leading: Icon(Icons.menu_book_rounded, color: primary, size: 22),
+        title: Text(s.name,
+            textAlign: TextAlign.right,
+            textDirection: TextDirection.rtl,
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Amiri',
+                color: isDark ? AppColors.darkText : AppColors.textPrimary)),
+        subtitle: Text(
+            '${s.revelationType == 'Meccan' ? 'مكية' : 'مدنية'} • ${_ar(s.numberOfAyahs)} آية',
+            textAlign: TextAlign.right,
+            textDirection: TextDirection.rtl,
+            style: TextStyle(
+                fontFamily: 'Amiri',
+                fontSize: 13,
+                color:
+                    isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
+        trailing: Icon(Icons.chevron_left_rounded,
+            color: isDark ? AppColors.darkTextSec : AppColors.textSecondary,
+            size: 18),
+      ),
+    );
   }
 
   @override
@@ -154,7 +203,8 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
               child: Align(
                   alignment: Alignment.centerRight,
-                  child: Text('${_ar(_results.length)} نتيجة',
+                  child: Text(
+                      '${_ar(_surahResults.length + _results.length)} نتيجة',
                       style: TextStyle(
                           color: subColor,
                           fontSize: 13,
@@ -164,7 +214,10 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
               ? Center(
                   child: Text(_error!,
                       style: TextStyle(color: subColor, fontFamily: 'Amiri')))
-              : (_searchedOnce && _results.isEmpty && !_searching)
+              : (_searchedOnce &&
+                      _results.isEmpty &&
+                      _surahResults.isEmpty &&
+                      !_searching)
                   ? Center(
                       child: Text('لا توجد نتائج',
                           style: TextStyle(
@@ -173,9 +226,12 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                               fontFamily: 'Amiri')))
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
-                      itemCount: _results.length,
+                      itemCount: _surahResults.length + _results.length,
                       itemBuilder: (_, i) {
-                        final r = _results[i];
+                        if (i < _surahResults.length) {
+                          return _surahTile(_surahResults[i], isDark);
+                        }
+                        final r = _results[i - _surahResults.length];
                         return Container(
                           margin: const EdgeInsets.only(bottom: 10),
                           decoration: BoxDecoration(

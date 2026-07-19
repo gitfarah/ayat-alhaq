@@ -114,6 +114,20 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     }
   }
 
+  /// One-time coach mark for the new gesture model.
+  Future<void> _maybeShowGestureHint() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('gestureHintShown') ?? false) return;
+    await prefs.setBool('gestureHintShown', true);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        duration: Duration(seconds: 5),
+        content: Text(
+            'اضغط مطولاً على أي آية لعرض خياراتها، واضغط ضغطة سريعة لإظهار أو إخفاء الأشرطة',
+            textDirection: TextDirection.rtl,
+            style: TextStyle(fontFamily: 'Amiri', height: 1.6))));
+  }
+
   /// One-time offer (per install) to download the whole Mushaf for
   /// offline reading. Never silently pulls ~350 MB on the user's data
   /// plan — it asks first. Once accepted, an interrupted download
@@ -352,6 +366,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       // Khatma auto-tracking: count the viewed page(s) as read.
       KhatmaService.markPageRead(basePage);
       if (secondData != null) KhatmaService.markPageRead(basePage + 1);
+
+      if (firstLoad) _maybeShowGestureHint();
 
       final step = wide ? 2 : 1;
       MushafSvgService.preload(basePage + step);
@@ -1381,25 +1397,16 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   ),
                 ),
               ),
-              // Single tap layer doing polygon hit-testing, so a tap
-              // always resolves to the ayah actually under the finger.
-              // Skip regions with missing metadata (some dataset pages
-              // have surahNumber/ayahNumber = 0). A tap on empty space
-              // falls through to the bars toggle, matching the old
-              // behaviour outside the artwork.
+              // Gesture layer. Model (matching well-known Mushaf apps):
+              // a FAST TAP anywhere — ayah or empty space — toggles
+              // the header/footer; a LONG-PRESS on an ayah opens its
+              // options (tafsir/bookmark/highlight/audio). This makes
+              // recovering from full-screen a single tap, always.
               Positioned.fill(
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: () {}, // required so onTapUp wins the arena
-                  onTapUp: (details) {
-                    // Full-screen escape hatch: while the bars are
-                    // hidden, the FIRST tap anywhere — even on an ayah
-                    // — only brings the bars back. This guarantees the
-                    // user can never get stuck in immersive mode.
-                    if (!_barsVisible) {
-                      _setBars(true);
-                      return;
-                    }
+                  onTap: () => _setBars(!_barsVisible),
+                  onLongPressStart: (details) {
                     final vx = details.localPosition.dx / scaleX;
                     final vy = details.localPosition.dy / scaleY;
                     for (final region in data.ayahRegions) {
@@ -1407,7 +1414,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           region.surahNumber > 0 &&
                           region.containsPoint(vx, vy)) {
                         // Visual + haptic confirmation of WHICH ayah
-                        // the tap landed on.
+                        // the press landed on.
                         HapticFeedback.selectionClick();
                         setState(() => _flashRegion = region);
                         _flashCtrl.forward(from: 0);
@@ -1415,7 +1422,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                         return;
                       }
                     }
-                    _setBars(!_barsVisible);
                   },
                 ),
               ),

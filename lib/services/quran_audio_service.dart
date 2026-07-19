@@ -94,6 +94,7 @@ class QuranAudioService extends ChangeNotifier {
   int? Function(int currentGlobalAyah)? nextAyahResolver;
 
   QuranAudioService() {
+    _configureAudioSession();
     _player.onPlayerStateChanged.listen((state) {
       _isPlaying = state == PlayerState.playing;
       // The moment real playback starts, the track is no longer
@@ -104,6 +105,32 @@ class QuranAudioService extends ChangeNotifier {
     });
     _player.onPlayerComplete.listen((_) => _handleComplete());
     _loadReciter();
+  }
+
+  /// Configures the OS audio session for BACKGROUND playback: on iOS
+  /// the `playback` category keeps recitation running when the screen
+  /// locks or the app is backgrounded (together with the `audio`
+  /// UIBackgroundMode in Info.plist); on Android `stayAwake` + media
+  /// focus do the same.
+  Future<void> _configureAudioSession() async {
+    if (kIsWeb) return;
+    try {
+      await AudioPlayer.global.setAudioContext(AudioContext(
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: const {},
+        ),
+        android: const AudioContextAndroid(
+          isSpeakerphoneOn: false,
+          stayAwake: true,
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.media,
+          audioFocus: AndroidAudioFocus.gain,
+        ),
+      ));
+    } catch (_) {
+      // Session config failing shouldn't block normal playback.
+    }
   }
 
   Future<void> _loadReciter() async {
@@ -182,10 +209,14 @@ class QuranAudioService extends ChangeNotifier {
     _dlSurah = null;
   }
 
-  /// Fetches every missing ayah of [globalAyah]'s surah in the
-  /// background, so continuous playback through the surah never has to
-  /// wait on the network. Playing order first: current ayah to the end,
-  /// then whatever was skipped at the start.
+  /// Fetches every missing ayah of [globalAyah]'s surah — in the
+  /// chosen reciter's voice — so continuous playback through the surah
+  /// never has to wait on the network and replays work fully offline.
+  ///
+  /// Downloads run 4-at-a-time, starting from the played ayah forward
+  /// (so the immediately-next ayahs arrive first), then filling in the
+  /// skipped beginning. The download keeps going even if playback is
+  /// stopped; only switching reciters abandons it.
   Future<void> _downloadSurahAround(int globalAyah) async {
     if (kIsWeb) return;
     final (surah, first, last) = surahRangeOf(globalAyah);
@@ -193,25 +224,31 @@ class QuranAudioService extends ChangeNotifier {
     final generation = ++_downloadGeneration;
     final reciter = _reciter;
 
-    final order = [
+    final queue = [
       for (var g = globalAyah; g <= last; g++) g,
       for (var g = first; g < globalAyah; g++) g,
     ];
 
     _dlSurah = surah;
-    _dlTotal = order.length;
+    _dlTotal = queue.length;
     _dlDone = 0;
-    for (final g in order) {
-      if (generation != _downloadGeneration) return; // cancelled
-      final f = await _localFile(reciter, g);
-      if (!(await f.exists() && (await f.length()) > 0)) {
-        await _ensureLocal(reciter, g);
+    notifyListeners();
+
+    Future<void> worker() async {
+      while (queue.isNotEmpty && generation == _downloadGeneration) {
+        final g = queue.removeAt(0);
+        final f = await _localFile(reciter, g);
+        if (!(await f.exists() && (await f.length()) > 0)) {
+          await _ensureLocal(reciter, g);
+        }
+        if (generation != _downloadGeneration) return;
+        _dlDone++;
+        // Notify sparsely — every few files is enough for progress UI.
+        if (_dlDone % 3 == 0 || _dlDone == _dlTotal) notifyListeners();
       }
-      if (generation != _downloadGeneration) return;
-      _dlDone++;
-      // Notify sparsely — every few files is enough for a progress UI.
-      if (_dlDone % 3 == 0 || _dlDone == _dlTotal) notifyListeners();
     }
+
+    await Future.wait([for (var i = 0; i < 4; i++) worker()]);
     if (generation == _downloadGeneration) {
       _dlSurah = null;
       notifyListeners();
@@ -283,7 +320,8 @@ class QuranAudioService extends ChangeNotifier {
   }
 
   Future<void> stop() async {
-    _cancelSurahDownload();
+    // Deliberately do NOT cancel the surah download: the user asked
+    // for the whole surah — let it finish so replays work offline.
     await _player.stop();
     _currentGlobalAyah = null;
     _isPlaying = false;

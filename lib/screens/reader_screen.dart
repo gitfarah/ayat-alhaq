@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -38,6 +39,20 @@ class _ReaderScreenState extends State<ReaderScreen> {
   final _positions = ItemPositionsListener.create();
   int _page = 1, _juz = 1, _hizb = 1;
   bool _barsVisible = true;
+
+  /// Bars + system chrome together (same model as the Mushaf screen):
+  /// a fast tap anywhere toggles them, scrolling hides them, and
+  /// long-pressing an ayah opens its options.
+  void _setBars(bool visible) {
+    if (_barsVisible == visible) return;
+    setState(() => _barsVisible = visible);
+    try {
+      SystemChrome.setEnabledSystemUIMode(
+          visible ? SystemUiMode.edgeToEdge : SystemUiMode.immersiveSticky);
+    } catch (_) {
+      // Cosmetic only — never let it break bar toggling.
+    }
+  }
 
   /// Every surah opens with the Basmala on its own line, except
   /// Al-Fatiha (the Basmala is ayah 1 there) and At-Tawbah (has none).
@@ -462,6 +477,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   void dispose() {
+    // Never leave the app stuck in immersive mode after this screen.
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _positions.itemPositions.removeListener(_onScroll);
     // Clear the resolver so it doesn't reference this screen's disposed
     // _ayahs list if audio is still playing when the user navigates away.
@@ -529,9 +546,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           : _error != null
               ? _buildError()
               : GestureDetector(
-                  onTap: () => setState(() {
-                    _barsVisible = !_barsVisible;
-                  }),
+                  onTap: () => _setBars(!_barsVisible),
                   child: Column(
                     children: [
                       Container(
@@ -571,7 +586,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         ),
                       ),
                       Expanded(
-                        child: ScrollablePositionedList.builder(
+                        child: NotificationListener<UserScrollNotification>(
+                          // Scrolling = reading: give the text the whole
+                          // screen. A tap brings the bars back.
+                          onNotification: (n) {
+                            if (n.direction != ScrollDirection.idle) {
+                              _setBars(false);
+                            }
+                            return false;
+                          },
+                          child: ScrollablePositionedList.builder(
                           itemScrollController: _scroll,
                           itemPositionsListener: _positions,
                           padding: const EdgeInsets.symmetric(
@@ -639,7 +663,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                             : AppColors.border);
 
                             return GestureDetector(
-                              onTap: () => _showOptions(ayah),
+                              // Fast tap = toggle the bars (same as
+                              // empty space); options live behind a
+                              // LONG-PRESS, like the big Mushaf apps.
+                              onTap: () => _setBars(!_barsVisible),
+                              onLongPress: () {
+                                HapticFeedback.selectionClick();
+                                _showOptions(ayah);
+                              },
                               child: Container(
                                 margin: const EdgeInsets.only(bottom: 12),
                                 padding:
@@ -789,6 +820,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                               ),
                             );
                           },
+                        ),
                         ),
                       ),
                       // Bottom bar: Now-Playing controls take over when

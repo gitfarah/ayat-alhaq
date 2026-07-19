@@ -44,6 +44,16 @@ void main() {
       expect(results, isNotEmpty);
       expect(results.any((r) => r.surahNumber == 112), isTrue);
     });
+
+    test('surah-name search matches plain typed names', () async {
+      // Full name, with and without the سورة prefix and diacritics.
+      expect((await QuranService.searchSurahs('الفاتحة')).first.number, 1);
+      expect((await QuranService.searchSurahs('سورة الفاتحة')).first.number, 1);
+      expect((await QuranService.searchSurahs('الإخلاص')).first.number, 112);
+      expect((await QuranService.searchSurahs('فاتحة')).first.number, 1);
+      expect((await QuranService.searchSurahs('البقرة')).first.number, 2);
+      expect(await QuranService.searchSurahs('كلمة غير موجودة'), isEmpty);
+    });
   });
 
   testWidgets('SurahFrame renders its ornamental band', (tester) async {
