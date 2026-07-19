@@ -10,6 +10,8 @@ import '../services/khatma_service.dart';
 import '../services/settings_service.dart';
 import '../services/quran_audio_service.dart';
 import '../theme.dart';
+import '../widgets/reciter_picker.dart';
+import '../widgets/surah_frame.dart';
 import 'tafsir_screen.dart';
 
 class ReaderScreen extends StatefulWidget {
@@ -42,8 +44,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool get _showBasmala =>
       widget.surah.number != 1 && widget.surah.number != 9;
 
-  /// List-index shift caused by the Basmala header item.
-  int get _headerOffset => _showBasmala ? 1 : 0;
+  /// List-index shift caused by the decorated surah-name frame (always
+  /// item 0) plus the Basmala header item when shown.
+  int get _headerOffset => 1 + (_showBasmala ? 1 : 0);
 
   @override
   void initState() {
@@ -376,6 +379,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
               ),
               onTap: () async {
                 Navigator.pop(context);
+                // First-ever playback: let the user pick the reciter
+                // once; the choice then sticks until changed on purpose.
+                if (!mounted) return;
+                final ok = await ensureReciterChosen(context, audio, isDark);
+                if (!ok) return;
                 await audio.togglePlayPause(ayah.number);
                 // Playback failures only set audio.error — without this
                 // the tap would silently do nothing.
@@ -570,7 +578,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
                               horizontal: 16, vertical: 8),
                           itemCount: _ayahs.length + _headerOffset,
                           itemBuilder: (context, index) {
-                            if (_showBasmala && index == 0) {
+                            if (index == 0) {
+                              // Ornamental surah-name frame, like the
+                              // decorated headers of the printed Mushaf.
+                              // The surah name from the data already
+                              // carries the "سُورَةُ" prefix.
+                              return SurahFrame(
+                                title: widget.surah.name,
+                                isDark: isDark,
+                              );
+                            }
+                            if (_showBasmala && index == 1) {
                               return Padding(
                                 padding:
                                     const EdgeInsets.only(top: 8, bottom: 16),
@@ -846,9 +864,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   Text(
                     audio.isLoading
                         ? 'جارٍ التحميل...'
-                        : (audio.isPlaying ? 'قيد التلاوة' : 'متوقف مؤقتاً'),
+                        : (audio.isPlaying
+                            ? 'قيد التلاوة — ${audio.reciterName}'
+                            : 'متوقف مؤقتاً'),
                     style: TextStyle(
                         fontSize: 11,
+                        fontFamily: 'Amiri',
                         color: isDark
                             ? AppColors.darkTextSec
                             : AppColors.textSecondary),
@@ -856,6 +877,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 ],
               ),
             ),
+          ),
+          IconButton(
+            tooltip: 'تغيير القارئ',
+            icon: Icon(
+              Icons.record_voice_over_rounded,
+              color: isDark ? AppColors.darkTextSec : AppColors.textSecondary,
+              size: 20,
+            ),
+            onPressed: () => showReciterPicker(context, audio, isDark),
           ),
           IconButton(
             tooltip: 'الانتقال التلقائي للآية التالية',

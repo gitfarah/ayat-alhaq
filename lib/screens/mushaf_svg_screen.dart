@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/quran_page_meta.dart';
 import '../services/mushaf_svg_service.dart';
 import '../services/bookmark_service.dart';
@@ -11,6 +12,7 @@ import '../services/library_events.dart';
 import '../services/quran_audio_service.dart';
 import '../services/settings_service.dart';
 import '../theme.dart';
+import '../widgets/reciter_picker.dart';
 import 'tafsir_screen.dart';
 
 class MushafSvgScreen extends StatefulWidget {
@@ -34,6 +36,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   List<Highlight> _highlights = [];
   QuranAudioService? _audioService;
   int? _lastFollowedAyah;
+
+  /// Full-Mushaf background download state (one run per screen).
+  bool _bulkDownloading = false;
+  bool _bulkCancel = false;
+  int _bulkDone = 0;
+  bool _fullyDownloaded = false;
 
   /// +1 = turning forward (new page slides in from the left, matching
   /// RTL page order), -1 = turning back.
@@ -77,11 +85,108 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       // view isn't scoped to one surah, so recitation flows across
       // surah boundaries just like reading the pages does.
       _audioService!.nextAyahResolver = (g) => g < 6236 ? g + 1 : null;
+      _maybeOfferFullDownload();
     });
+  }
+
+  /// Bars visibility + system chrome together: hiding the bars also
+  /// hides the status/navigation bars so the page truly fills the
+  /// screen; showing them restores normal chrome.
+  void _setBars(bool visible) {
+    if (_barsVisible == visible) return;
+    setState(() => _barsVisible = visible);
+    SystemChrome.setEnabledSystemUIMode(
+        visible ? SystemUiMode.edgeToEdge : SystemUiMode.immersiveSticky);
+  }
+
+  /// One-time offer (per install) to download the whole Mushaf for
+  /// offline reading. Never silently pulls ~350 MB on the user's data
+  /// plan — it asks first; afterwards the download can always be
+  /// started from the menu.
+  Future<void> _maybeOfferFullDownload() async {
+    if (!MushafSvgService.supportsFullOfflineDownload) return;
+    _fullyDownloaded = await MushafSvgService.isFullyDownloaded();
+    if (_fullyDownloaded || !mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('mushafDlPrompted') ?? false) return;
+    await prefs.setBool('mushafDlPrompted', true);
+    if (!mounted) return;
+    final isDark = context.read<SettingsService>().isDarkIn(context);
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('المصحف دون اتصال',
+            textAlign: TextAlign.center,
+            textDirection: TextDirection.rtl,
+            style: TextStyle(
+                fontFamily: 'Amiri',
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: isDark ? AppColors.darkText : AppColors.textPrimary)),
+        content: Text(
+            'هل تريد تنزيل صفحات المصحف كاملة (٦٠٤ صفحات، ~٣٥٠ م.ب) لتتمكن من تصفحها دون اتصال بالإنترنت؟\nيمكنك بدء التنزيل لاحقاً من قائمة ☰ في أي وقت.',
+            textAlign: TextAlign.center,
+            textDirection: TextDirection.rtl,
+            style: TextStyle(
+                fontFamily: 'Amiri',
+                height: 1.8,
+                fontSize: 14,
+                color: isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('لاحقاً', style: TextStyle(color: Colors.grey))),
+          ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12))),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('تنزيل الآن',
+                  style: TextStyle(color: Colors.white, fontFamily: 'Amiri'))),
+        ],
+      ),
+    );
+    if (go == true) _startBulkDownload();
+  }
+
+  Future<void> _startBulkDownload() async {
+    if (_bulkDownloading) return;
+    setState(() {
+      _bulkDownloading = true;
+      _bulkCancel = false;
+      _bulkDone = 0;
+    });
+    await MushafSvgService.downloadEntireMushaf(
+      onProgress: (done, total) {
+        if (!mounted) return;
+        // Repaint sparsely; every page would rebuild 604 times.
+        if (done % 5 == 0 || done == total) {
+          setState(() => _bulkDone = done);
+        } else {
+          _bulkDone = done;
+        }
+      },
+      isCancelled: () => _bulkCancel || !mounted,
+    );
+    if (!mounted) return;
+    _fullyDownloaded = await MushafSvgService.isFullyDownloaded();
+    if (!mounted) return;
+    setState(() => _bulkDownloading = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_fullyDownloaded
+            ? '✓ اكتمل تنزيل المصحف — التصفح متاح دون اتصال'
+            : 'توقف التنزيل — يمكنك المتابعة لاحقاً من القائمة')));
   }
 
   @override
   void dispose() {
+    _bulkCancel = true;
+    // Never leave the app stuck in immersive mode after this screen.
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _flashCtrl.dispose();
     LibraryEvents.bookmarks.removeListener(_loadMarks);
     LibraryEvents.highlights.removeListener(_loadMarks);
@@ -397,6 +502,32 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   Navigator.pop(context);
                   _jumpDialog();
                 }),
+            if (MushafSvgService.supportsFullOfflineDownload)
+              ListTile(
+                  leading: Icon(
+                      _fullyDownloaded
+                          ? Icons.offline_pin_rounded
+                          : (_bulkDownloading
+                              ? Icons.downloading_rounded
+                              : Icons.download_rounded),
+                      color: iconColor),
+                  title: Text(
+                      _fullyDownloaded
+                          ? 'المصحف كامل محفوظ دون اتصال ✓'
+                          : (_bulkDownloading
+                              ? 'جارٍ التنزيل ($_bulkDone/٦٠٤) — اضغط للإيقاف'
+                              : 'تنزيل المصحف كاملاً دون اتصال'),
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(fontFamily: 'Amiri', color: textColor)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (_fullyDownloaded) return;
+                    if (_bulkDownloading) {
+                      setState(() => _bulkCancel = true);
+                    } else {
+                      _startBulkDownload();
+                    }
+                  }),
             const SizedBox(height: 8),
           ],
         ),
@@ -548,6 +679,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                             : AppColors.textPrimary)),
                 onTap: () async {
                   Navigator.pop(context);
+                  // First-ever playback: pick a reciter once; the
+                  // choice then sticks until changed on purpose.
+                  if (!mounted) return;
+                  final ok =
+                      await ensureReciterChosen(context, audio, isDark);
+                  if (!ok) return;
                   await audio.togglePlayPause(globalAyah);
                   // Playback failures only set audio.error — surface it.
                   if (mounted && audio.error != null) {
@@ -851,15 +988,19 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             )
           : null,
       body: GestureDetector(
-        onTap: () => setState(() => _barsVisible = !_barsVisible),
+        onTap: () => _setBars(!_barsVisible),
         // Finger swipe page turning. Mushaf pages advance right-to-left,
         // so a rightward fling (like flipping a printed page over to the
-        // right) goes FORWARD and a leftward fling goes back.
+        // right) goes FORWARD and a leftward fling goes back. Swiping
+        // also hides the bars so the page takes the full screen while
+        // reading; a tap brings them back.
         onHorizontalDragEnd: (details) {
           final v = details.primaryVelocity ?? 0;
           if (v > 200) {
+            _setBars(false);
             _next();
           } else if (v < -200) {
+            _setBars(false);
             _prev();
           }
         },
@@ -981,8 +1122,13 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     final surahCount = QuranPageMeta.surahsOnPage(data.pageNumber).length;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      padding: EdgeInsets.symmetric(
+          horizontal: _barsVisible ? 4 : 0, vertical: _barsVisible ? 4 : 0),
       child: Column(children: [
+        // The page info header is part of the chrome: it disappears
+        // with the bars so the page itself gets every pixel while the
+        // user is immersed in reading.
+        if (_barsVisible)
         // ── Header: a single compact, CENTERED group — juz/hizb block,
         // a thin divider, then the surah name(s). Deliberately NOT
         // stretched edge-to-edge (that created a large dead gap in the
@@ -1246,7 +1392,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                         return;
                       }
                     }
-                    setState(() => _barsVisible = !_barsVisible);
+                    _setBars(!_barsVisible);
                   },
                 ),
               ),
@@ -1302,11 +1448,23 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               }
             },
           ),
+          IconButton(
+            tooltip: 'تغيير القارئ',
+            icon: Icon(Icons.record_voice_over_rounded,
+                color:
+                    isDark ? AppColors.darkTextSec : AppColors.textSecondary,
+                size: 20),
+            onPressed: () => showReciterPicker(context, audio, isDark),
+          ),
           Expanded(
             child: Text(
               audio.isLoading
                   ? 'جارٍ التحميل...'
-                  : (audio.isPlaying ? 'قيد التلاوة' : 'متوقف مؤقتاً'),
+                  : (audio.isPlaying
+                      ? (audio.isDownloadingSurah
+                          ? 'قيد التلاوة — تنزيل السورة ${audio.downloadDone}/${audio.downloadTotal}'
+                          : 'قيد التلاوة — ${audio.reciterName}')
+                      : 'متوقف مؤقتاً'),
               textAlign: TextAlign.end,
               textDirection: TextDirection.rtl,
               style: TextStyle(

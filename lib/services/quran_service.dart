@@ -1,28 +1,49 @@
 import 'dart:convert';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import '../models/surah.dart';
 
-/// Fetches Quran text data (surah list, ayah text + page/juz/hizb
-/// metadata, and tafsir) from the api.alquran.cloud REST API.
+/// Provides Quran text data (surah list, ayah text + page/juz/hizb
+/// metadata) from the BUNDLED asset `assets/quran/quran_ar.json`
+/// (ar.alafasy edition) — the entire Quran works offline from the
+/// moment the app is installed. The network is only used for optional
+/// per-ayah translations, which are not part of the bundle.
 class QuranService {
   static const String _baseUrl = 'https://api.alquran.cloud/v1';
 
-  /// The surah list is static reference data that never changes, so we
-  /// cache it in memory after the first fetch. Without this, every
-  /// screen that needs to resolve a Surah object (bookmarks, highlights)
-  /// was re-fetching the entire list over the network on every single
-  /// tap, causing a very noticeable delay before navigation even began.
   static List<Surah>? _surahCache;
 
+  /// Raw per-surah ayah tuples straight from the asset:
+  /// [globalNumber, numberInSurah, juz, page, hizbQuarter, text]
+  static List<List<dynamic>>? _rawAyahs;
+
+  /// Normalized (bare-letter) ayah texts for offline search, built
+  /// lazily on the first search: one entry per surah, parallel to
+  /// [_rawAyahs].
+  static List<List<String>>? _searchIndex;
+
+  static Future<void> _ensureLoaded() async {
+    if (_surahCache != null) return;
+    final raw = await rootBundle.loadString('assets/quran/quran_ar.json');
+    final List list = jsonDecode(raw);
+    _surahCache = [
+      for (final s in list)
+        Surah(
+          number: s['number'],
+          name: s['name'],
+          englishName: s['englishName'],
+          englishNameTranslation: s['englishNameTranslation'],
+          numberOfAyahs: (s['ayahs'] as List).length,
+          revelationType: s['revelationType'],
+        ),
+    ];
+    _rawAyahs = [
+      for (final s in list) (s['ayahs'] as List).cast<List<dynamic>>(),
+    ];
+  }
+
   static Future<List<Surah>> getAllSurahs({bool forceRefresh = false}) async {
-    if (!forceRefresh && _surahCache != null) return _surahCache!;
-    final response = await http.get(Uri.parse('$_baseUrl/surah'));
-    if (response.statusCode != 200) {
-      throw Exception('فشل تحميل قائمة السور');
-    }
-    final data = jsonDecode(response.body);
-    final List list = data['data'];
-    _surahCache = list.map((s) => Surah.fromJson(s)).toList();
+    await _ensureLoaded();
     return _surahCache!;
   }
 
@@ -48,47 +69,60 @@ class QuranService {
   static bool isRtlEdition(String edition) =>
       edition.startsWith('ur.') || edition.startsWith('fa.');
 
-  /// Ayah text uses the Alafasy recitation edition (ar.alafasy) purely
-  /// as the text/metadata source — audio itself is fetched separately
-  /// by QuranAudioService directly from the CDN using the global ayah
-  /// number, not through this endpoint.
+  static Ayah _ayahFromTuple(List<dynamic> t, {String? translation}) {
+    final int hizbQuarter = t[4];
+    return Ayah(
+      number: t[0],
+      text: t[5],
+      numberInSurah: t[1],
+      juz: t[2],
+      page: t[3],
+      hizb: ((hizbQuarter - 1) ~/ 4) + 1,
+      rub: hizbQuarter,
+      translation: translation,
+    );
+  }
+
+  /// Returns the surah's ayahs from the bundled asset — always
+  /// available offline.
   ///
-  /// The API merges the Basmala into the first ayah's text of every
-  /// surah. Per Mushaf convention it belongs on its own line, so it is
-  /// stripped here — except for Al-Fatiha (1), where the Basmala IS
-  /// ayah 1, and At-Tawbah (9), which has no Basmala at all.
-  /// When [translationEdition] is set, the multi-edition endpoint is
-  /// used so Arabic text and translation arrive in ONE request, and each
-  /// Ayah carries its translation.
+  /// The asset merges the Basmala into the first ayah's text of every
+  /// surah (as the source edition does). Per Mushaf convention it
+  /// belongs on its own line, so it is stripped here — except for
+  /// Al-Fatiha (1), where the Basmala IS ayah 1, and At-Tawbah (9),
+  /// which has no Basmala at all.
+  ///
+  /// When [translationEdition] is set, the translation alone is fetched
+  /// from the network and merged in. If that fetch fails (offline), the
+  /// Arabic text is returned WITHOUT translation instead of failing —
+  /// reading always works.
   static Future<List<Ayah>> getSurahAyahs(int surahNumber,
       {String? translationEdition}) async {
-    final List ayahs;
+    await _ensureLoaded();
+    final tuples = _rawAyahs![surahNumber - 1];
+
     List? translated;
-    if (translationEdition == null) {
-      final response =
-          await http.get(Uri.parse('$_baseUrl/surah/$surahNumber/ar.alafasy'));
-      if (response.statusCode != 200) {
-        throw Exception('فشل تحميل آيات السورة');
+    if (translationEdition != null) {
+      try {
+        final response = await http
+            .get(Uri.parse('$_baseUrl/surah/$surahNumber/$translationEdition'))
+            .timeout(const Duration(seconds: 20));
+        if (response.statusCode == 200) {
+          translated = jsonDecode(response.body)['data']['ayahs'];
+        }
+      } catch (_) {
+        // Offline or API down — show Arabic only.
       }
-      ayahs = jsonDecode(response.body)['data']['ayahs'];
-    } else {
-      final response = await http.get(Uri.parse(
-          '$_baseUrl/surah/$surahNumber/editions/ar.alafasy,$translationEdition'));
-      if (response.statusCode != 200) {
-        throw Exception('فشل تحميل آيات السورة');
-      }
-      final List editions = jsonDecode(response.body)['data'];
-      ayahs = editions[0]['ayahs'];
-      translated = editions.length > 1 ? editions[1]['ayahs'] : null;
     }
 
     final list = [
-      for (var i = 0; i < ayahs.length; i++)
-        Ayah.fromJson({
-          ...ayahs[i] as Map<String, dynamic>,
-          if (translated != null && i < translated.length)
-            'translation': translated[i]['text'],
-        }),
+      for (var i = 0; i < tuples.length; i++)
+        _ayahFromTuple(
+          tuples[i],
+          translation: (translated != null && i < translated.length)
+              ? translated[i]['text'] as String?
+              : null,
+        ),
     ];
     if (surahNumber != 1 && surahNumber != 9 && list.isNotEmpty) {
       final first = list.first;
@@ -147,49 +181,53 @@ class QuranService {
     return b.toString();
   }
 
-  /// Fetches a single ayah's text directly — much lighter than fetching
-  /// the whole surah when only one verse's text is needed (e.g. opening
-  /// Tafsir from the Mushaf page view, which only has ayah *numbers*
-  /// from the tap-region data, not the actual Arabic text).
+  /// A single ayah's text from the bundled asset — offline, no network.
+  /// Same Mushaf convention as [getSurahAyahs]: the merged Basmala is
+  /// stripped from each surah's first ayah.
   static Future<String> getAyahText(int surahNumber, int ayahNumber) async {
-    final response = await http
-        .get(Uri.parse('$_baseUrl/ayah/$surahNumber:$ayahNumber/ar.alafasy'));
-    if (response.statusCode != 200) {
-      throw Exception('فشل تحميل نص الآية');
-    }
-    final data = jsonDecode(response.body);
-    final text = (data['data']['text'] ?? '') as String;
-    // Same Mushaf convention as getSurahAyahs: the API merges the
-    // Basmala into each surah's first ayah — show the ayah alone.
+    await _ensureLoaded();
+    final tuples = _rawAyahs![surahNumber - 1];
+    if (ayahNumber < 1 || ayahNumber > tuples.length) return '';
+    final text = tuples[ayahNumber - 1][5] as String;
     if (ayahNumber == 1 && surahNumber != 1 && surahNumber != 9) {
       return _stripBasmala(text);
     }
     return text;
   }
 
-  /// Full-text ayah search via the API's search endpoint. The
-  /// quran-simple-clean edition (no diacritics) is used so plain
-  /// keyboard input like "الرحمن" matches the vocalized text.
-  /// Returns an empty list when nothing matches (the API reports
-  /// no-match as 404).
+  /// Full-text ayah search over the BUNDLED text — works offline.
+  /// Both the query and the ayah text are reduced to bare letters, so
+  /// plain keyboard input like "الرحمن" matches the vocalized text.
   static Future<List<AyahSearchResult>> searchAyahs(String query) async {
-    final q = Uri.encodeComponent(query.trim());
-    if (q.isEmpty) return [];
-    final response =
-        await http.get(Uri.parse('$_baseUrl/search/$q/all/quran-simple-clean'));
-    if (response.statusCode == 404) return [];
-    if (response.statusCode != 200) {
-      throw Exception('فشل البحث');
+    await _ensureLoaded();
+    final normQuery =
+        query.trim().split(RegExp(r'\s+')).map(_bareLetters).join(' ');
+    if (normQuery.isEmpty) return [];
+
+    _searchIndex ??= [
+      for (final surah in _rawAyahs!)
+        [
+          for (final t in surah)
+            (t[5] as String).split(' ').map(_bareLetters).join(' '),
+        ],
+    ];
+
+    final results = <AyahSearchResult>[];
+    for (var s = 0; s < _searchIndex!.length; s++) {
+      final texts = _searchIndex![s];
+      for (var i = 0; i < texts.length; i++) {
+        if (texts[i].contains(normQuery)) {
+          results.add(AyahSearchResult(
+            surahNumber: s + 1,
+            surahName: _surahCache![s].name,
+            numberInSurah: _rawAyahs![s][i][1] as int,
+            text: _rawAyahs![s][i][5] as String,
+          ));
+          if (results.length >= 300) return results;
+        }
+      }
     }
-    final List matches = jsonDecode(response.body)['data']['matches'];
-    return matches
-        .map((m) => AyahSearchResult(
-              surahNumber: m['surah']['number'],
-              surahName: m['surah']['name'] ?? '',
-              numberInSurah: m['numberInSurah'],
-              text: (m['text'] ?? '') as String,
-            ))
-        .toList();
+    return results;
   }
 
   // Tafsir fetching lives in TafsirService (lib/services/tafsir_service
