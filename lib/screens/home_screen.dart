@@ -1,0 +1,889 @@
+import 'package:flutter/material.dart';
+import 'package:hijri/hijri_calendar.dart';
+import 'package:provider/provider.dart';
+import '../models/surah.dart';
+import '../services/library_events.dart';
+import '../services/prayer_service.dart';
+import '../services/quran_service.dart';
+import '../services/settings_service.dart';
+import '../theme.dart';
+import 'ayah_search_screen.dart';
+import 'reader_screen.dart';
+import 'settings_screen.dart';
+import 'mushaf_svg_screen.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  List<Surah> _all = [], _filtered = [];
+  bool _loading = true;
+  String? _error;
+  final _search = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final s = await QuranService.getAllSurahs();
+      setState(() {
+        _all = s;
+        _filtered = s;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _loading = false;
+        _error = 'فشل تحميل السور\nتحقق من اتصالك';
+      });
+    }
+  }
+
+  void _filter(String q) {
+    setState(() {
+      _filtered = q.isEmpty
+          ? _all
+          : _all
+              .where((s) =>
+                  s.name.contains(q) ||
+                  s.englishName.toLowerCase().contains(q.toLowerCase()) ||
+                  s.number.toString() == q)
+              .toList();
+    });
+  }
+
+  String _ar(int n) {
+    const d = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    return n.toString().split('').map((c) => d[int.parse(c)]).join();
+  }
+
+  static const Map<int, int> _surahPage = {
+    1: 1,
+    2: 2,
+    3: 50,
+    4: 77,
+    5: 106,
+    6: 128,
+    7: 151,
+    8: 177,
+    9: 187,
+    10: 208,
+    11: 221,
+    12: 235,
+    13: 249,
+    14: 255,
+    15: 262,
+    16: 267,
+    17: 282,
+    18: 293,
+    19: 305,
+    20: 312,
+    21: 322,
+    22: 332,
+    23: 342,
+    24: 350,
+    25: 359,
+    26: 367,
+    27: 377,
+    28: 385,
+    29: 396,
+    30: 404,
+    31: 411,
+    32: 415,
+    33: 418,
+    34: 428,
+    35: 434,
+    36: 440,
+    37: 446,
+    38: 453,
+    39: 458,
+    40: 467,
+    41: 477,
+    42: 483,
+    43: 489,
+    44: 496,
+    45: 499,
+    46: 502,
+    47: 507,
+    48: 511,
+    49: 515,
+    50: 518,
+    51: 520,
+    52: 523,
+    53: 526,
+    54: 528,
+    55: 531,
+    56: 534,
+    57: 537,
+    58: 542,
+    59: 545,
+    60: 549,
+    61: 551,
+    62: 553,
+    63: 554,
+    64: 556,
+    65: 558,
+    66: 560,
+    67: 562,
+    68: 564,
+    69: 566,
+    70: 568,
+    71: 570,
+    72: 572,
+    73: 574,
+    74: 575,
+    75: 577,
+    76: 578,
+    77: 580,
+    78: 582,
+    79: 583,
+    80: 585,
+    81: 586,
+    82: 587,
+    83: 587,
+    84: 589,
+    85: 590,
+    86: 591,
+    87: 591,
+    88: 592,
+    89: 593,
+    90: 593,
+    91: 594,
+    92: 594,
+    93: 595,
+    94: 595,
+    95: 596,
+    96: 596,
+    97: 597,
+    98: 597,
+    99: 598,
+    100: 598,
+    101: 599,
+    102: 599,
+    103: 600,
+    104: 600,
+    105: 600,
+    106: 601,
+    107: 601,
+    108: 602,
+    109: 602,
+    110: 602,
+    111: 603,
+    112: 603,
+    113: 603,
+    114: 604,
+  };
+
+  void _openOptions(Surah surah) {
+    final isDark = context.read<SettingsService>().isDarkIn(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      // Scrollable so the sheet never overflows on short (landscape)
+      // screens.
+      builder: (_) => SingleChildScrollView(
+        child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2))),
+          Text(surah.name,
+              style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Amiri',
+                  color: isDark ? AppColors.darkText : AppColors.textPrimary)),
+          Text(
+              '${surah.revelationType == 'Meccan' ? 'مكية' : 'مدنية'} • ${_ar(surah.numberOfAyahs)} آية',
+              style: TextStyle(
+                  color:
+                      isDark ? AppColors.darkTextSec : AppColors.textSecondary,
+                  fontFamily: 'Amiri')),
+          const SizedBox(height: 24),
+          Row(children: [
+            Expanded(
+                child: _ModeBtn(
+                    icon: Icons.menu_book_rounded,
+                    label: 'المصحف',
+                    sub: 'قراءة بالصفحات',
+                    color: AppColors.primary,
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => MushafSvgScreen(
+                                  startPage: _surahPage[surah.number] ?? 1)));
+                    })),
+            const SizedBox(width: 14),
+            Expanded(
+                child: _ModeBtn(
+                    icon: Icons.format_align_right_rounded,
+                    label: 'الآيات',
+                    sub: 'قراءة متجاوبة',
+                    color: AppColors.accent,
+                    isDark: isDark,
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => ReaderScreen(surah: surah)));
+                    })),
+          ]),
+        ]),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.watch<SettingsService>();
+    final isDark = s.isDarkIn(context);
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('الفهرس'),
+        actions: [
+          IconButton(
+              icon: Icon(
+                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                  color: theme.colorScheme.primary),
+              onPressed: () => s.toggleDarkIn(context)),
+          IconButton(
+              icon: Icon(Icons.settings_rounded,
+                  color: theme.colorScheme.primary),
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()))),
+        ],
+      ),
+      body: _loading
+          ? Center(
+              child:
+                  CircularProgressIndicator(color: theme.colorScheme.primary))
+          : _error != null
+              ? _buildError(theme)
+              : _buildScrollBody(s, isDark, theme),
+    );
+  }
+
+  /// The whole page scrolls as ONE list — with the date, last-read and
+  /// search banners as its leading items. Fixed headers above the list
+  /// left no room for the surah list at all on short (landscape)
+  /// screens.
+  Widget _buildScrollBody(SettingsService s, bool isDark, ThemeData theme) {
+    final headers = <Widget>[
+      // Date + last-read share one row (last-read left, date right);
+      // without a last-read entry the date card takes the full width.
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: s.hasLastRead
+            ? IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(flex: 2, child: _buildLastRead(s, isDark)),
+                    const SizedBox(width: 10),
+                    Expanded(flex: 3, child: _buildHijriDate(isDark)),
+                  ],
+                ),
+              )
+            : _buildHijriDate(isDark),
+      ),
+      _PrayerTimesBanner(isDark: isDark),
+      _buildSearch(isDark),
+      // Surah-name filtering happens live above; searching INSIDE the
+      // ayah text is a deliberate second step (network round-trip).
+      if (_search.text.trim().length >= 2)
+        GestureDetector(
+          onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) =>
+                      AyahSearchScreen(initialQuery: _search.text.trim()))),
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+                color: (isDark ? AppColors.darkPrimary : AppColors.primary)
+                    .withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12)),
+            child: Row(children: [
+              Icon(Icons.manage_search_rounded,
+                  size: 20,
+                  color: isDark ? AppColors.darkPrimary : AppColors.primary),
+              const Spacer(),
+              Flexible(
+                child: Text('البحث في الآيات عن "${_search.text.trim()}"',
+                    textDirection: TextDirection.rtl,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontFamily: 'Amiri',
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isDark
+                            ? AppColors.darkPrimary
+                            : AppColors.primary)),
+              ),
+            ]),
+          ),
+        ),
+      Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+          child: Align(
+              alignment: Alignment.centerRight,
+              child: Text('${_ar(_filtered.length)} سورة',
+                  style: TextStyle(
+                      color: isDark
+                          ? AppColors.darkTextSec
+                          : AppColors.textSecondary,
+                      fontSize: 13,
+                      fontFamily: 'Amiri')))),
+    ];
+    return RefreshIndicator(
+      color: theme.colorScheme.primary,
+      onRefresh: _load,
+      child: ListView.builder(
+        padding: const EdgeInsets.only(bottom: 8),
+        itemCount: headers.length + _filtered.length,
+        itemBuilder: (_, i) => i < headers.length
+            ? headers[i]
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _tile(_filtered[i - headers.length], isDark),
+              ),
+      ),
+    );
+  }
+
+  /// Today's date in the Hijri (Umm al-Qura) calendar, with the
+  /// Gregorian date as a secondary line.
+  Widget _buildHijriDate(bool isDark) {
+    HijriCalendar.setLocal('ar');
+    final h = HijriCalendar.now();
+    final g = DateTime.now();
+    const gregorianMonths = [
+      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+    ];
+    const weekdays = [
+      'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس',
+      'الجمعة', 'السبت', 'الأحد',
+    ];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+          color: AppColors.secondary.withValues(alpha: isDark ? 0.16 : 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border:
+              Border.all(color: AppColors.secondary.withValues(alpha: 0.25))),
+      child: Row(children: [
+        Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+                color: AppColors.secondary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.calendar_month_rounded,
+                color: AppColors.secondary, size: 18)),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+              Text(
+                  '${weekdays[g.weekday - 1]} ${_ar(h.hDay)} ${h.longMonthName} ${_ar(h.hYear)} هـ',
+                  textDirection: TextDirection.rtl,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color:
+                          isDark ? AppColors.darkText : AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      fontFamily: 'Amiri')),
+              Text(
+                  '${_ar(g.day)} ${gregorianMonths[g.month - 1]} ${_ar(g.year)} م',
+                  textDirection: TextDirection.rtl,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: isDark
+                          ? AppColors.darkTextSec
+                          : AppColors.textSecondary,
+                      fontSize: 13,
+                      fontFamily: 'Amiri')),
+            ])),
+      ]),
+    );
+  }
+
+  Widget _buildLastRead(SettingsService s, bool isDark) => GestureDetector(
+        onTap: () async {
+          if (s.lastSurah != null) {
+            final surah = _all.firstWhere((x) => x.number == s.lastSurah,
+                orElse: () => _all.first);
+            Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) =>
+                        ReaderScreen(surah: surah, targetAyah: s.lastAyah)));
+          } else if (s.lastPage != null) {
+            Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => MushafSvgScreen(startPage: s.lastPage)));
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.08),
+              borderRadius: BorderRadius.circular(14),
+              border:
+                  Border.all(color: AppColors.primary.withValues(alpha: 0.25))),
+          child: Row(children: [
+            Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                    color: (isDark ? AppColors.darkPrimary : AppColors.primary)
+                        .withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10)),
+                child: Icon(Icons.auto_stories_rounded,
+                    color: isDark ? AppColors.darkPrimary : AppColors.primary,
+                    size: 18)),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                  Text('آخر ما قرأت',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkPrimary
+                              : AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          fontFamily: 'Amiri')),
+                  if (s.lastSurah != null)
+                    Text(
+                        'سورة رقم ${s.lastSurah}${s.lastAyah != null ? ' · الآية ${s.lastAyah}' : ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: isDark
+                                ? AppColors.darkTextSec
+                                : AppColors.textSecondary,
+                            fontSize: 13,
+                            fontFamily: 'Amiri')),
+                ])),
+          ]),
+        ),
+      );
+
+  Widget _buildSearch(bool isDark) => Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurface : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: isDark ? AppColors.darkBorder : AppColors.border)),
+        child: Row(children: [
+          Icon(Icons.search_rounded, color: Colors.grey[400], size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+              child: TextField(
+                  controller: _search,
+                  textDirection: TextDirection.rtl,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                      color:
+                          isDark ? AppColors.darkText : AppColors.textPrimary,
+                      fontFamily: 'Amiri'),
+                  decoration: InputDecoration(
+                      hintText: 'ابحث عن سورة أو رقم...',
+                      hintTextDirection: TextDirection.rtl,
+                      hintStyle: TextStyle(
+                          color: isDark
+                              ? AppColors.darkTextSec
+                              : AppColors.textLight,
+                          fontFamily: 'Amiri',
+                          fontSize: 14),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14)),
+                  onChanged: _filter)),
+          if (_search.text.isNotEmpty)
+            GestureDetector(
+                onTap: () {
+                  _search.clear();
+                  _filter('');
+                },
+                child: Icon(Icons.close_rounded,
+                    color: Colors.grey[400], size: 18)),
+        ]),
+      );
+
+  Widget _tile(Surah surah, bool isDark) {
+    final meccan = surah.revelationType == 'Meccan';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _openOptions(surah),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: isDark ? AppColors.darkBorder : AppColors.border,
+                    width: 0.8)),
+            child: Row(children: [
+              Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                      color: AppColors.primary
+                          .withValues(alpha: isDark ? 0.2 : 0.08),
+                      shape: BoxShape.circle),
+                  child: Center(
+                      child: Text(_ar(surah.number),
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: isDark
+                                  ? AppColors.darkPrimary
+                                  : AppColors.primary,
+                              fontFamily: 'Amiri')))),
+              const SizedBox(width: 14),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                    Text(surah.name,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Amiri',
+                            color: isDark
+                                ? AppColors.darkText
+                                : AppColors.textPrimary)),
+                    const SizedBox(height: 3),
+                    Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                      Text('ص ${_ar(_surahPage[surah.number] ?? 1)}',
+                          style: TextStyle(
+                              fontSize: 12.5,
+                              color: isDark
+                                  ? AppColors.darkTextSec
+                                  : AppColors.textLight)),
+                      const SizedBox(width: 8),
+                      Text('${_ar(surah.numberOfAyahs)} آية',
+                          style: TextStyle(
+                              fontSize: 12.5,
+                              color: isDark
+                                  ? AppColors.darkTextSec
+                                  : AppColors.textSecondary)),
+                      const SizedBox(width: 6),
+                      Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                              color: meccan
+                                  ? const Color(0xFFE8F5E9)
+                                  : const Color(0xFFF3E5F5),
+                              borderRadius: BorderRadius.circular(8)),
+                          child: Text(meccan ? 'مكية' : 'مدنية',
+                              style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: meccan
+                                      ? AppColors.primary
+                                      : const Color(0xFF7B1FA2)))),
+                    ]),
+                  ])),
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_left_rounded,
+                  color: isDark ? AppColors.darkTextSec : AppColors.textLight,
+                  size: 20),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildError(ThemeData theme) => Center(
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        const Icon(Icons.wifi_off_rounded, size: 64, color: Colors.grey),
+        const SizedBox(height: 16),
+        Text(_error!,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontFamily: 'Amiri',
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.6)),
+        const SizedBox(height: 24),
+        ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
+            onPressed: _load,
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            label: const Text('إعادة المحاولة',
+                style: TextStyle(fontFamily: 'Amiri', color: Colors.white))),
+      ]));
+}
+
+/// Today's five prayer times for the configured city, with the next
+/// upcoming prayer highlighted. Until a city is chosen it shows a
+/// one-tap prompt that opens the settings screen.
+class _PrayerTimesBanner extends StatefulWidget {
+  final bool isDark;
+  const _PrayerTimesBanner({required this.isDark});
+
+  @override
+  State<_PrayerTimesBanner> createState() => _PrayerTimesBannerState();
+}
+
+class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
+  PrayerTimes? _times;
+  String? _label;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    LibraryEvents.prayer.addListener(_load);
+  }
+
+  @override
+  void dispose() {
+    LibraryEvents.prayer.removeListener(_load);
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final label = await PrayerService.locationLabel();
+      final times = label == null ? null : await PrayerService.getTodayTimes();
+      if (!mounted) return;
+      setState(() {
+        _label = label;
+        _times = times;
+        _loaded = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loaded = true); // Offline — hide quietly.
+    }
+  }
+
+  String _ar(String hhmm) {
+    const d = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    return hhmm
+        .split('')
+        .map((c) => int.tryParse(c) != null ? d[int.parse(c)] : c)
+        .join();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    if (!_loaded) return const SizedBox.shrink();
+
+    // Not configured yet — a one-tap prompt.
+    if (_label == null) {
+      return GestureDetector(
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const SettingsScreen())),
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+              color: (isDark ? AppColors.darkPrimary : AppColors.primary)
+                  .withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: (isDark ? AppColors.darkPrimary : AppColors.primary)
+                      .withValues(alpha: 0.25))),
+          child: Row(children: [
+            Icon(Icons.mosque_rounded,
+                size: 18,
+                color: isDark ? AppColors.darkPrimary : AppColors.primary),
+            const Spacer(),
+            Text('اختر مدينتك لعرض مواقيت الصلاة',
+                textDirection: TextDirection.rtl,
+                style: TextStyle(
+                    fontFamily: 'Amiri',
+                    fontSize: 13,
+                    color:
+                        isDark ? AppColors.darkPrimary : AppColors.primary)),
+          ]),
+        ),
+      );
+    }
+
+    final times = _times;
+    if (times == null) return const SizedBox.shrink();
+    final next = times.nextPrayerIndex(DateTime.now());
+    final accent = isDark ? AppColors.darkPrimary : AppColors.primary;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+              color: isDark ? AppColors.darkBorder : AppColors.border)),
+      child: Column(children: [
+        Row(children: [
+          Icon(Icons.mosque_rounded, size: 14, color: accent),
+          const Spacer(),
+          Text('مواقيت الصلاة — $_label',
+              textDirection: TextDirection.rtl,
+              style: TextStyle(
+                  fontFamily: 'Amiri',
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? AppColors.darkText : AppColors.textPrimary)),
+        ]),
+        const SizedBox(height: 8),
+        Row(
+          // RTL order: Fajr appears rightmost.
+          textDirection: TextDirection.rtl,
+          children: [
+            for (var i = 0; i < 5; i++)
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                      color: i == next
+                          ? accent.withValues(alpha: 0.14)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10)),
+                  child: Column(children: [
+                    Text(PrayerTimes.names[i],
+                        style: TextStyle(
+                            fontFamily: 'Amiri',
+                            fontSize: 13,
+                            fontWeight:
+                                i == next ? FontWeight.bold : FontWeight.normal,
+                            color: i == next
+                                ? accent
+                                : (isDark
+                                    ? AppColors.darkTextSec
+                                    : AppColors.textSecondary))),
+                    const SizedBox(height: 2),
+                    Text(_ar(times.all[i]),
+                        style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight:
+                                i == next ? FontWeight.bold : FontWeight.normal,
+                            color: i == next
+                                ? accent
+                                : (isDark
+                                    ? AppColors.darkText
+                                    : AppColors.textPrimary))),
+                  ]),
+                ),
+              ),
+          ],
+        ),
+      ]),
+    );
+  }
+}
+
+class _ModeBtn extends StatelessWidget {
+  final IconData icon;
+  final String label, sub;
+  final Color color;
+  final bool isDark;
+  final VoidCallback onTap;
+  const _ModeBtn(
+      {required this.icon,
+      required this.label,
+      required this.sub,
+      required this.color,
+      required this.isDark,
+      required this.onTap});
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+            color: color.withValues(alpha: isDark ? 0.15 : 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withValues(alpha: 0.3))),
+        child: Column(children: [
+          // The light theme's deep emerald/gold are too dark to read on
+          // the dark sheet — swap to their bright dark-theme variants.
+          Icon(icon,
+              size: 36,
+              color: isDark
+                  ? (color == AppColors.primary
+                      ? AppColors.darkPrimary
+                      : AppColors.darkSecondary)
+                  : color),
+          const SizedBox(height: 8),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Amiri',
+                  color: isDark
+                      ? (color == AppColors.primary
+                          ? AppColors.darkPrimary
+                          : AppColors.darkSecondary)
+                      : color)),
+          Text(sub,
+              style: TextStyle(
+                  fontSize: 12,
+                  color:
+                      isDark ? AppColors.darkTextSec : AppColors.textSecondary,
+                  fontFamily: 'Amiri')),
+        ]),
+      ));
+}

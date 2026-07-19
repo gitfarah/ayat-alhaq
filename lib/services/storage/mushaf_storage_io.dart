@@ -1,0 +1,83 @@
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+
+/// Mobile/desktop storage backend — real files on disk. Phones have
+/// gigabytes of free space, so caching the entire ~230MB Mushaf here
+/// is practical and safe.
+class MushafFileStorage {
+  static Future<Directory> _dir() async {
+    final base = await getApplicationDocumentsDirectory();
+    final dir = Directory('${base.path}/mushaf_pages');
+    if (!await dir.exists()) await dir.create(recursive: true);
+    return dir;
+  }
+
+  static String _pad(int page) => page.toString().padLeft(3, '0');
+
+  static Future<bool> hasPage(int page) async {
+    final dir = await _dir();
+    final svg = File('${dir.path}/${_pad(page)}.svg');
+    final json = File('${dir.path}/${_pad(page)}.json');
+    return await svg.exists() && await json.exists();
+  }
+
+  static Future<String?> readSvg(int page) async {
+    final dir = await _dir();
+    final f = File('${dir.path}/${_pad(page)}.svg');
+    if (!await f.exists()) return null;
+    return f.readAsString();
+  }
+
+  static Future<String?> readJson(int page) async {
+    final dir = await _dir();
+    final f = File('${dir.path}/${_pad(page)}.json');
+    if (!await f.exists()) return null;
+    return f.readAsString();
+  }
+
+  static Future<void> writePage(int page, String svg, String json) async {
+    final dir = await _dir();
+    await File('${dir.path}/${_pad(page)}.svg').writeAsString(svg);
+    await File('${dir.path}/${_pad(page)}.json').writeAsString(json);
+  }
+
+  static Future<void> deletePage(int page) async {
+    final dir = await _dir();
+    final svg = File('${dir.path}/${_pad(page)}.svg');
+    final json = File('${dir.path}/${_pad(page)}.json');
+    if (await svg.exists()) await svg.delete();
+    if (await json.exists()) await json.delete();
+  }
+
+  static Future<void> clearAll() async {
+    final dir = await _dir();
+    if (await dir.exists()) await dir.delete(recursive: true);
+  }
+
+  static Future<int> totalSizeBytes() async {
+    final dir = await _dir();
+    if (!await dir.exists()) return 0;
+    int total = 0;
+    await for (final e in dir.list()) {
+      if (e is File) total += await e.length();
+    }
+    return total;
+  }
+
+  static Future<List<int>> cachedPages() async {
+    final dir = await _dir();
+    if (!await dir.exists()) return [];
+    final pages = <int>{};
+    await for (final e in dir.list()) {
+      if (e is File && e.path.endsWith('.svg')) {
+        final name = e.uri.pathSegments.last.replaceAll('.svg', '');
+        final n = int.tryParse(name);
+        if (n != null) pages.add(n);
+      }
+    }
+    return pages.toList()..sort();
+  }
+
+  /// Phones have ample storage — full offline download is offered.
+  static const bool supportsFullOfflineDownload = true;
+}

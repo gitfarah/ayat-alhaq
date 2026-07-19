@@ -1,0 +1,1141 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import '../models/surah.dart';
+import '../services/quran_service.dart';
+import '../services/bookmark_service.dart';
+import '../services/highlight_service.dart';
+import '../services/khatma_service.dart';
+import '../services/settings_service.dart';
+import '../services/quran_audio_service.dart';
+import '../theme.dart';
+import 'tafsir_screen.dart';
+
+class ReaderScreen extends StatefulWidget {
+  final Surah surah;
+  final int? targetAyah;
+  final int? targetAyahNumber;
+  const ReaderScreen({
+    Key? key,
+    required this.surah,
+    this.targetAyah,
+    this.targetAyahNumber,
+  }) : super(key: key);
+  @override
+  State<ReaderScreen> createState() => _ReaderScreenState();
+}
+
+class _ReaderScreenState extends State<ReaderScreen> {
+  List<Ayah> _ayahs = [];
+  bool _loading = true;
+  String? _error;
+  List<Bookmark> _bookmarks = [];
+  List<Highlight> _highlights = [];
+  final _scroll = ItemScrollController();
+  final _positions = ItemPositionsListener.create();
+  int _page = 1, _juz = 1, _hizb = 1;
+  bool _barsVisible = true;
+
+  /// Every surah opens with the Basmala on its own line, except
+  /// Al-Fatiha (the Basmala is ayah 1 there) and At-Tawbah (has none).
+  bool get _showBasmala =>
+      widget.surah.number != 1 && widget.surah.number != 9;
+
+  /// List-index shift caused by the Basmala header item.
+  int get _headerOffset => _showBasmala ? 1 : 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAll();
+  }
+
+  /// Edition the currently shown ayahs were loaded with (may lag the
+  /// setting until the reload completes).
+  String? _loadedEdition;
+
+  Future<void> _loadAll() async {
+    final edition = context.read<SettingsService>().translationEdition;
+    try {
+      // Fetch everything needed for the first paint concurrently, but
+      // wait for ALL three before calling setState a single time. The
+      // previous version called setState separately inside each of
+      // _loadAyahs/_loadBookmark/_loadHighlights as soon as that one
+      // future resolved — since ayahs (network) and bookmark/highlight
+      // (local SharedPreferences) don't finish at the same moment, this
+      // caused the target ayah to render first with no color, then
+      // "pop in" a bookmark/highlight color a moment later. Combining
+      // them into one setState removes that visible flash entirely.
+      final results = await Future.wait([
+        QuranService.getSurahAyahs(widget.surah.number,
+            translationEdition: edition),
+        BookmarkService.getBookmarksBySurah(widget.surah.number),
+        HighlightService.getHighlightsBySurah(widget.surah.number),
+      ]);
+
+      if (!mounted) return;
+      final data = results[0] as List<Ayah>;
+      final bookmarks = results[1] as List<Bookmark>;
+      final highlights = results[2] as List<Highlight>;
+
+      setState(() {
+        _ayahs = data;
+        _bookmarks = bookmarks;
+        _highlights = highlights;
+        _loadedEdition = edition;
+        _loading = false;
+        if (data.isNotEmpty) {
+          _page = data.first.page;
+          _juz = data.first.juz;
+          _hizb = data.first.hizb;
+        }
+      });
+      if (data.isNotEmpty) KhatmaService.markPageRead(data.first.page);
+
+      // Give the audio service a way to resolve "what comes next" for
+      // auto-advance, scoped to THIS surah's loaded ayah list. Cleared
+      // in dispose() so a stale closure never outlives this screen.
+      context.read<QuranAudioService>().nextAyahResolver = (currentGlobalAyah) {
+        final idx = _ayahs.indexWhere((a) => a.number == currentGlobalAyah);
+        if (idx == -1 || idx + 1 >= _ayahs.length) return null;
+        return _ayahs[idx + 1].number;
+      };
+
+      final scrollTarget = widget.targetAyah ?? widget.targetAyahNumber;
+      if (scrollTarget != null) {
+        WidgetsBinding.instance
+            .addPostFrameCallback((_) => _scrollTo(scrollTarget));
+      }
+      _positions.itemPositions.addListener(_onScroll);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'خطأ في تحميل الآيات';
+      });
+    }
+  }
+
+  void _onScroll() {
+    final pos = _positions.itemPositions.value;
+    if (pos.isEmpty) return;
+    final idx = pos.first.index - _headerOffset;
+    if (idx >= 0 && idx < _ayahs.length) {
+      final a = _ayahs[idx];
+      if (a.page != _page || a.juz != _juz) {
+        setState(() {
+          _page = a.page;
+          _juz = a.juz;
+          _hizb = a.hizb;
+        });
+        context.read<SettingsService>().saveLastRead(
+              surah: widget.surah.number,
+              ayah: a.numberInSurah,
+            );
+        // Khatma auto-tracking: scrolling into a page counts it as read.
+        KhatmaService.markPageRead(a.page);
+      }
+    }
+  }
+
+  void _scrollTo(int ayahNum) {
+    final idx = _ayahs.indexWhere((a) => a.numberInSurah == ayahNum);
+    if (idx != -1) {
+      _scroll.scrollTo(
+        index: idx + _headerOffset,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+        alignment: 0.2,
+      );
+    }
+  }
+
+  /// Reloads just the bookmark/highlight state after the user adds or
+  /// removes one from the options sheet, without refetching ayah text.
+  Future<void> _refreshBookmarkAndHighlights() async {
+    final results = await Future.wait([
+      BookmarkService.getBookmarksBySurah(widget.surah.number),
+      HighlightService.getHighlightsBySurah(widget.surah.number),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _bookmarks = results[0] as List<Bookmark>;
+      _highlights = results[1] as List<Highlight>;
+    });
+  }
+
+  Bookmark? _bookmarkFor(int n) => _bookmarks
+      .cast<Bookmark?>()
+      .firstWhere((b) => b?.ayahNumber == n, orElse: () => null);
+
+  Highlight? _getHL(int n) => _highlights
+      .cast<Highlight?>()
+      .firstWhere((h) => h?.ayahNumber == n, orElse: () => null);
+
+  /// Ribbon-marker picker: the app supports one bookmark PER COLOR
+  /// (like colored ribbons in a printed Mushaf). Choosing a color moves
+  /// that ribbon here; the block dot removes this ayah's bookmark.
+  void _showBookmarkPicker(int ayahNumber) {
+    final isDark = context.read<SettingsService>().isDarkIn(context);
+    final existing = _bookmarkFor(ayahNumber);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('اختر لون الفاصل',
+                style: TextStyle(
+                    fontFamily: 'Amiri',
+                    fontWeight: FontWeight.bold,
+                    color:
+                        isDark ? AppColors.darkText : AppColors.textPrimary)),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 50,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (existing != null)
+                    _Dot(
+                      name: 'none',
+                      color: Colors.grey.shade300,
+                      selected: false,
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await BookmarkService.deleteBookmarkByAyah(
+                            widget.surah.number, ayahNumber);
+                        await _refreshBookmarkAndHighlights();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('تم إزالة الفاصل')));
+                        }
+                      },
+                    ),
+                  ...AppColors.highlights.entries.map(
+                    (e) => _Dot(
+                      name: e.key,
+                      color: e.value,
+                      selected: existing?.color == e.key,
+                      icon: Icons.bookmark_rounded,
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await BookmarkService.addBookmark(Bookmark(
+                          surahNumber: widget.surah.number,
+                          ayahNumber: ayahNumber,
+                          surahName: widget.surah.name,
+                          color: e.key,
+                          createdAt: DateTime.now(),
+                        ));
+                        await _refreshBookmarkAndHighlights();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('✓ تم حفظ الفاصل')));
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _copyAyah(String text, int n) async {
+    await Clipboard.setData(
+      ClipboardData(text: '${widget.surah.name} (${_ar(n)})\n$text'),
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✓ تم نسخ الآية')),
+      );
+    }
+  }
+
+  Future<void> _showOptions(Ayah ayah) async {
+    final isDark = context.read<SettingsService>().isDarkIn(context);
+    final audio = context.read<QuranAudioService>();
+    final existing = await HighlightService.getHighlight(
+        widget.surah.number, ayah.numberInSurah);
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      // Scrollable so the sheet never overflows on short (landscape)
+      // screens.
+      builder: (_) => SingleChildScrollView(
+        child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text(
+              ayah.text,
+              textAlign: TextAlign.right,
+              textDirection: TextDirection.rtl,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 18,
+                height: 1.8,
+                fontFamily: 'Amiri',
+                color: isDark ? AppColors.darkText : AppColors.textPrimary,
+              ),
+            ),
+            const Divider(height: 24),
+            // Highlight color row
+            SizedBox(
+              height: 50,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (existing != null)
+                    _Dot(
+                      name: 'none',
+                      color: Colors.grey.shade300,
+                      selected: false,
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await HighlightService.deleteHighlight(
+                            widget.surah.number, ayah.numberInSurah);
+                        await _refreshBookmarkAndHighlights();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('تم إزالة التمييز')),
+                          );
+                        }
+                      },
+                    ),
+                  ...AppColors.highlights.entries.map(
+                    (e) => _Dot(
+                      name: e.key,
+                      color: e.value,
+                      selected: existing?.color == e.key,
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await HighlightService.addHighlight(Highlight(
+                          surahNumber: widget.surah.number,
+                          ayahNumber: ayah.numberInSurah,
+                          surahName: widget.surah.name,
+                          color: e.key,
+                          createdAt: DateTime.now(),
+                        ));
+                        await _refreshBookmarkAndHighlights();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('✓ تم التمييز')),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 8),
+            // Play / pause recitation
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                (audio.currentGlobalAyah == ayah.number && audio.isPlaying)
+                    ? Icons.pause_circle_rounded
+                    : Icons.play_circle_rounded,
+                color: AppColors.primary,
+              ),
+              title: Text(
+                (audio.currentGlobalAyah == ayah.number && audio.isPlaying)
+                    ? 'إيقاف التلاوة'
+                    : 'تشغيل التلاوة',
+                textDirection: TextDirection.rtl,
+                style: const TextStyle(fontFamily: 'Amiri'),
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                await audio.togglePlayPause(ayah.number);
+                // Playback failures only set audio.error — without this
+                // the tap would silently do nothing.
+                if (mounted && audio.error != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(audio.error!)),
+                  );
+                }
+              },
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                  _bookmarkFor(ayah.numberInSurah) != null
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_add_rounded,
+                  color: _bookmarkFor(ayah.numberInSurah) != null
+                      ? AppColors.highlight(
+                          _bookmarkFor(ayah.numberInSurah)!.color)
+                      : AppColors.primary),
+              title: const Text('الفاصل',
+                  textDirection: TextDirection.rtl,
+                  style: TextStyle(fontFamily: 'Amiri')),
+              onTap: () {
+                Navigator.pop(context);
+                _showBookmarkPicker(ayah.numberInSurah);
+              },
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading:
+                  const Icon(Icons.menu_book_rounded, color: AppColors.primary),
+              title: const Text('التفسير',
+                  textDirection: TextDirection.rtl,
+                  style: TextStyle(fontFamily: 'Amiri')),
+              onTap: () {
+                Navigator.pop(context);
+                _showTafsir(ayah.numberInSurah, ayah.text);
+              },
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.copy_rounded, color: AppColors.accent),
+              title: const Text('نسخ الآية',
+                  textDirection: TextDirection.rtl,
+                  style: TextStyle(fontFamily: 'Amiri')),
+              onTap: () {
+                Navigator.pop(context);
+                _copyAyah(ayah.text, ayah.numberInSurah);
+              },
+            ),
+          ],
+        ),
+        ),
+      ),
+    );
+  }
+
+  void _showTafsir(int ayahNumber, String text) {
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TafsirScreen(
+            surahNumber: widget.surah.number,
+            surahName: widget.surah.name,
+            ayahNumber: ayahNumber,
+            ayahText: text,
+          ),
+        ));
+  }
+
+  String _ar(int number) {
+    const ar = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+    return number.toString().split('').map((d) => ar[int.parse(d)]).join();
+  }
+
+  @override
+  void dispose() {
+    _positions.itemPositions.removeListener(_onScroll);
+    // Clear the resolver so it doesn't reference this screen's disposed
+    // _ayahs list if audio is still playing when the user navigates away.
+    try {
+      context.read<QuranAudioService>().nextAyahResolver = null;
+    } catch (_) {
+      // Context may already be unusable during teardown — safe to ignore.
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.watch<SettingsService>();
+    final audio = context.watch<QuranAudioService>();
+    final isDark = settings.isDarkIn(context);
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: _barsVisible
+          ? AppBar(
+              leading: IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_rounded, size: 16),
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: Column(children: [
+                Text(widget.surah.name,
+                    style: const TextStyle(
+                        fontFamily: 'Amiri',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20)),
+                Text('${widget.surah.numberOfAyahs} آية',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? AppColors.darkTextSec
+                            : AppColors.textSecondary)),
+              ]),
+              actions: [
+                IconButton(
+                  icon: Icon(Icons.translate_rounded,
+                      color: settings.translationEdition != null
+                          ? AppColors.primary
+                          : null),
+                  onPressed: () => _showTranslationSheet(settings),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.text_fields_rounded),
+                  onPressed: () => _showFontSizeSheet(settings),
+                ),
+              ],
+            )
+          : null,
+      body: _loading
+          ? Center(
+              child:
+                  CircularProgressIndicator(color: theme.colorScheme.primary))
+          : _error != null
+              ? _buildError()
+              : GestureDetector(
+                  onTap: () => setState(() {
+                    _barsVisible = !_barsVisible;
+                  }),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary
+                              .withOpacity(isDark ? 0.2 : 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: AppColors.primary.withOpacity(0.2)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _InfoChip(
+                              label: widget.surah.revelationType == 'Meccan'
+                                  ? 'مكية'
+                                  : 'مدنية',
+                              color: widget.surah.revelationType == 'Meccan'
+                                  ? AppColors.primary
+                                  : const Color(0xFF7B1FA2),
+                              bg: widget.surah.revelationType == 'Meccan'
+                                  ? const Color(0xFFE8F5E9)
+                                  : const Color(0xFFF3E5F5),
+                            ),
+                            Text('${widget.surah.numberOfAyahs} آية',
+                                style: TextStyle(
+                                    color: isDark
+                                        ? AppColors.darkTextSec
+                                        : Colors.grey[600],
+                                    fontSize: 13,
+                                    fontFamily: 'Amiri')),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: ScrollablePositionedList.builder(
+                          itemScrollController: _scroll,
+                          itemPositionsListener: _positions,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          itemCount: _ayahs.length + _headerOffset,
+                          itemBuilder: (context, index) {
+                            if (_showBasmala && index == 0) {
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.only(top: 8, bottom: 16),
+                                child: Text(
+                                  QuranService.basmala,
+                                  textAlign: TextAlign.center,
+                                  textDirection: TextDirection.rtl,
+                                  style: TextStyle(
+                                    fontSize: settings.fontSize + 2,
+                                    height: 1.8,
+                                    fontFamily: 'Amiri',
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark
+                                        ? AppColors.darkText
+                                        : AppColors.textPrimary,
+                                  ),
+                                ),
+                              );
+                            }
+                            final ayah = _ayahs[index - _headerOffset];
+                            final bookmark =
+                                _bookmarkFor(ayah.numberInSurah);
+                            final isBookmarked = bookmark != null;
+                            final highlight = _getHL(ayah.numberInSurah);
+                            final isPlayingThis =
+                                audio.currentGlobalAyah == ayah.number;
+
+                            final bgColor = isPlayingThis
+                                ? AppColors.secondary
+                                    .withOpacity(isDark ? 0.22 : 0.12)
+                                : isBookmarked
+                                    ? AppColors.highlight(bookmark.color)
+                                        .withOpacity(isDark ? 0.28 : 0.18)
+                                    : highlight != null
+                                        ? AppColors.highlight(highlight.color)
+                                            .withOpacity(0.25)
+                                        : (isDark
+                                            ? AppColors.darkSurface
+                                            : Colors.white);
+                            final borderColor = isPlayingThis
+                                ? AppColors.secondary
+                                : isBookmarked
+                                    ? AppColors.highlight(bookmark.color)
+                                    : highlight != null
+                                        ? AppColors.highlight(highlight.color)
+                                        : (isDark
+                                            ? AppColors.darkBorder
+                                            : AppColors.border);
+
+                            return GestureDetector(
+                              onTap: () => _showOptions(ayah),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding:
+                                    const EdgeInsets.fromLTRB(12, 14, 14, 14),
+                                decoration: BoxDecoration(
+                                  color: bgColor,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: borderColor,
+                                    width: (isBookmarked || isPlayingThis)
+                                        ? 1.5
+                                        : 0.8,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    // Ribbon indicator — tells a
+                                    // bookmark apart from a highlight
+                                    // of the same color.
+                                    if (isBookmarked)
+                                      Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 4),
+                                        child: Icon(Icons.bookmark_rounded,
+                                            size: 16,
+                                            color: AppColors.highlight(
+                                                bookmark.color)),
+                                      ),
+                                    if (isPlayingThis)
+                                      Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 6),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              audio.isLoading
+                                                  ? Icons.hourglass_top_rounded
+                                                  : (audio.isPlaying
+                                                      ? Icons.volume_up_rounded
+                                                      : Icons
+                                                          .pause_circle_outline_rounded),
+                                              size: 14,
+                                              color: AppColors.secondary,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              audio.isLoading
+                                                  ? 'جارٍ التحميل...'
+                                                  : 'قيد التلاوة',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontFamily: 'Amiri',
+                                                color: AppColors.secondary,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    RichText(
+                                      textAlign: TextAlign.justify,
+                                      textDirection: TextDirection.rtl,
+                                      text: TextSpan(
+                                        style: TextStyle(
+                                          fontSize: settings.fontSize,
+                                          height: 2.1,
+                                          color: isDark
+                                              ? AppColors.darkText
+                                              : AppColors.textPrimary,
+                                          fontFamily: 'Amiri',
+                                        ),
+                                        children: [
+                                          TextSpan(text: ayah.text),
+                                          const WidgetSpan(
+                                              child: SizedBox(width: 6)),
+                                          WidgetSpan(
+                                            alignment:
+                                                PlaceholderAlignment.middle,
+                                            child: Container(
+                                              margin: const EdgeInsets.only(
+                                                  right: 4),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 7,
+                                                      vertical: 2),
+                                              decoration: BoxDecoration(
+                                                border: Border.all(
+                                                    color: (isDark
+                                                            ? AppColors
+                                                                .darkSecondary
+                                                            : AppColors.accent)
+                                                        .withOpacity(0.5)),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                color: isDark
+                                                    ? AppColors.darkBg
+                                                    : AppColors.background,
+                                              ),
+                                              child: Text(
+                                                _ar(ayah.numberInSurah),
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isDark
+                                                      ? AppColors.darkSecondary
+                                                      : AppColors.accent,
+                                                  fontFamily: 'Amiri',
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (ayah.translation != null) ...[
+                                      Divider(
+                                          height: 18,
+                                          color: (isDark
+                                                  ? Colors.white
+                                                  : Colors.black)
+                                              .withValues(alpha: 0.08)),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: Text(
+                                          '${ayah.numberInSurah}. ${ayah.translation!}',
+                                          textDirection: _loadedEdition !=
+                                                      null &&
+                                                  QuranService.isRtlEdition(
+                                                      _loadedEdition!)
+                                              ? TextDirection.rtl
+                                              : TextDirection.ltr,
+                                          style: TextStyle(
+                                            fontSize: (settings.fontSize - 10)
+                                                .clamp(13.0, 22.0),
+                                            height: 1.5,
+                                            color: isDark
+                                                ? AppColors.darkTextSec
+                                                : AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      // Bottom bar: Now-Playing controls take over when
+                      // audio is active; otherwise show hizb/juz/page.
+                      if (_barsVisible)
+                        audio.hasActiveTrack
+                            ? _buildNowPlayingBar(isDark, audio)
+                            : _buildInfoBar(isDark),
+                    ],
+                  ),
+                ),
+    );
+  }
+
+  Widget _buildNowPlayingBar(bool isDark, QuranAudioService audio) {
+    final ayah = _ayahs.cast<Ayah?>().firstWhere(
+          (a) => a?.number == audio.currentGlobalAyah,
+          orElse: () => null,
+        );
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          )
+        ],
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: Icon(Icons.stop_circle_rounded,
+                color: isDark
+                    ? AppColors.darkTextSec
+                    : AppColors.textSecondary),
+            onPressed: audio.stop,
+          ),
+          IconButton(
+            icon: Icon(
+              audio.isPlaying
+                  ? Icons.pause_circle_filled_rounded
+                  : Icons.play_circle_fill_rounded,
+              color: isDark ? AppColors.darkPrimary : AppColors.primary,
+              size: 34,
+            ),
+            onPressed: () {
+              if (audio.currentGlobalAyah != null) {
+                audio.togglePlayPause(audio.currentGlobalAyah!);
+              }
+            },
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    ayah != null ? 'آية ${_ar(ayah.numberInSurah)}' : '',
+                    textDirection: TextDirection.rtl,
+                    style: TextStyle(
+                      fontFamily: 'Amiri',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color:
+                          isDark ? AppColors.darkText : AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    audio.isLoading
+                        ? 'جارٍ التحميل...'
+                        : (audio.isPlaying ? 'قيد التلاوة' : 'متوقف مؤقتاً'),
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? AppColors.darkTextSec
+                            : AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'الانتقال التلقائي للآية التالية',
+            icon: Icon(
+              audio.autoAdvance
+                  ? Icons.repeat_on_rounded
+                  : Icons.repeat_rounded,
+              color: audio.autoAdvance
+                  ? (isDark ? AppColors.darkPrimary : AppColors.primary)
+                  : (isDark
+                      ? AppColors.darkTextSec
+                      : AppColors.textSecondary),
+              size: 20,
+            ),
+            onPressed: audio.toggleAutoAdvance,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoBar(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          )
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text('الحزب ${_ar(_hizb)}',
+              style: TextStyle(
+                  color: isDark ? AppColors.darkTextSec : Colors.grey[600],
+                  fontSize: 12,
+                  fontFamily: 'Amiri')),
+          Text('الجزء ${_ar(_juz)}',
+              style: TextStyle(
+                  color: isDark ? AppColors.darkTextSec : Colors.grey[600],
+                  fontSize: 12,
+                  fontFamily: 'Amiri')),
+          Text('الصفحة ${_ar(_page)}',
+              style: TextStyle(
+                  color: isDark ? AppColors.darkPrimary : AppColors.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Amiri')),
+        ],
+      ),
+    );
+  }
+
+  /// Picker for the per-ayah translation language. Selecting an entry
+  /// saves the choice and refetches the surah with that edition.
+  void _showTranslationSheet(SettingsService settings) {
+    final isDark = settings.isDarkIn(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetCtx) {
+        final current = settings.translationEdition;
+        Future<void> select(String? edition) async {
+          Navigator.pop(sheetCtx);
+          if (edition == current) return;
+          await settings.setTranslationEdition(edition);
+          if (!mounted) return;
+          setState(() => _loading = true);
+          await _loadAll();
+        }
+
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('الترجمة',
+                    style: TextStyle(
+                      color:
+                          isDark ? AppColors.darkText : AppColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Amiri',
+                    )),
+                const SizedBox(height: 8),
+                RadioGroup<String?>(
+                  groupValue: current,
+                  onChanged: select,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RadioListTile<String?>(
+                        value: null,
+                        activeColor: AppColors.primary,
+                        title: Text('بدون ترجمة',
+                            textDirection: TextDirection.rtl,
+                            style: TextStyle(
+                                fontFamily: 'Amiri',
+                                color: isDark
+                                    ? AppColors.darkText
+                                    : AppColors.textPrimary)),
+                      ),
+                      ...QuranService.translationEditions.entries.map(
+                        (e) => RadioListTile<String?>(
+                          value: e.key,
+                          activeColor: AppColors.primary,
+                          title: Text(e.value,
+                              style: TextStyle(
+                                  color: isDark
+                                      ? AppColors.darkText
+                                      : AppColors.textPrimary)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showFontSizeSheet(SettingsService settings) {
+    final isDark = settings.isDarkIn(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSheet) => SingleChildScrollView(
+          child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('حجم الخط',
+                  style: TextStyle(
+                    color: isDark ? AppColors.darkText : AppColors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Amiri',
+                  )),
+              const SizedBox(height: 20),
+              Text('بِسْمِ اللَّهِ',
+                  style: TextStyle(
+                    fontSize: settings.fontSize,
+                    fontFamily: 'Amiri',
+                    color: isDark ? AppColors.darkText : AppColors.textPrimary,
+                  )),
+              Slider(
+                value: settings.fontSize,
+                min: 18,
+                max: 44,
+                divisions: 13,
+                activeColor:
+                    isDark ? AppColors.darkPrimary : AppColors.primary,
+                onChanged: (v) {
+                  settings.setFontSize(v);
+                  setSheet(() {});
+                },
+              ),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Text('أ',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? AppColors.darkTextSec
+                            : AppColors.textSecondary)),
+                Text('أ',
+                    style: TextStyle(
+                        fontSize: 22,
+                        color: isDark
+                            ? AppColors.darkTextSec
+                            : AppColors.textSecondary)),
+              ]),
+            ],
+          ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildError() {
+    final isDark = context.read<SettingsService>().isDarkIn(context);
+    return Center(
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        const Icon(Icons.error_outline, size: 48, color: Colors.red),
+        const SizedBox(height: 16),
+        Text(_error!,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                color: isDark
+                    ? AppColors.darkTextSec
+                    : AppColors.textSecondary)),
+        const SizedBox(height: 16),
+        ElevatedButton(
+          onPressed: () {
+            setState(() {
+              _loading = true;
+              _error = null;
+            });
+            _loadAll();
+          },
+          child: const Text('إعادة المحاولة'),
+        ),
+      ]),
+    );
+  }
+}
+
+class _Dot extends StatelessWidget {
+  final String name;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  /// Optional glyph inside the dot (e.g. a bookmark ribbon).
+  final IconData? icon;
+
+  const _Dot(
+      {required this.name,
+      required this.color,
+      required this.selected,
+      required this.onTap,
+      this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border:
+              selected ? Border.all(color: AppColors.primary, width: 3) : null,
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)
+          ],
+        ),
+        child: name == 'none'
+            ? const Icon(Icons.block, color: Colors.white, size: 20)
+            : icon != null
+                ? Icon(icon, color: Colors.white, size: 18)
+                : null,
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final Color bg;
+  const _InfoChip({required this.label, required this.color, required this.bg});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+      child: Text(label,
+          style: TextStyle(
+              color: color, fontSize: 12, fontWeight: FontWeight.bold)),
+    );
+  }
+}
