@@ -114,7 +114,7 @@ class AppTypography {
   );
   static const TextStyle headlineMd = TextStyle(
     fontFamily: uiFont,
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: FontWeight.w600,
     height: 1.4,
   );

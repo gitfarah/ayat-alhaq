@@ -124,7 +124,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   textDirection: TextDirection.rtl,
                   style: TextStyle(
                       fontFamily: 'Amiri',
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight:
                           selected ? FontWeight.bold : FontWeight.normal,
                       color: isDark
@@ -168,7 +168,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
                           fontFamily: 'Amiri',
-                          fontSize: 15,
+                          fontSize: 17,
                           fontWeight: e.key == _prayerMethod
                               ? FontWeight.bold
                               : FontWeight.normal,
@@ -341,13 +341,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               textDirection: TextDirection.rtl,
               style: TextStyle(
                   fontFamily: 'Amiri',
-                  fontSize: 14,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: isDark ? AppColors.darkText : AppColors.textPrimary)),
           Text(status,
               textDirection: TextDirection.rtl,
               style: TextStyle(
-                  fontFamily: 'Amiri', fontSize: 11, color: subColor)),
+                  fontFamily: 'Amiri', fontSize: 13, color: subColor)),
         ]),
       ]),
     );
@@ -506,7 +506,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             textDirection: TextDirection.rtl,
                             style: TextStyle(
                                 fontFamily: 'Amiri',
-                                fontSize: 14,
+                                fontSize: 16,
                                 color: isDark
                                     ? AppColors.darkText
                                     : AppColors.textPrimary)),
@@ -537,7 +537,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   textAlign: TextAlign.right,
                   style: TextStyle(
                       fontFamily: 'Amiri',
-                      fontSize: 12,
+                      fontSize: 14,
                       color: isDark
                           ? AppColors.darkTextSec
                           : AppColors.textSecondary,
@@ -596,7 +596,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               isDark: isDark,
               icon: Icons.info_outline_rounded,
               title: 'آيات الحق — الإصدار',
-              subtitle: '2.1.0'),
+              subtitle: '2.1.1'),
           _Tile(
               isDark: isDark,
               icon: Icons.api_rounded,
@@ -631,7 +631,7 @@ class _SectionLabel extends StatelessWidget {
               color: AppColors.primary,
               fontWeight: FontWeight.bold,
               fontFamily: 'Amiri',
-              fontSize: 13)));
+              fontSize: 18)));
 }
 
 class _Tile extends StatelessWidget {
@@ -665,7 +665,7 @@ class _Tile extends StatelessWidget {
                   style: TextStyle(
                       fontFamily: 'Amiri',
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 19,
                       color:
                           isDark ? AppColors.darkText : AppColors.textPrimary)),
               if (subtitle != null)
@@ -675,7 +675,7 @@ class _Tile extends StatelessWidget {
                         color: isDark
                             ? AppColors.darkTextSec
                             : AppColors.textSecondary,
-                        fontSize: 13,
+                        fontSize: 15,
                         fontFamily: 'Amiri')),
             ]),
             const SizedBox(width: 12),

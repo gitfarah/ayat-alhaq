@@ -37,10 +37,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   QuranAudioService? _audioService;
   int? _lastFollowedAyah;
 
-  /// Full-Mushaf background download state (one run per screen).
-  bool _bulkDownloading = false;
-  bool _bulkCancel = false;
-  int _bulkDone = 0;
+  /// Whether the whole Mushaf is stored offline. Download itself is
+  /// owned by MushafSvgService and survives leaving this screen.
   bool _fullyDownloaded = false;
 
   /// +1 = turning forward (new page slides in from the left, matching
@@ -87,6 +85,19 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       _audioService!.nextAyahResolver = (g) => g < 6236 ? g + 1 : null;
       _maybeOfferFullDownload();
     });
+    MushafSvgService.bulkProgress.addListener(_onBulkProgress);
+  }
+
+  /// Repaints the menu/progress UI while the service downloads pages,
+  /// and refreshes the offline badge when the run ends.
+  void _onBulkProgress() {
+    if (!mounted) return;
+    setState(() {});
+    if (MushafSvgService.bulkProgress.value == null) {
+      MushafSvgService.isFullyDownloaded().then((v) {
+        if (mounted) setState(() => _fullyDownloaded = v);
+      });
+    }
   }
 
   /// Bars visibility + system chrome together: hiding the bars also
@@ -95,19 +106,30 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   void _setBars(bool visible) {
     if (_barsVisible == visible) return;
     setState(() => _barsVisible = visible);
-    SystemChrome.setEnabledSystemUIMode(
-        visible ? SystemUiMode.edgeToEdge : SystemUiMode.immersiveSticky);
+    try {
+      SystemChrome.setEnabledSystemUIMode(
+          visible ? SystemUiMode.edgeToEdge : SystemUiMode.immersiveSticky);
+    } catch (_) {
+      // System chrome is cosmetic — never let it break bar toggling.
+    }
   }
 
   /// One-time offer (per install) to download the whole Mushaf for
   /// offline reading. Never silently pulls ~350 MB on the user's data
-  /// plan — it asks first; afterwards the download can always be
-  /// started from the menu.
+  /// plan — it asks first. Once accepted, an interrupted download
+  /// RESUMES automatically every time the Mushaf is opened, without
+  /// asking again; it can also always be started from the menu.
   Future<void> _maybeOfferFullDownload() async {
     if (!MushafSvgService.supportsFullOfflineDownload) return;
     _fullyDownloaded = await MushafSvgService.isFullyDownloaded();
+    if (mounted) setState(() {});
     if (_fullyDownloaded || !mounted) return;
     final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('mushafDlAccepted') ?? false) {
+      // User already said yes earlier — silently continue the download.
+      MushafSvgService.startBulkDownload();
+      return;
+    }
     if (prefs.getBool('mushafDlPrompted') ?? false) return;
     await prefs.setBool('mushafDlPrompted', true);
     if (!mounted) return;
@@ -150,41 +172,17 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         ],
       ),
     );
-    if (go == true) _startBulkDownload();
-  }
-
-  Future<void> _startBulkDownload() async {
-    if (_bulkDownloading) return;
-    setState(() {
-      _bulkDownloading = true;
-      _bulkCancel = false;
-      _bulkDone = 0;
-    });
-    await MushafSvgService.downloadEntireMushaf(
-      onProgress: (done, total) {
-        if (!mounted) return;
-        // Repaint sparsely; every page would rebuild 604 times.
-        if (done % 5 == 0 || done == total) {
-          setState(() => _bulkDone = done);
-        } else {
-          _bulkDone = done;
-        }
-      },
-      isCancelled: () => _bulkCancel || !mounted,
-    );
-    if (!mounted) return;
-    _fullyDownloaded = await MushafSvgService.isFullyDownloaded();
-    if (!mounted) return;
-    setState(() => _bulkDownloading = false);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(_fullyDownloaded
-            ? '✓ اكتمل تنزيل المصحف — التصفح متاح دون اتصال'
-            : 'توقف التنزيل — يمكنك المتابعة لاحقاً من القائمة')));
+    if (go == true) {
+      await prefs.setBool('mushafDlAccepted', true);
+      MushafSvgService.startBulkDownload();
+    }
   }
 
   @override
   void dispose() {
-    _bulkCancel = true;
+    // The bulk download deliberately keeps running — it belongs to the
+    // service, not this screen.
+    MushafSvgService.bulkProgress.removeListener(_onBulkProgress);
     // Never leave the app stuck in immersive mode after this screen.
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _flashCtrl.dispose();
@@ -393,6 +391,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     return n.toString().split('').map((c) => d[int.parse(c)]).join();
   }
 
+  /// Converts Arabic-Indic (٠-٩) and extended (۰-۹) digits to Western
+  /// digits so typed page numbers parse regardless of keyboard layout.
+  static String _westernDigits(String s) => s
+      .replaceAllMapped(RegExp('[٠-٩]'),
+          (m) => String.fromCharCode(m[0]!.codeUnitAt(0) - 0x0660 + 0x30))
+      .replaceAllMapped(RegExp('[۰-۹]'),
+          (m) => String.fromCharCode(m[0]!.codeUnitAt(0) - 0x06F0 + 0x30));
+
   void _jumpDialog() {
     final ctrl = TextEditingController();
     final isDark = context.read<SettingsService>().isDarkIn(context);
@@ -413,7 +419,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             controller: ctrl,
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            autofocus: true,
+            // digitsOnly rejects Arabic-Indic digits, which is what an
+            // Arabic iOS keyboard types — accept both digit families.
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp('[0-9٠-٩۰-۹]')),
+            ],
             style: TextStyle(
                 fontSize: 20,
                 fontFamily: 'Amiri',
@@ -438,7 +449,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12))),
               onPressed: () {
-                final p = int.tryParse(ctrl.text);
+                final p = int.tryParse(_westernDigits(ctrl.text));
                 if (p != null && p >= 1 && p <= 604) {
                   Navigator.pop(context);
                   _loadPage(p);
@@ -503,31 +514,35 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   _jumpDialog();
                 }),
             if (MushafSvgService.supportsFullOfflineDownload)
-              ListTile(
-                  leading: Icon(
-                      _fullyDownloaded
-                          ? Icons.offline_pin_rounded
-                          : (_bulkDownloading
-                              ? Icons.downloading_rounded
-                              : Icons.download_rounded),
-                      color: iconColor),
-                  title: Text(
-                      _fullyDownloaded
-                          ? 'المصحف كامل محفوظ دون اتصال ✓'
-                          : (_bulkDownloading
-                              ? 'جارٍ التنزيل ($_bulkDone/٦٠٤) — اضغط للإيقاف'
-                              : 'تنزيل المصحف كاملاً دون اتصال'),
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(fontFamily: 'Amiri', color: textColor)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (_fullyDownloaded) return;
-                    if (_bulkDownloading) {
-                      setState(() => _bulkCancel = true);
-                    } else {
-                      _startBulkDownload();
-                    }
-                  }),
+              Builder(builder: (_) {
+                final prog = MushafSvgService.bulkProgress.value;
+                return ListTile(
+                    leading: Icon(
+                        _fullyDownloaded
+                            ? Icons.offline_pin_rounded
+                            : (prog != null
+                                ? Icons.downloading_rounded
+                                : Icons.download_rounded),
+                        color: iconColor),
+                    title: Text(
+                        _fullyDownloaded
+                            ? 'المصحف كامل محفوظ دون اتصال ✓'
+                            : (prog != null
+                                ? 'جارٍ التنزيل (${_ar(prog.$1)}/${_ar(prog.$2)}) — اضغط للإيقاف'
+                                : 'تنزيل المصحف كاملاً دون اتصال'),
+                        textDirection: TextDirection.rtl,
+                        style:
+                            TextStyle(fontFamily: 'Amiri', color: textColor)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      if (_fullyDownloaded) return;
+                      if (MushafSvgService.bulkRunning) {
+                        MushafSvgService.cancelBulkDownload();
+                      } else {
+                        MushafSvgService.startBulkDownload();
+                      }
+                    });
+              }),
             const SizedBox(height: 8),
           ],
         ),
@@ -1377,6 +1392,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   behavior: HitTestBehavior.opaque,
                   onTap: () {}, // required so onTapUp wins the arena
                   onTapUp: (details) {
+                    // Full-screen escape hatch: while the bars are
+                    // hidden, the FIRST tap anywhere — even on an ayah
+                    // — only brings the bars back. This guarantees the
+                    // user can never get stuck in immersive mode.
+                    if (!_barsVisible) {
+                      _setBars(true);
+                      return;
+                    }
                     final vx = details.localPosition.dx / scaleX;
                     final vy = details.localPosition.dy / scaleY;
                     for (final region in data.ayahRegions) {

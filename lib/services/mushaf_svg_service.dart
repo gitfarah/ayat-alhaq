@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'storage/mushaf_storage.dart';
 
@@ -198,30 +199,72 @@ class MushafSvgService {
     }
   }
 
-  /// Downloads every page (1-604) for full offline use. Only meaningful
-  /// where [supportsFullOfflineDownload] is true (mobile/desktop) — on
-  /// web the rolling cache would just evict earlier pages as later ones
-  /// are written, so callers should not offer this there.
-  ///
-  /// [onProgress] is called after every page attempt (whether it
-  /// succeeded or failed) with (pagesProcessed, totalPages).
-  /// [isCancelled] is checked before each page; return true to stop.
-  static Future<void> downloadEntireMushaf({
-    required void Function(int processed, int total) onProgress,
-    bool Function()? isCancelled,
-  }) async {
-    for (int page = 1; page <= totalPages; page++) {
-      if (isCancelled != null && isCancelled()) break;
-      try {
-        if (!(await MushafFileStorage.hasPage(page))) {
-          await getPage(page);
+  // ── Full-Mushaf background download ────────────────────────────────
+  //
+  // Owned by the SERVICE (not a screen) so navigating away never kills
+  // an in-flight download. Pages are fetched by a pool of parallel
+  // workers and written straight to storage WITHOUT SVG/JSON parsing —
+  // parsing 604 pages on the UI isolate was the main reason the old
+  // sequential download felt endless.
+
+  /// (pagesDone, totalPages) while a bulk download runs, null when idle.
+  static final ValueNotifier<(int, int)?> bulkProgress =
+      ValueNotifier<(int, int)?>(null);
+
+  static bool _bulkCancelled = false;
+  static bool get bulkRunning => bulkProgress.value != null;
+
+  static void cancelBulkDownload() => _bulkCancelled = true;
+
+  /// Starts (or resumes) downloading every missing page for full
+  /// offline use. Already-cached pages are skipped, so calling this
+  /// again after an interruption continues where it left off. No-op if
+  /// a bulk download is already running.
+  static Future<void> startBulkDownload() async {
+    if (bulkRunning || !supportsFullOfflineDownload) return;
+    _bulkCancelled = false;
+
+    final cached = (await MushafFileStorage.cachedPages()).toSet();
+    final queue = [
+      for (var p = 1; p <= totalPages; p++)
+        if (!cached.contains(p)) p
+    ];
+    var done = totalPages - queue.length;
+    bulkProgress.value = (done, totalPages);
+    if (queue.isEmpty) {
+      bulkProgress.value = null;
+      return;
+    }
+
+    final client = http.Client();
+    try {
+      const parallel = 8;
+      Future<void> worker() async {
+        while (queue.isNotEmpty && !_bulkCancelled) {
+          final page = queue.removeAt(0);
+          try {
+            final results = await Future.wait([
+              client.get(Uri.parse('$_svgBaseUrl/${_padded(page)}.svg')),
+              client.get(Uri.parse('$_jsonBaseUrl/${_padded(page)}.json')),
+            ]).timeout(const Duration(seconds: 40));
+            if (results[0].statusCode == 200 &&
+                results[1].statusCode == 200) {
+              await MushafFileStorage.writePage(
+                  page, results[0].body, results[1].body);
+            }
+          } catch (_) {
+            // Connection hiccup — the page stays missing and a later
+            // resume picks it up.
+          }
+          done++;
+          bulkProgress.value = (done, totalPages);
         }
-      } catch (_) {
-        // Skip this page (e.g. connection dropped mid-download) and
-        // continue — a later manual open or re-run of this download
-        // will retry it.
       }
-      onProgress(page, totalPages);
+
+      await Future.wait([for (var i = 0; i < parallel; i++) worker()]);
+    } finally {
+      client.close();
+      bulkProgress.value = null;
     }
   }
 
