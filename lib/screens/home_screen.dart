@@ -328,21 +328,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final headers = <Widget>[
       // Date + last-read share one row (last-read left, date right);
       // without a last-read entry the date card takes the full width.
+      // Stacked full-width cards: sharing one row squeezed both and
+      // ellipsized their text ("…") on normal phone widths.
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        child: s.hasLastRead
-            ? IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(flex: 2, child: _buildLastRead(s, isDark)),
-                    const SizedBox(width: 10),
-                    Expanded(flex: 3, child: _buildHijriDate(isDark)),
-                  ],
-                ),
-              )
-            : _buildHijriDate(isDark),
+        child: _buildHijriDate(isDark),
       ),
+      if (s.hasLastRead)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: _buildLastRead(s, isDark),
+        ),
       _PrayerTimesBanner(isDark: isDark),
       _buildSearch(isDark),
       Padding(

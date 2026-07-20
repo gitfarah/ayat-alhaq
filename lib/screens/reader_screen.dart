@@ -607,113 +607,38 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: _barsVisible
-          ? AppBar(
-              leading: IconButton(
-                icon: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.arrow_back_ios_rounded, size: 16),
-                ),
-                onPressed: () => Navigator.pop(context),
-              ),
-              title: Column(children: [
-                Text(widget.surah.name,
-                    style: const TextStyle(
-                        fontFamily: 'Amiri',
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20)),
-                Text('${widget.surah.numberOfAyahs} آية',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: isDark
-                            ? AppColors.darkTextSec
-                            : AppColors.textSecondary)),
-              ]),
-              actions: [
-                IconButton(
-                  tooltip: 'البحث في السورة',
-                  icon: const Icon(Icons.search_rounded),
-                  onPressed: _showSurahSearch,
-                ),
-                IconButton(
-                  icon: Icon(Icons.translate_rounded,
-                      color: settings.translationEdition != null
-                          ? AppColors.primary
-                          : null),
-                  onPressed: () => _showTranslationSheet(settings),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.text_fields_rounded),
-                  onPressed: () => _showFontSizeSheet(settings),
-                ),
-              ],
-            )
-          : null,
       body: _loading
           ? Center(
               child:
                   CircularProgressIndicator(color: theme.colorScheme.primary))
           : _error != null
               ? _buildError()
-              : GestureDetector(
-                  onTap: () => _setBars(!_barsVisible),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        margin: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary
-                              .withOpacity(isDark ? 0.2 : 0.08),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: AppColors.primary.withOpacity(0.2)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _InfoChip(
-                              label: widget.surah.revelationType == 'Meccan'
-                                  ? 'مكية'
-                                  : 'مدنية',
-                              color: widget.surah.revelationType == 'Meccan'
-                                  ? AppColors.primary
-                                  : const Color(0xFF7B1FA2),
-                              bg: widget.surah.revelationType == 'Meccan'
-                                  ? const Color(0xFFE8F5E9)
-                                  : const Color(0xFFF3E5F5),
-                            ),
-                            Text('${widget.surah.numberOfAyahs} آية',
-                                style: TextStyle(
-                                    color: isDark
-                                        ? AppColors.darkTextSec
-                                        : Colors.grey[600],
-                                    fontSize: 13,
-                                    fontFamily: 'Amiri')),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: NotificationListener<UserScrollNotification>(
-                          // Scrolling = reading: give the text the whole
-                          // screen. A tap brings the bars back.
-                          onNotification: (n) {
-                            if (n.direction != ScrollDirection.idle) {
-                              _setBars(false);
-                            }
-                            return false;
-                          },
-                          child: ScrollablePositionedList.builder(
+              : Stack(children: [
+                  // The text is full-bleed with CONSTANT padding — the
+                  // bars float above it, so toggling them never shifts
+                  // the page up or down.
+                  Positioned.fill(
+                    child: GestureDetector(
+                      onTap: () => _setBars(!_barsVisible),
+                      child: NotificationListener<UserScrollNotification>(
+                        // Scrolling = reading: give the text the whole
+                        // screen. A tap brings the bars back.
+                        onNotification: (n) {
+                          if (n.direction != ScrollDirection.idle) {
+                            _setBars(false);
+                          }
+                          return false;
+                        },
+                        child: ScrollablePositionedList.builder(
                           itemScrollController: _scroll,
                           itemPositionsListener: _positions,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
+                          padding: EdgeInsets.fromLTRB(
+                              16,
+                              MediaQuery.of(context).padding.top +
+                                  kToolbarHeight +
+                                  8,
+                              16,
+                              110),
                           itemCount: _ayahs.length + _headerOffset,
                           itemBuilder: (context, index) {
                             if (index == 0) {
@@ -935,17 +860,119 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             );
                           },
                         ),
+                      ),
+                    ),
+                  ),
+                  // Floating top bar
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: AnimatedSlide(
+                      offset:
+                          _barsVisible ? Offset.zero : const Offset(0, -1.1),
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                      child: _buildTopBar(settings, isDark),
+                    ),
+                  ),
+                  // Floating bottom bar: Now-Playing controls take over
+                  // when audio is active; otherwise hizb/juz/page info.
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: AnimatedSlide(
+                      offset:
+                          _barsVisible ? Offset.zero : const Offset(0, 1.1),
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                      child: Container(
+                        color: isDark ? AppColors.darkSurface : Colors.white,
+                        child: SafeArea(
+                          top: false,
+                          child: audio.hasActiveTrack
+                              ? _buildNowPlayingBar(isDark, audio)
+                              : _buildInfoBar(isDark),
                         ),
                       ),
-                      // Bottom bar: Now-Playing controls take over when
-                      // audio is active; otherwise show hizb/juz/page.
-                      if (_barsVisible)
-                        audio.hasActiveTrack
-                            ? _buildNowPlayingBar(isDark, audio)
-                            : _buildInfoBar(isDark),
-                    ],
+                    ),
                   ),
+                ]),
+    );
+  }
+
+  /// Floating app-bar replacement — overlays the text instead of
+  /// resizing it, same model as the Mushaf screen.
+  Widget _buildTopBar(SettingsService settings, bool isDark) {
+    final bg = isDark ? AppColors.darkBg : AppColors.background;
+    final textColor = isDark ? AppColors.darkText : AppColors.textPrimary;
+    return Container(
+      decoration: BoxDecoration(
+        color: bg.withValues(alpha: 0.97),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06), blurRadius: 5),
+        ],
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: kToolbarHeight,
+          child: Row(children: [
+            IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
                 ),
+                child: Icon(Icons.arrow_back_ios_rounded,
+                    size: 16, color: textColor),
+              ),
+              onPressed: () => Navigator.pop(context),
+            ),
+            Expanded(
+              child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(widget.surah.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontFamily: 'Amiri',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: textColor)),
+                    Text(
+                        '${widget.surah.revelationType == 'Meccan' ? 'مكية' : 'مدنية'} • ${widget.surah.numberOfAyahs} آية',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontFamily: 'Amiri',
+                            color: isDark
+                                ? AppColors.darkTextSec
+                                : AppColors.textSecondary)),
+                  ]),
+            ),
+            IconButton(
+              tooltip: 'البحث في السورة',
+              icon: Icon(Icons.search_rounded, color: textColor),
+              onPressed: _showSurahSearch,
+            ),
+            IconButton(
+              icon: Icon(Icons.translate_rounded,
+                  color: settings.translationEdition != null
+                      ? AppColors.primary
+                      : textColor),
+              onPressed: () => _showTranslationSheet(settings),
+            ),
+            IconButton(
+              icon: Icon(Icons.text_fields_rounded, color: textColor),
+              onPressed: () => _showFontSizeSheet(settings),
+            ),
+          ]),
+        ),
+      ),
     );
   }
 
@@ -1297,21 +1324,3 @@ class _Dot extends StatelessWidget {
   }
 }
 
-class _InfoChip extends StatelessWidget {
-  final String label;
-  final Color color;
-  final Color bg;
-  const _InfoChip({required this.label, required this.color, required this.bg});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Text(label,
-          style: TextStyle(
-              color: color, fontSize: 12, fontWeight: FontWeight.bold)),
-    );
-  }
-}

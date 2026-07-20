@@ -23,6 +23,13 @@ void main() {
     );
     await tester.pump();
 
+    // The Bismillah intro shows first on a cold start…
+    expect(find.text('آيات الحق'), findsOneWidget);
+
+    // …and gives way to the main navigation after its timer.
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(milliseconds: 600));
+
     expect(find.text('الفهرس'), findsWidgets);
     expect(find.text('الفواصل'), findsOneWidget);
     expect(find.text('التمييزات'), findsOneWidget);
