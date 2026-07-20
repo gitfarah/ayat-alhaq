@@ -101,40 +101,51 @@ class _BismillahSplash extends StatelessWidget {
           gradient: RadialGradient(
               center: const Alignment(0, -0.2), radius: 1.2, colors: bg),
         ),
-        child: Center(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: 1),
-            duration: const Duration(milliseconds: 1100),
-            curve: Curves.easeOutCubic,
-            builder: (_, t, child) => Opacity(
-              opacity: t,
-              child: Transform.scale(scale: 0.92 + 0.08 * t, child: child),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '﷽', // ﷽ — Bismillah ligature, calligraphic in Amiri
-                  textDirection: TextDirection.rtl,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'Amiri',
-                    fontSize: 96,
-                    height: 1.6,
-                    color: ink,
+        child: SafeArea(
+          child: Center(
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 1100),
+              curve: Curves.easeOutCubic,
+              builder: (_, t, child) => Opacity(
+                opacity: t,
+                child: Transform.scale(scale: 0.92 + 0.08 * t, child: child),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // The ligature's glyph is far larger than its font
+                  // metrics suggest — FittedBox scales it to genuinely
+                  // FIT the screen width and stay centered.
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 36),
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      child: Text(
+                        '﷽', // Bismillah ligature, calligraphic in Amiri
+                        textDirection: TextDirection.rtl,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Amiri',
+                          fontSize: 84,
+                          color: ink,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  'آيات الحق',
-                  style: TextStyle(
-                    fontFamily: 'Amiri',
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: ink.withValues(alpha: 0.7),
+                  const SizedBox(height: 18),
+                  Text(
+                    'آيات الحق',
+                    style: TextStyle(
+                      fontFamily: 'Amiri',
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: ink.withValues(alpha: 0.7),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

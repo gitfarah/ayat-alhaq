@@ -173,7 +173,11 @@ class _TafsirScreenState extends State<TafsirScreen> {
         ),
         centerTitle: true,
       ),
-      body: Column(
+      // ONE scroll view for the whole page: the longest ayahs (e.g.
+      // 2:282) are taller than the screen on their own, so a fixed
+      // ayah card left no room for the tafsir at all.
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: 24),
         children: [
           // Ayah card at top
           Container(
@@ -264,30 +268,31 @@ class _TafsirScreenState extends State<TafsirScreen> {
 
           const SizedBox(height: 8),
 
-          // Tafsir content
-          Expanded(
-            child: _isLoading
-                ? Center(
-                    child: CircularProgressIndicator(color: accent),
-                  )
-                : _error != null
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error_outline,
-                                size: 48, color: Colors.red[300]),
-                            const SizedBox(height: 16),
-                            Text(_error!, textAlign: TextAlign.center),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _loadTafsir,
-                              child: const Text('إعادة المحاولة'),
-                            ),
-                          ],
-                        ),
-                      )
-                    : Container(
+          // Tafsir content — scrolls together with the ayah card above.
+          if (_isLoading)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 48),
+              child: Center(child: CircularProgressIndicator(color: accent)),
+            )
+          else if (_error != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                  const SizedBox(height: 16),
+                  Text(_error!, textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadTafsir,
+                    child: const Text('إعادة المحاولة'),
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
                         margin: const EdgeInsets.symmetric(horizontal: 16),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -351,7 +356,6 @@ class _TafsirScreenState extends State<TafsirScreen> {
                           ),
                         ),
                       ),
-          ),
         ],
       ),
     );

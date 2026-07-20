@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_strings.dart';
 import '../services/settings_service.dart';
 import '../theme.dart';
 import 'home_screen.dart';
@@ -25,6 +26,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = context.watch<SettingsService>().isDarkIn(context);
+    final t = L10n.of(context);
     return Scaffold(
       body: IndexedStack(index: _idx, children: _screens),
       bottomNavigationBar: Container(
@@ -37,21 +39,22 @@ class _MainScreenState extends State<MainScreen> {
         child: BottomNavigationBar(
           currentIndex: _idx,
           onTap: (i) => setState(() => _idx = i),
-          items: const [
+          items: [
             BottomNavigationBarItem(
-                icon: Icon(Icons.highlight_rounded), label: 'التمييزات'),
+                icon: const Icon(Icons.highlight_rounded),
+                label: t('tabHighlights')),
             BottomNavigationBarItem(
-                icon: Icon(Icons.bookmark_border_rounded),
-                activeIcon: Icon(Icons.bookmark_rounded),
-                label: 'الفواصل'),
+                icon: const Icon(Icons.bookmark_border_rounded),
+                activeIcon: const Icon(Icons.bookmark_rounded),
+                label: t('tabBookmarks')),
             BottomNavigationBarItem(
-                icon: Icon(Icons.check_circle_outline_rounded),
-                activeIcon: Icon(Icons.check_circle_rounded),
-                label: 'الختمة'),
+                icon: const Icon(Icons.check_circle_outline_rounded),
+                activeIcon: const Icon(Icons.check_circle_rounded),
+                label: t('tabKhatma')),
             BottomNavigationBarItem(
-                icon: Icon(Icons.menu_book_outlined),
-                activeIcon: Icon(Icons.menu_book_rounded),
-                label: 'الفهرس'),
+                icon: const Icon(Icons.menu_book_outlined),
+                activeIcon: const Icon(Icons.menu_book_rounded),
+                label: t('tabIndex')),
           ],
         ),
       ),

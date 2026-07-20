@@ -8,6 +8,18 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
   int? _lastAyah;
   int? _lastPage;
   String? _translationEdition;
+  String _appLanguage = 'ar';
+
+  /// UI language for the app chrome: 'ar' (default), 'en', or 'de'.
+  /// Quran content itself always stays Arabic.
+  String get appLanguage => _appLanguage;
+
+  Future<void> setAppLanguage(String code) async {
+    if (!['ar', 'en', 'de'].contains(code)) return;
+    _appLanguage = code;
+    (await SharedPreferences.getInstance()).setString('appLanguage', code);
+    notifyListeners();
+  }
 
   ThemeMode get themeMode => _themeMode;
 
@@ -92,6 +104,7 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
     _lastPage = p.getInt('lastPage');
     final edition = p.getString('translationEdition');
     _translationEdition = (edition == null || edition.isEmpty) ? null : edition;
+    _appLanguage = p.getString('appLanguage') ?? 'ar';
     notifyListeners();
   }
 

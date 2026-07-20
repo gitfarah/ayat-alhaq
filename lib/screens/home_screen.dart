@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_strings.dart';
 import '../models/surah.dart';
 import '../services/library_events.dart';
 import '../services/prayer_service.dart';
@@ -296,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('الفهرس'),
+        title: Text(L10n.of(context)('tabIndex')),
         actions: [
           IconButton(
               icon: Icon(
@@ -347,8 +348,8 @@ class _HomeScreenState extends State<HomeScreen> {
               alignment: Alignment.centerRight,
               child: Text(
                   _ayahResults.isEmpty
-                      ? '${_ar(_filtered.length)} سورة'
-                      : '${_ar(_filtered.length)} سورة • ${_ar(_ayahResults.length)} آية',
+                      ? '${L10n.of(context).number(_filtered.length)} ${L10n.of(context)('surahUnit')}'
+                      : '${L10n.of(context).number(_filtered.length)} ${L10n.of(context)('surahUnit')} • ${L10n.of(context).number(_ayahResults.length)} ${L10n.of(context)('ayahUnit')}',
                   style: TextStyle(
                       color: isDark
                           ? AppColors.darkTextSec
@@ -382,7 +383,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                 child: Align(
                     alignment: Alignment.centerRight,
-                    child: Text('نتائج في الآيات',
+                    child: Text(L10n.of(context)('ayahResults'),
                         style: TextStyle(
                             color: isDark
                                 ? AppColors.darkPrimary
@@ -545,7 +546,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                  Text('آخر ما قرأت',
+                  Text(L10n.of(context)('lastRead'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -592,7 +593,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           isDark ? AppColors.darkText : AppColors.textPrimary,
                       fontFamily: 'Amiri'),
                   decoration: InputDecoration(
-                      hintText: 'ابحث عن سورة أو رقم...',
+                      hintText: L10n.of(context)('searchHint'),
                       hintTextDirection: TextDirection.rtl,
                       hintStyle: TextStyle(
                           color: isDark
@@ -809,7 +810,7 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
                 size: 18,
                 color: isDark ? AppColors.darkPrimary : AppColors.primary),
             const Spacer(),
-            Text('اختر مدينتك لعرض مواقيت الصلاة',
+            Text(L10n.of(context)('chooseCity'),
                 textDirection: TextDirection.rtl,
                 style: TextStyle(
                     fontFamily: 'Amiri',
@@ -838,7 +839,7 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
         Row(children: [
           Icon(Icons.mosque_rounded, size: 14, color: accent),
           const Spacer(),
-          Text('مواقيت الصلاة — $_label',
+          Text('${L10n.of(context)('prayerTimes')} — $_label',
               textDirection: TextDirection.rtl,
               style: TextStyle(
                   fontFamily: 'Amiri',

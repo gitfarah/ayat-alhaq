@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_strings.dart';
 import '../services/settings_service.dart';
 import '../services/mushaf_svg_service.dart';
 import '../services/prayer_service.dart';
@@ -357,43 +358,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final s = context.watch<SettingsService>();
     final isDark = s.isDarkIn(context);
+    final t = L10n.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('الإعدادات')),
+      appBar: AppBar(title: Text(t('settingsTitle'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _SectionLabel('المظهر', isDark),
+          _SectionLabel(t('appearance'), isDark),
+          _Tile(
+            isDark: isDark,
+            icon: Icons.language_rounded,
+            title: t('language'),
+            subtitle: L10n.languages[s.appLanguage],
+            child: Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<String>(
+                  segments: [
+                    for (final e in L10n.languages.entries)
+                      ButtonSegment(
+                          value: e.key,
+                          label: Text(e.value,
+                              style: const TextStyle(fontFamily: 'Amiri'))),
+                  ],
+                  selected: {s.appLanguage},
+                  onSelectionChanged: (sel) => s.setAppLanguage(sel.first),
+                ),
+              ),
+            ),
+          ),
           _Tile(
             isDark: isDark,
             icon: isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-            title: 'المظهر',
+            title: t('appearance'),
             subtitle: switch (s.themeMode) {
-              ThemeMode.system => 'حسب النظام',
-              ThemeMode.light => 'نهاري',
-              ThemeMode.dark => 'ليلي',
+              ThemeMode.system => t('themeSystem'),
+              ThemeMode.light => t('themeLight'),
+              ThemeMode.dark => t('themeDark'),
             },
             child: Padding(
               padding: const EdgeInsets.only(top: 12),
               child: SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<ThemeMode>(
-                  segments: const [
+                  segments: [
                     ButtonSegment(
                         value: ThemeMode.dark,
-                        label: Text('ليلي',
-                            style: TextStyle(fontFamily: 'Amiri')),
-                        icon: Icon(Icons.dark_mode_rounded, size: 16)),
+                        label: Text(t('themeDark'),
+                            style: const TextStyle(fontFamily: 'Amiri')),
+                        icon: const Icon(Icons.dark_mode_rounded, size: 16)),
                     ButtonSegment(
                         value: ThemeMode.system,
-                        label: Text('النظام',
-                            style: TextStyle(fontFamily: 'Amiri')),
-                        icon: Icon(Icons.brightness_auto_rounded, size: 16)),
+                        label: Text(t('themeSystem'),
+                            style: const TextStyle(fontFamily: 'Amiri')),
+                        icon: const Icon(Icons.brightness_auto_rounded,
+                            size: 16)),
                     ButtonSegment(
                         value: ThemeMode.light,
-                        label: Text('نهاري',
-                            style: TextStyle(fontFamily: 'Amiri')),
-                        icon: Icon(Icons.light_mode_rounded, size: 16)),
+                        label: Text(t('themeLight'),
+                            style: const TextStyle(fontFamily: 'Amiri')),
+                        icon: const Icon(Icons.light_mode_rounded, size: 16)),
                   ],
                   selected: {s.themeMode},
                   onSelectionChanged: (sel) => s.setThemeMode(sel.first),
@@ -402,12 +428,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          _SectionLabel('القراءة', isDark),
+          _SectionLabel(t('reading'), isDark),
           _Tile(
             isDark: isDark,
             icon: Icons.text_fields_rounded,
-            title: 'حجم الخط',
-            subtitle: '${s.fontSize.toInt()} نقطة',
+            title: t('fontSizeLbl'),
+            subtitle: '${s.fontSize.toInt()} ${t('pointUnit')}',
             child: Column(children: [
               const SizedBox(height: 8),
               Container(
@@ -455,7 +481,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ]),
           ),
           const SizedBox(height: 16),
-          _SectionLabel('مواقيت الصلاة', isDark),
+          _SectionLabel(t('prayerTimes'), isDark),
           GestureDetector(
             onTap: _locating ? null : () => _showCityPicker(isDark),
             child: _Tile(
@@ -463,25 +489,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: _locating
                     ? Icons.my_location_rounded
                     : Icons.location_city_rounded,
-                title: 'الموقع',
+                title: t('location'),
                 subtitle: _locating
                     ? 'جارٍ تحديد الموقع...'
-                    : _prayerLabel ?? 'غير محدد — اضغط للاختيار'),
+                    : _prayerLabel ?? t('locationUnset')),
           ),
           GestureDetector(
             onTap: () => _showMethodPicker(isDark),
             child: _Tile(
                 isDark: isDark,
                 icon: Icons.calculate_rounded,
-                title: 'طريقة الحساب',
+                title: t('calcMethod'),
                 subtitle: PrayerService.methods[_prayerMethod] ?? ''),
           ),
           const SizedBox(height: 16),
-          _SectionLabel('التلاوة', isDark),
+          _SectionLabel(t('recitation'), isDark),
           _Tile(
             isDark: isDark,
             icon: Icons.record_voice_over_rounded,
-            title: 'القارئ',
+            title: t('reciterLbl'),
             subtitle: context.watch<QuranAudioService>().reciterName,
             child: Column(children: [
               const SizedBox(height: 4),
@@ -517,11 +543,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ]),
           ),
           const SizedBox(height: 16),
-          _SectionLabel('المصحف دون اتصال', isDark),
+          _SectionLabel(t('mushafOffline'), isDark),
           _Tile(
             isDark: isDark,
             icon: Icons.download_for_offline_rounded,
-            title: 'الصفحات المحفوظة',
+            title: t('savedPages'),
             subtitle: _cacheBytes == null
                 ? 'جارٍ الحساب...'
                 : _cacheBytes == 0
@@ -574,11 +600,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ]),
           ),
           const SizedBox(height: 16),
-          _SectionLabel('التفاسير دون اتصال', isDark),
+          _SectionLabel(t('tafsirOffline'), isDark),
           _Tile(
             isDark: isDark,
             icon: Icons.library_books_rounded,
-            title: 'تحميل التفاسير',
+            title: t('downloadTafsir'),
             subtitle: TafsirService.supportsDownload
                 ? 'حمّل ما تحتاجه فقط — كل تفسير على حدة'
                 : 'التحميل متاح على تطبيق الهاتف فقط',
@@ -591,26 +617,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 : null,
           ),
           const SizedBox(height: 16),
-          _SectionLabel('عن التطبيق', isDark),
+          _SectionLabel(t('about'), isDark),
           _Tile(
               isDark: isDark,
               icon: Icons.info_outline_rounded,
-              title: 'آيات الحق — الإصدار',
-              subtitle: '2.4.0'),
+              title: t('versionLbl'),
+              subtitle: '2.5.0'),
           _Tile(
               isDark: isDark,
               icon: Icons.api_rounded,
-              title: 'مصدر النصوص',
+              title: t('textSource'),
               subtitle: 'api.qurancdn.com'),
           _Tile(
               isDark: isDark,
               icon: Icons.menu_book_rounded,
-              title: 'مصدر صفحات المصحف',
+              title: t('pagesSource'),
               subtitle: 'quranpedia.net (مجمع الملك فهد)'),
           _Tile(
               isDark: isDark,
               icon: Icons.font_download_outlined,
-              title: 'الخط',
+              title: t('fontLbl'),
               subtitle: 'Amiri — مفتوح المصدر'),
         ],
       ),
