@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:provider/provider.dart';
@@ -7,7 +8,6 @@ import '../services/prayer_service.dart';
 import '../services/quran_service.dart';
 import '../services/settings_service.dart';
 import '../theme.dart';
-import 'ayah_search_screen.dart';
 import 'reader_screen.dart';
 import 'settings_screen.dart';
 import 'mushaf_svg_screen.dart';
@@ -20,6 +20,12 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<Surah> _all = [], _filtered = [];
+
+  /// Ayah-text matches shown INLINE below the surah matches — search
+  /// happens right here on the home screen, no separate page.
+  List<AyahSearchResult> _ayahResults = [];
+  Timer? _debounce;
+
   bool _loading = true;
   String? _error;
   final _search = TextEditingController();
@@ -32,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _search.dispose();
     super.dispose();
   }
@@ -57,15 +64,34 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _filter(String q) {
+    final query = q.trim();
+    // Diacritic- and prefix-insensitive surah filter: the data's names
+    // are fully vocalized (سُورَةُ ٱلْفَاتِحَةِ) while users type plain
+    // letters — raw contains() almost never matched.
+    final norm = QuranService.normalizeArabic(query)
+        .replaceFirst(RegExp(r'^سورة\s*'), '');
     setState(() {
-      _filtered = q.isEmpty
+      _filtered = query.isEmpty
           ? _all
-          : _all
-              .where((s) =>
-                  s.name.contains(q) ||
-                  s.englishName.toLowerCase().contains(q.toLowerCase()) ||
-                  s.number.toString() == q)
-              .toList();
+          : _all.where((s) {
+              final name = QuranService.normalizeArabic(s.name)
+                  .replaceFirst(RegExp(r'^سورة\s*'), '');
+              return (norm.isNotEmpty && name.contains(norm)) ||
+                  s.englishName.toLowerCase().contains(query.toLowerCase()) ||
+                  s.number.toString() == query;
+            }).toList();
+    });
+
+    // Ayah-text search, debounced, results shown inline below.
+    _debounce?.cancel();
+    if (query.length < 2) {
+      setState(() => _ayahResults = []);
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 400), () async {
+      final res = await QuranService.searchAyahs(query);
+      if (!mounted || _search.text.trim() != query) return;
+      setState(() => _ayahResults = res.take(30).toList());
     });
   }
 
@@ -319,48 +345,14 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       _PrayerTimesBanner(isDark: isDark),
       _buildSearch(isDark),
-      // Surah-name filtering happens live above; searching INSIDE the
-      // ayah text is a deliberate second step (network round-trip).
-      if (_search.text.trim().length >= 2)
-        GestureDetector(
-          onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) =>
-                      AyahSearchScreen(initialQuery: _search.text.trim()))),
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-                color: (isDark ? AppColors.darkPrimary : AppColors.primary)
-                    .withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(12)),
-            child: Row(children: [
-              Icon(Icons.manage_search_rounded,
-                  size: 20,
-                  color: isDark ? AppColors.darkPrimary : AppColors.primary),
-              const Spacer(),
-              Flexible(
-                child: Text('البحث في الآيات عن "${_search.text.trim()}"',
-                    textDirection: TextDirection.rtl,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        fontFamily: 'Amiri',
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: isDark
-                            ? AppColors.darkPrimary
-                            : AppColors.primary)),
-              ),
-            ]),
-          ),
-        ),
       Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           child: Align(
               alignment: Alignment.centerRight,
-              child: Text('${_ar(_filtered.length)} سورة',
+              child: Text(
+                  _ayahResults.isEmpty
+                      ? '${_ar(_filtered.length)} سورة'
+                      : '${_ar(_filtered.length)} سورة • ${_ar(_ayahResults.length)} آية',
                   style: TextStyle(
                       color: isDark
                           ? AppColors.darkTextSec
@@ -368,21 +360,92 @@ class _HomeScreenState extends State<HomeScreen> {
                       fontSize: 13,
                       fontFamily: 'Amiri')))),
     ];
+    // Inline result layout: headers, then matching surahs, then — when
+    // the query also hits ayah text — a section label + ayah results,
+    // all in the SAME scrolling list right under the search field.
+    final ayahSection = _ayahResults.isEmpty ? 0 : 1 + _ayahResults.length;
     return RefreshIndicator(
       color: theme.colorScheme.primary,
       onRefresh: _load,
       child: ListView.builder(
         padding: const EdgeInsets.only(bottom: 8),
-        itemCount: headers.length + _filtered.length,
-        itemBuilder: (_, i) => i < headers.length
-            ? headers[i]
-            : Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _tile(_filtered[i - headers.length], isDark),
-              ),
+        itemCount: headers.length + _filtered.length + ayahSection,
+        itemBuilder: (_, i) {
+          if (i < headers.length) return headers[i];
+          final si = i - headers.length;
+          if (si < _filtered.length) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _tile(_filtered[si], isDark),
+            );
+          }
+          final ai = si - _filtered.length;
+          if (ai == 0) {
+            return Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text('نتائج في الآيات',
+                        style: TextStyle(
+                            color: isDark
+                                ? AppColors.darkPrimary
+                                : AppColors.primary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Amiri'))));
+          }
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _ayahTile(_ayahResults[ai - 1], isDark),
+          );
+        },
       ),
     );
   }
+
+  /// An inline ayah-text search result; tapping opens the reader at
+  /// that exact ayah.
+  Widget _ayahTile(AyahSearchResult r, bool isDark) => Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurface : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+                color: isDark ? AppColors.darkBorder : AppColors.border)),
+        child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          onTap: () {
+            final surah = _all.firstWhere((s) => s.number == r.surahNumber,
+                orElse: () => _all.first);
+            Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => ReaderScreen(
+                        surah: surah, targetAyah: r.numberInSurah)));
+          },
+          title: Text(r.text,
+              textDirection: TextDirection.rtl,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 16,
+                  height: 1.8,
+                  fontFamily: 'Amiri',
+                  color: isDark ? AppColors.darkText : AppColors.textPrimary)),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text('${r.surahName} • الآية ${_ar(r.numberInSurah)}',
+                textDirection: TextDirection.rtl,
+                style: TextStyle(
+                    color: isDark ? AppColors.darkPrimary : AppColors.primary,
+                    fontFamily: 'Amiri',
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold)),
+          ),
+        ),
+      );
 
   /// Today's date in the Hijri (Umm al-Qura) calendar, with the
   /// Gregorian date as a secondary line.

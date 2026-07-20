@@ -596,7 +596,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               isDark: isDark,
               icon: Icons.info_outline_rounded,
               title: 'آيات الحق — الإصدار',
-              subtitle: '2.2.0'),
+              subtitle: '2.3.0'),
           _Tile(
               isDark: isDark,
               icon: Icons.api_rounded,

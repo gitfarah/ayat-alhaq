@@ -457,6 +457,115 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
+  /// In-surah search: filters THIS surah's loaded ayahs as the user
+  /// types; tapping a match scrolls straight to that ayah.
+  void _showSurahSearch() {
+    final isDark = context.read<SettingsService>().isDarkIn(context);
+    final ctrl = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetCtx) => StatefulBuilder(builder: (ctx, setSheet) {
+        final q = QuranService.normalizeArabic(ctrl.text);
+        final matches = q.length < 2
+            ? const <Ayah>[]
+            : _ayahs
+                .where((a) =>
+                    QuranService.normalizeArabic(a.text).contains(q))
+                .toList();
+        return Padding(
+          // Keep the sheet above the keyboard.
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: SizedBox(
+            height: MediaQuery.of(ctx).size.height * 0.6,
+            child: Column(children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  textDirection: TextDirection.rtl,
+                  textAlign: TextAlign.right,
+                  onChanged: (_) => setSheet(() {}),
+                  style: TextStyle(
+                      fontFamily: 'Amiri',
+                      color:
+                          isDark ? AppColors.darkText : AppColors.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'ابحث في ${widget.surah.name}...',
+                    hintTextDirection: TextDirection.rtl,
+                    hintStyle: TextStyle(
+                        fontFamily: 'Amiri',
+                        color: isDark
+                            ? AppColors.darkTextSec
+                            : AppColors.textLight),
+                    prefixIcon:
+                        Icon(Icons.search_rounded, color: Colors.grey[400]),
+                    filled: true,
+                    fillColor:
+                        isDark ? AppColors.darkBg : AppColors.background,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: matches.isEmpty
+                    ? Center(
+                        child: Text(
+                            ctrl.text.trim().length < 2
+                                ? 'اكتب كلمة من الآية'
+                                : 'لا توجد نتائج في هذه السورة',
+                            style: TextStyle(
+                                fontFamily: 'Amiri',
+                                color: isDark
+                                    ? AppColors.darkTextSec
+                                    : AppColors.textSecondary)))
+                    : ListView.builder(
+                        padding:
+                            const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                        itemCount: matches.length,
+                        itemBuilder: (_, i) {
+                          final a = matches[i];
+                          return ListTile(
+                            dense: true,
+                            onTap: () {
+                              Navigator.pop(sheetCtx);
+                              _scrollTo(a.numberInSurah);
+                            },
+                            leading: Text(_ar(a.numberInSurah),
+                                style: TextStyle(
+                                    fontFamily: 'Amiri',
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark
+                                        ? AppColors.darkSecondary
+                                        : AppColors.accent)),
+                            title: Text(a.text,
+                                textDirection: TextDirection.rtl,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontFamily: 'Amiri',
+                                    fontSize: 15,
+                                    height: 1.7,
+                                    color: isDark
+                                        ? AppColors.darkText
+                                        : AppColors.textPrimary)),
+                          );
+                        }),
+              ),
+            ]),
+          ),
+        );
+      }),
+    );
+  }
+
   void _showTafsir(int ayahNumber, String text) {
     Navigator.push(
         context,
@@ -525,6 +634,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             : AppColors.textSecondary)),
               ]),
               actions: [
+                IconButton(
+                  tooltip: 'البحث في السورة',
+                  icon: const Icon(Icons.search_rounded),
+                  onPressed: _showSurahSearch,
+                ),
                 IconButton(
                   icon: Icon(Icons.translate_rounded,
                       color: settings.translationEdition != null

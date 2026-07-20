@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/quran_page_meta.dart';
 import '../services/mushaf_svg_service.dart';
+import '../services/quran_service.dart';
 import '../services/bookmark_service.dart';
 import '../services/highlight_service.dart';
 import '../services/khatma_service.dart';
@@ -26,10 +27,17 @@ class MushafSvgScreen extends StatefulWidget {
 class _MushafSvgScreenState extends State<MushafSvgScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   late int _pageNum;
-  MushafPageData? _pageData;
-  MushafPageData? _secondPageData;
-  bool _loading = true;
-  String? _error;
+
+  /// Real swipeable paging (finger-following, like printed pages).
+  /// Nullable because it is (re)created in build() where screen width
+  /// is known — a wide screen pages by 2-page spreads.
+  PageController? _pageCtrl;
+  bool _wide = false;
+
+  /// Per-index page-load futures so rebuilds don't refetch; pruned to
+  /// the neighbourhood of the current page to keep memory flat.
+  final Map<int, Future<List<MushafPageData>>> _pageFutures = {};
+
   bool _isCachedOffline = false;
   bool _barsVisible = true;
   List<Bookmark> _bookmarks = [];
@@ -40,13 +48,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// Whether the whole Mushaf is stored offline. Download itself is
   /// owned by MushafSvgService and survives leaving this screen.
   bool _fullyDownloaded = false;
-
-  /// +1 = turning forward (new page slides in from the left, matching
-  /// RTL page order), -1 = turning back.
-  int _turnDirection = 1;
-
-  /// A page turn is loading while the current page stays visible.
-  bool _turning = false;
 
   /// Tap feedback: the just-tapped ayah flashes briefly so the user
   /// sees exactly which ayah the tap registered on.
@@ -78,14 +79,45 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     _audioService = context.read<QuranAudioService>();
     _audioService!.addListener(_followRecitation);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadPage(_pageNum);
       // Auto-advance simply moves to the next global ayah — the Mushaf
       // view isn't scoped to one surah, so recitation flows across
       // surah boundaries just like reading the pages does.
       _audioService!.nextAyahResolver = (g) => g < 6236 ? g + 1 : null;
+      _onPageSettled(_pageNum);
       _maybeOfferFullDownload();
+      _maybeShowGestureHint();
     });
     MushafSvgService.bulkProgress.addListener(_onBulkProgress);
+  }
+
+  // ── PageView index mapping (wide screens page by 2-page spreads) ──
+
+  int _indexForPage(int page) =>
+      _wide ? (_spreadBase(page) - 1) ~/ 2 : page - 1;
+  int _pageForIndex(int index) => _wide ? index * 2 + 1 : index + 1;
+  int get _pageCount => _wide ? 302 : 604;
+
+  /// Bookkeeping when a page becomes the visible one: last-read state,
+  /// khatma tracking, neighbour preloads, offline badge.
+  Future<void> _onPageSettled(int basePage) async {
+    if (!mounted) return;
+    setState(() => _pageNum = basePage);
+    context.read<SettingsService>().saveLastRead(page: basePage);
+    KhatmaService.markPageRead(basePage);
+    if (_wide && basePage + 1 <= 604) KhatmaService.markPageRead(basePage + 1);
+
+    final step = _wide ? 2 : 1;
+    MushafSvgService.preload(basePage + step);
+    MushafSvgService.preload(basePage + step + 1);
+    MushafSvgService.preload(basePage - 1);
+
+    // Keep only the current neighbourhood of load-futures alive so the
+    // retained page data can't grow without bound.
+    final center = _indexForPage(basePage);
+    _pageFutures.removeWhere((k, _) => (k - center).abs() > 3);
+
+    final cached = await MushafSvgService.isCached(basePage);
+    if (mounted) setState(() => _isCachedOffline = cached);
   }
 
   /// Repaints the menu/progress UI while the service downloads pages,
@@ -199,6 +231,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     MushafSvgService.bulkProgress.removeListener(_onBulkProgress);
     // Never leave the app stuck in immersive mode after this screen.
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _pageCtrl?.dispose();
     _flashCtrl.dispose();
     LibraryEvents.bookmarks.removeListener(_loadMarks);
     LibraryEvents.highlights.removeListener(_loadMarks);
@@ -220,42 +253,23 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     return (a != null && a.hasActiveTrack) ? a.currentGlobalAyah : null;
   }
 
-  bool _pageHasAyah(MushafPageData? d, int g) =>
-      d != null &&
-      d.ayahRegions.any((r) =>
-          r.surahNumber > 0 && r.ayahNumber > 0 && _regionGlobal(r) == g);
-
-  /// When recitation advances to an ayah that is no longer on the
-  /// visible page(s), turn the page forward — exactly like a reader
-  /// following along in a printed Mushaf.
+  /// When recitation advances to an ayah on the NEXT page, turn the
+  /// page forward — exactly like a reader following along in a printed
+  /// Mushaf. (If the user started audio somewhere else entirely, the
+  /// page is not yanked away.)
   void _followRecitation() {
-    if (!mounted || _loading || _pageData == null) return;
+    if (!mounted) return;
     final audio = _audioService;
     if (audio == null || !audio.hasActiveTrack) return;
     final g = audio.currentGlobalAyah;
     if (g == null || g == _lastFollowedAyah) return;
     _lastFollowedAyah = g;
 
-    if (_pageHasAyah(_pageData, g) || _pageHasAyah(_secondPageData, g)) {
-      return; // still visible — build() repaints the tint via watch.
-    }
-
-    // Only follow FORWARD flow (the ayah right after the last visible
-    // one); if the user started audio elsewhere, don't yank the page.
-    var maxG = 0;
-    for (final d in [_pageData, _secondPageData]) {
-      if (d == null) continue;
-      for (final r in d.ayahRegions) {
-        if (r.surahNumber > 0 && r.ayahNumber > 0) {
-          final rg = _regionGlobal(r);
-          if (rg > maxG) maxG = rg;
-        }
-      }
-    }
-    final step = _isWideScreen(context) ? 2 : 1;
-    if (maxG > 0 && g == maxG + 1 && _pageNum + step <= 604) {
-      _loadPage(_pageNum + step);
-    }
+    QuranService.pageOfGlobalAyah(g).then((p) {
+      if (!mounted) return;
+      final visibleEnd = _wide ? _pageNum + 1 : _pageNum;
+      if (p == visibleEnd + 1) _loadPage(p);
+    });
   }
 
   /// Loads all bookmarks and highlights so the matching ayah regions
@@ -289,11 +303,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   @override
   void didChangeMetrics() {
     super.didChangeMetrics();
+    // build() recreates the PageController when wide-mode flips.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _loading) return;
-      final wide = _isWideScreen(context);
-      final hasSecond = _secondPageData != null;
-      if (wide != hasSecond) _loadPage(_pageNum);
+      if (mounted) setState(() {});
     });
   }
 
@@ -317,89 +329,33 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     return size.width > size.height && !_isWideScreen(context);
   }
 
-  Future<void> _loadPage(int page) async {
-    final wide = _isWideScreen(context);
-    final basePage = wide ? _spreadBase(page) : page;
-    // Which way the incoming page should slide in (Mushaf pages run
-    // right-to-left, so forward = enters from the left).
-    if (basePage != _pageNum) _turnDirection = basePage > _pageNum ? 1 : -1;
-    // Only the very first load blanks the screen with a spinner —
-    // page TURNS keep the current page visible until the next one is
-    // ready, so the slide animation goes page-to-page directly.
-    final firstLoad = _pageData == null;
-
-    setState(() {
-      _error = null;
-      if (firstLoad) {
-        _loading = true;
-        _secondPageData = null;
-      } else {
-        _turning = true;
-      }
-      _pageNum = basePage;
-    });
-
-    context.read<SettingsService>().saveLastRead(page: basePage);
-
-    try {
-      final wasCached = await MushafSvgService.isCached(basePage);
-      final data = await MushafSvgService.getPage(basePage);
-
-      MushafPageData? secondData;
-      if (wide && basePage + 1 <= 604) {
-        try {
-          secondData = await MushafSvgService.getPage(basePage + 1);
-        } catch (_) {
-          secondData = null;
-        }
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _pageData = data;
-        _secondPageData = secondData;
-        _loading = false;
-        _turning = false;
-        _isCachedOffline = wasCached;
-      });
-
-      // Khatma auto-tracking: count the viewed page(s) as read.
-      KhatmaService.markPageRead(basePage);
-      if (secondData != null) KhatmaService.markPageRead(basePage + 1);
-
-      if (firstLoad) _maybeShowGestureHint();
-
-      final step = wide ? 2 : 1;
-      MushafSvgService.preload(basePage + step);
-      MushafSvgService.preload(basePage + step + 1);
-      MushafSvgService.preload(basePage - step);
-      MushafSvgService.preload(basePage - 1);
-    } catch (e) {
-      debugPrint('MushafSvgScreen error loading page $page: $e');
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _turning = false;
-        if (firstLoad) {
-          _error = 'تعذّر تحميل الصفحة\n$e';
-        }
-      });
-      if (!firstLoad) {
-        // The previous page is still on screen — a snackbar suffices.
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('تعذّر تحميل الصفحة، تحقق من اتصالك')));
-      }
+  /// Jumps straight to [page] (menu pickers, recitation follow). The
+  /// PageView's onPageChanged then runs the usual bookkeeping.
+  void _loadPage(int page) {
+    final ctrl = _pageCtrl;
+    if (ctrl != null && ctrl.hasClients) {
+      ctrl.jumpToPage(_indexForPage(page));
+    } else {
+      _onPageSettled(_wide ? _spreadBase(page) : page);
     }
   }
 
   void _next() {
-    final step = _isWideScreen(context) ? 2 : 1;
-    if (_pageNum + step <= 604) _loadPage(_pageNum + step);
+    final ctrl = _pageCtrl;
+    if (ctrl != null && ctrl.hasClients) {
+      ctrl.nextPage(
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic);
+    }
   }
 
   void _prev() {
-    final step = _isWideScreen(context) ? 2 : 1;
-    if (_pageNum - step >= 1) _loadPage(_pageNum - step);
+    final ctrl = _pageCtrl;
+    if (ctrl != null && ctrl.hasClients) {
+      ctrl.previousPage(
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic);
+    }
   }
 
   String _ar(int n) {
@@ -977,25 +933,197 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     final bgColor = isDark ? AppColors.darkBg : AppColors.background;
     final textColor = isDark ? AppColors.darkText : AppColors.textPrimary;
 
+    // (Re)create the controller when wide-mode flips — index math
+    // differs between single pages and 2-page spreads.
+    final wide = _isWideScreen(context);
+    if (_pageCtrl == null || wide != _wide) {
+      _wide = wide;
+      _pageCtrl?.dispose();
+      _pageCtrl = PageController(initialPage: _indexForPage(_pageNum));
+      _pageFutures.clear();
+    }
+
     return Scaffold(
       backgroundColor: bgColor,
-      appBar: _barsVisible
-          ? AppBar(
-              backgroundColor: bgColor,
-              leading: IconButton(
-                  icon: Container(
-                      padding: const EdgeInsets.all(6),
+      body: Stack(children: [
+        // ── The pages: ALWAYS full-bleed. The bars float on top and
+        // never resize the page, so toggling them causes no zoom jump.
+        // PageView gives real finger-following page turns; reverse =
+        // RTL book order (swipe right, like flipping a printed page,
+        // advances).
+        Positioned.fill(
+          child: PageView.builder(
+            controller: _pageCtrl,
+            reverse: true,
+            itemCount: _pageCount,
+            onPageChanged: (i) {
+              _setBars(false);
+              _onPageSettled(_pageForIndex(i));
+            },
+            itemBuilder: (ctx, i) => _buildPageItem(i, isDark),
+          ),
+        ),
+        // ── Top bar overlay (slides away in immersive reading)
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: AnimatedSlide(
+            offset: _barsVisible ? Offset.zero : const Offset(0, -1.1),
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            child: _buildTopBar(isDark, bgColor, textColor),
+          ),
+        ),
+        // ── Bottom overlay: audio controls + page navigation
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: AnimatedSlide(
+            offset: _barsVisible ? Offset.zero : const Offset(0, 1.1),
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              if (audio.hasActiveTrack) _buildAudioBar(audio, isDark),
+              _buildNavBar(isDark),
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  /// One PageView item: a single page, or a 2-page spread on wide
+  /// screens. Loads through a cached future so rebuilds don't refetch.
+  Widget _buildPageItem(int index, bool isDark) {
+    final base = _pageForIndex(index);
+    final future = _pageFutures[index] ??= () async {
+      final first = await MushafSvgService.getPage(base);
+      if (!_wide || base + 1 > 604) return [first];
+      try {
+        return [first, await MushafSvgService.getPage(base + 1)];
+      } catch (_) {
+        return [first];
+      }
+    }();
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _setBars(!_barsVisible),
+      child: FutureBuilder<List<MushafPageData>>(
+        future: future,
+        builder: (ctx, snap) {
+          if (snap.hasError) {
+            return Center(
+                child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                  const Icon(Icons.wifi_off_rounded,
+                      size: 48, color: Colors.grey),
+                  const SizedBox(height: 12),
+                  Text('تعذّر تحميل صفحة ${_ar(base)}\nتحقق من اتصالك',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontFamily: 'Amiri',
+                          color: isDark
+                              ? AppColors.darkTextSec
+                              : AppColors.textSecondary,
+                          height: 1.6)),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12))),
+                      onPressed: () =>
+                          setState(() => _pageFutures.remove(index)),
+                      icon: const Icon(Icons.refresh_rounded,
+                          color: Colors.white),
+                      label: const Text('إعادة المحاولة',
+                          style: TextStyle(
+                              color: Colors.white, fontFamily: 'Amiri'))),
+                ]));
+          }
+          if (!snap.hasData) {
+            return Center(
+                child: CircularProgressIndicator(
+                    color:
+                        isDark ? AppColors.darkPrimary : AppColors.primary));
+          }
+          final pages = snap.data!;
+          final content = pages.length == 1
+              ? _buildSinglePage(pages[0], isDark)
+              : Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(children: [
+                    Expanded(child: _buildSinglePage(pages[1], isDark)),
+                    // Book spine divider
+                    Container(
+                      width: 2,
+                      margin: const EdgeInsets.symmetric(vertical: 24),
                       decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          shape: BoxShape.circle),
-                      child: Icon(Icons.arrow_back_ios_rounded,
-                          size: 16, color: textColor)),
-                  onPressed: () => Navigator.pop(context)),
-              title: Row(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            Colors.transparent,
+                            (isDark ? Colors.white : Colors.black)
+                                .withValues(alpha: 0.15),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                    Expanded(child: _buildSinglePage(pages[0], isDark)),
+                  ]),
+                );
+          return SafeArea(child: content);
+        },
+      ),
+    );
+  }
+
+  /// Floating top bar: back / page number / menu plus the juz-hizb and
+  /// surah info strip — all overlaying the page, never resizing it.
+  Widget _buildTopBar(bool isDark, Color bgColor, Color textColor) {
+    const gold = AppColors.mushafBorderGold;
+    final headerText = isDark ? AppColors.darkPrimary : AppColors.primary;
+    final subText = isDark ? AppColors.darkTextSec : AppColors.textSecondary;
+    final juz = QuranPageMeta.juzForPage(_pageNum);
+    final hizb = QuranPageMeta.hizbForPage(_pageNum);
+    final surahLabel = QuranPageMeta.headerLabelForPage(_pageNum);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor.withValues(alpha: 0.97),
+        border:
+            Border(bottom: BorderSide(color: gold.withValues(alpha: 0.5))),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08), blurRadius: 6),
+        ],
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Row(children: [
+            IconButton(
+                icon: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle),
+                    child: Icon(Icons.arrow_back_ios_rounded,
+                        size: 16, color: textColor)),
+                onPressed: () => Navigator.pop(context)),
+            Expanded(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                      _secondPageData != null
+                      _wide && _pageNum + 1 <= 604
                           ? 'صفحة ${_ar(_pageNum)} — ${_ar(_pageNum + 1)}'
                           : 'صفحة ${_ar(_pageNum)}',
                       style: TextStyle(
@@ -1011,128 +1139,49 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   ],
                 ],
               ),
-              actions: [
-                IconButton(
-                    icon: Icon(Icons.menu_rounded, color: textColor),
-                    onPressed: _showMenuSheet),
-              ],
-            )
-          : null,
-      body: GestureDetector(
-        onTap: () => _setBars(!_barsVisible),
-        // Finger swipe page turning. Mushaf pages advance right-to-left,
-        // so a rightward fling (like flipping a printed page over to the
-        // right) goes FORWARD and a leftward fling goes back. Swiping
-        // also hides the bars so the page takes the full screen while
-        // reading; a tap brings them back.
-        onHorizontalDragEnd: (details) {
-          final v = details.primaryVelocity ?? 0;
-          if (v > 200) {
-            _setBars(false);
-            _next();
-          } else if (v < -200) {
-            _setBars(false);
-            _prev();
-          }
-        },
-        child: _loading
-            ? Center(
-                child: CircularProgressIndicator(
-                    color: isDark ? AppColors.darkPrimary : AppColors.primary))
-            : _error != null
-                ? Center(
-                    child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                        const Icon(Icons.wifi_off_rounded,
-                            size: 48, color: Colors.grey),
-                        const SizedBox(height: 12),
-                        Text(_error!,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                color: isDark
-                                    ? AppColors.darkTextSec
-                                    : AppColors.textSecondary,
-                                height: 1.6)),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12))),
-                            onPressed: () => _loadPage(_pageNum),
-                            icon: const Icon(Icons.refresh_rounded,
-                                color: Colors.white),
-                            label: const Text('إعادة المحاولة',
-                                style: TextStyle(
-                                    color: Colors.white, fontFamily: 'Amiri'))),
-                      ]))
-                : Column(children: [
-                    // Slim indicator while the next page loads over the
-                    // still-visible current page (slow networks only —
-                    // preloaded neighbours turn instantly).
-                    if (_turning)
-                      LinearProgressIndicator(
-                          minHeight: 2,
-                          color: isDark
-                              ? AppColors.darkPrimary
-                              : AppColors.primary,
-                          backgroundColor: Colors.transparent),
-                    Expanded(
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 280),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        transitionBuilder: (child, animation) =>
-                            SlideTransition(
-                          position: Tween<Offset>(
-                            begin: Offset(_turnDirection * -0.25, 0),
-                            end: Offset.zero,
-                          ).animate(animation),
-                          child:
-                              FadeTransition(opacity: animation, child: child),
-                        ),
-                        child: KeyedSubtree(
-                          key: ValueKey(
-                              'p${_pageData?.pageNumber}-${_secondPageData?.pageNumber}'),
-                          child: _buildPageView(isDark),
-                        ),
-                      ),
-                    ),
-                    if (audio.hasActiveTrack) _buildAudioBar(audio, isDark),
-                    if (_barsVisible) _buildNavBar(isDark),
-                  ]),
-      ),
-    );
-  }
-
-  Widget _buildPageView(bool isDark) {
-    final wide = _isWideScreen(context) && _secondPageData != null;
-
-    if (!wide) return _buildSinglePage(_pageData!, isDark);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(children: [
-        Expanded(child: _buildSinglePage(_secondPageData!, isDark)),
-        // Book spine divider
-        Container(
-          width: 2,
-          margin: const EdgeInsets.symmetric(vertical: 24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [
-                Colors.transparent,
-                (isDark ? Colors.white : Colors.black).withValues(alpha: 0.15),
-                Colors.transparent,
-              ],
+            ),
+            IconButton(
+                icon: Icon(Icons.menu_rounded, color: textColor),
+                onPressed: _showMenuSheet),
+          ]),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 220),
+                    child: Text(surahLabel,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontFamily: 'Amiri',
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: headerText,
+                            height: 1.25)),
+                  ),
+                  const SizedBox(width: 14),
+                  Container(
+                      width: 1,
+                      height: 18,
+                      color: gold.withValues(alpha: 0.45)),
+                  const SizedBox(width: 14),
+                  Text('الجزء ${_ar(juz)} • الحزب ${_ar(hizb)}',
+                      style: TextStyle(
+                          fontFamily: 'Amiri',
+                          fontSize: 12,
+                          color: subText)),
+                ],
+              ),
             ),
           ),
-        ),
-        Expanded(child: _buildSinglePage(_pageData!, isDark)),
-      ]),
+        ]),
+      ),
     );
   }
 
@@ -1141,97 +1190,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     if (data.pageNumber <= 2) {
       return _buildIlluminatedPage(data, isDark);
     }
-
-    const gold = AppColors.mushafBorderGold;
-    final headerBg = isDark ? AppColors.darkSurface : Colors.white;
-    final headerText = isDark ? AppColors.darkPrimary : AppColors.primary;
-    final subText = isDark ? AppColors.darkTextSec : AppColors.textSecondary;
-
-    final juz = QuranPageMeta.juzForPage(data.pageNumber);
-    final hizb = QuranPageMeta.hizbForPage(data.pageNumber);
-    final surahLabel = QuranPageMeta.headerLabelForPage(data.pageNumber);
-    final surahCount = QuranPageMeta.surahsOnPage(data.pageNumber).length;
-
+    // Just the page artwork at its maximum size — the info header
+    // lives in the floating top bar now, so the page NEVER resizes.
     return Padding(
-      padding: EdgeInsets.symmetric(
-          horizontal: _barsVisible ? 4 : 0, vertical: _barsVisible ? 4 : 0),
-      child: Column(children: [
-        // The page info header is part of the chrome: it disappears
-        // with the bars so the page itself gets every pixel while the
-        // user is immersed in reading.
-        if (_barsVisible)
-        // ── Header: a single compact, CENTERED group — juz/hizb block,
-        // a thin divider, then the surah name(s). Deliberately NOT
-        // stretched edge-to-edge (that created a large dead gap in the
-        // middle when there was only one short surah name). Wrapped in
-        // Directionality so the surah name renders on the visual right
-        // and the juz/hizb block on the visual left, matching the
-        // printed Mushaf convention, regardless of the surrounding
-        // widget tree's directionality.
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-              color: headerBg,
-              border: Border(
-                  bottom: BorderSide(
-                      color: gold.withValues(alpha: 0.5), width: 1))),
-          child: Center(
-            child: Directionality(
-              textDirection: TextDirection.rtl,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Rightmost (first in RTL): surah name(s)
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 220),
-                    child: Text(
-                      surahLabel,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'Amiri',
-                        fontSize: surahCount > 1 ? 12 : 14,
-                        fontWeight: FontWeight.bold,
-                        color: headerText,
-                        height: 1.25,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Container(
-                      width: 1,
-                      height: 26,
-                      color: gold.withValues(alpha: 0.45)),
-                  const SizedBox(width: 14),
-                  // Leftmost (last in RTL): juz + hizb
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('الجزء ${_ar(juz)}',
-                          style: TextStyle(
-                              fontFamily: 'Amiri',
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: headerText)),
-                      Text('الحزب ${_ar(hizb)}',
-                          style: TextStyle(
-                              fontFamily: 'Amiri',
-                              fontSize: 10,
-                              color: subText)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        // ── Page artwork ──────────────────────────────────────────────
-        Expanded(child: _buildPageArtwork(data, isDark)),
-      ]),
+      padding: const EdgeInsets.all(2),
+      child: _buildPageArtwork(data, isDark),
     );
   }
 

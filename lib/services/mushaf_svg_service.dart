@@ -183,6 +183,13 @@ class MushafSvgService {
     );
 
     _memoryCache[page] = data;
+    // Cap the in-memory cache: each page's SVG string is ~0.6 MB, and a
+    // swipe through the whole Mushaf must not accumulate 350 MB of RAM.
+    // Insertion order ≈ recency here (pages are re-fetched from disk
+    // cheaply once evicted).
+    while (_memoryCache.length > 12) {
+      _memoryCache.remove(_memoryCache.keys.first);
+    }
     return data;
   }
 

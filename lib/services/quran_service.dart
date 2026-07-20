@@ -195,6 +195,23 @@ class QuranService {
     return text;
   }
 
+  /// The Mushaf page a GLOBAL ayah number (1-6236) appears on, from the
+  /// bundled metadata. Returns 1 when out of range.
+  static Future<int> pageOfGlobalAyah(int globalAyah) async {
+    await _ensureLoaded();
+    for (final surah in _rawAyahs!) {
+      if (surah.isEmpty) continue;
+      final lastGlobal = surah.last[0] as int;
+      if (globalAyah <= lastGlobal) {
+        for (final t in surah) {
+          if (t[0] as int == globalAyah) return t[3] as int;
+        }
+        return 1;
+      }
+    }
+    return 1;
+  }
+
   /// Normalizes Arabic to bare letters word-by-word (public form of
   /// [_bareLetters] for multi-word strings).
   static String normalizeArabic(String s) =>
