@@ -146,7 +146,11 @@ class _TafsirScreenState extends State<TafsirScreen> {
         isDark ? AppColors.darkPrimary : const Color(0xFF2D6A4F);
     final bodyText = isDark ? AppColors.darkText : Colors.black87;
 
-    return Scaffold(
+    // Reading surfaces keep their original fixed layout (RTL content,
+    // LTR-positioned chrome) regardless of the app's UI language.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
         backgroundColor: bg,
@@ -358,6 +362,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
                       ),
         ],
       ),
+    ),
     );
   }
 }

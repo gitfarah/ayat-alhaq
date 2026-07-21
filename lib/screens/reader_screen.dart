@@ -605,7 +605,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final isDark = settings.isDarkIn(context);
     final theme = Theme.of(context);
 
-    return Scaffold(
+    // Reading surfaces keep their original fixed layout (RTL content,
+    // LTR-positioned chrome) regardless of the app's UI language.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Scaffold(
       body: _loading
           ? Center(
               child:
@@ -898,6 +902,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     ),
                   ),
                 ]),
+    ),
     );
   }
 

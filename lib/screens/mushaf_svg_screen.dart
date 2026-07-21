@@ -946,7 +946,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       _pageFutures.clear();
     }
 
-    return Scaffold(
+    // The Mushaf keeps its original fixed layout and page-turn
+    // direction regardless of the app's UI language — it is Quran
+    // reading, not app chrome.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Scaffold(
       backgroundColor: bgColor,
       body: Stack(children: [
         // ── The pages: ALWAYS full-bleed. The bars float on top and
@@ -994,6 +999,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           ),
         ),
       ]),
+    ),
     );
   }
 
