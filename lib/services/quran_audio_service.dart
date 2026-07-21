@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -201,9 +202,29 @@ class QuranAudioService extends ChangeNotifier {
 
   // ── Playback ─────────────────────────────────────────────────────────
 
+  /// The app icon, copied out of assets to a real file once so it can
+  /// be shown as the artwork on the lock screen / media notification
+  /// (artUri needs a file/content URI, not an asset path).
+  Uri? _artUri;
+  Future<Uri?> _appArtUri() async {
+    if (_artUri != null || kIsWeb) return _artUri;
+    try {
+      _docsDir ??= await getApplicationDocumentsDirectory();
+      final f = File('${_docsDir!.path}${Platform.pathSeparator}media_art.png');
+      if (!await f.exists()) {
+        final bytes = await rootBundle.load('assets/icon/media_art.png');
+        await f.writeAsBytes(bytes.buffer.asUint8List(), flush: true);
+      }
+      _artUri = Uri.file(f.path);
+    } catch (_) {
+      _artUri = null;
+    }
+    return _artUri;
+  }
+
   /// Media metadata shown on the lock screen / control center for the
-  /// currently playing ayah.
-  MediaItem _mediaItemFor(int globalAyah) {
+  /// currently playing ayah — including the app icon as artwork.
+  MediaItem _mediaItemFor(int globalAyah, Uri? art) {
     final (surah, first, _) = surahRangeOf(globalAyah);
     final ayahInSurah = globalAyah - first + 1;
     return MediaItem(
@@ -211,6 +232,7 @@ class QuranAudioService extends ChangeNotifier {
       album: 'آيات الحق',
       title: 'سورة ${QuranPageMeta.surahName(surah)} — آية $ayahInSurah',
       artist: reciterName,
+      artUri: art,
     );
   }
 
@@ -221,7 +243,7 @@ class QuranAudioService extends ChangeNotifier {
     notifyListeners();
 
     final reciter = _reciter;
-    final media = _mediaItemFor(globalAyahNumber);
+    final media = _mediaItemFor(globalAyahNumber, await _appArtUri());
     var started = false;
 
     if (!kIsWeb) {

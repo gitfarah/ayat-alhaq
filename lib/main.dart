@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:provider/provider.dart';
 import 'package:device_preview/device_preview.dart';
@@ -54,9 +55,15 @@ class QuranApp extends StatelessWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: s.themeMode,
-      // Required by device_preview so it can correctly simulate the
-      // selected device's screen size, safe areas, and text scaling.
-      locale: DevicePreview.locale(context),
+      // Drives the app's text DIRECTION: Arabic → RTL, English/German →
+      // LTR. Everything not explicitly overridden follows this.
+      locale: Locale(s.effectiveLanguage),
+      supportedLocales: const [Locale('ar'), Locale('en'), Locale('de')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       builder: DevicePreview.appBuilder,
       home: const SplashGate(),
     );

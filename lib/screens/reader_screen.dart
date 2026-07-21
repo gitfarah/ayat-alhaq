@@ -10,6 +10,7 @@ import '../services/highlight_service.dart';
 import '../services/khatma_service.dart';
 import '../services/settings_service.dart';
 import '../services/quran_audio_service.dart';
+import '../l10n/app_strings.dart';
 import '../theme.dart';
 import '../widgets/reciter_picker.dart';
 import '../widgets/surah_frame.dart';
@@ -196,6 +197,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   /// that ribbon here; the block dot removes this ayah's bookmark.
   void _showBookmarkPicker(int ayahNumber) {
     final isDark = context.read<SettingsService>().isDarkIn(context);
+    final l = L10n.of(context);
     final existing = _bookmarkFor(ayahNumber);
     showModalBottomSheet(
       context: context,
@@ -206,7 +208,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text('اختر لون الفاصل',
+            Text(l('chooseBookmarkColor'),
                 style: TextStyle(
                     fontFamily: 'Amiri',
                     fontWeight: FontWeight.bold,
@@ -230,8 +232,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         await _refreshBookmarkAndHighlights();
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('تم إزالة الفاصل')));
+                              SnackBar(content: Text(l('removedBookmark'))));
                         }
                       },
                     ),
@@ -253,8 +254,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         await _refreshBookmarkAndHighlights();
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('✓ تم حفظ الفاصل')));
+                              SnackBar(content: Text(l('savedBookmark'))));
                         }
                       },
                     ),
@@ -274,13 +274,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✓ تم نسخ الآية')),
+        SnackBar(content: Text(L10n.of(context)('copiedAyah'))),
       );
     }
   }
 
   Future<void> _showOptions(Ayah ayah) async {
     final isDark = context.read<SettingsService>().isDarkIn(context);
+    final l = L10n.of(context);
     final audio = context.read<QuranAudioService>();
     final existing = await HighlightService.getHighlight(
         widget.surah.number, ayah.numberInSurah);
@@ -344,7 +345,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         await _refreshBookmarkAndHighlights();
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('تم إزالة التمييز')),
+                            SnackBar(content: Text(l('removedHighlight'))),
                           );
                         }
                       },
@@ -366,7 +367,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         await _refreshBookmarkAndHighlights();
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('✓ تم التمييز')),
+                            SnackBar(content: Text(l('highlighted'))),
                           );
                         }
                       },
@@ -387,9 +388,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
               ),
               title: Text(
                 (audio.currentGlobalAyah == ayah.number && audio.isPlaying)
-                    ? 'إيقاف التلاوة'
-                    : 'تشغيل التلاوة',
-                textDirection: TextDirection.rtl,
+                    ? l('pauseRecitation')
+                    : l('playRecitation'),
                 style: const TextStyle(fontFamily: 'Amiri'),
               ),
               onTap: () async {
@@ -419,9 +419,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       ? AppColors.highlight(
                           _bookmarkFor(ayah.numberInSurah)!.color)
                       : AppColors.primary),
-              title: const Text('الفاصل',
-                  textDirection: TextDirection.rtl,
-                  style: TextStyle(fontFamily: 'Amiri')),
+              title: Text(l('bookmark'),
+                  style: const TextStyle(fontFamily: 'Amiri')),
               onTap: () {
                 Navigator.pop(context);
                 _showBookmarkPicker(ayah.numberInSurah);
@@ -431,9 +430,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
               contentPadding: EdgeInsets.zero,
               leading:
                   const Icon(Icons.menu_book_rounded, color: AppColors.primary),
-              title: const Text('التفسير',
-                  textDirection: TextDirection.rtl,
-                  style: TextStyle(fontFamily: 'Amiri')),
+              title: Text(l('tafsir'),
+                  style: const TextStyle(fontFamily: 'Amiri')),
               onTap: () {
                 Navigator.pop(context);
                 _showTafsir(ayah.numberInSurah, ayah.text);
@@ -442,9 +440,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.copy_rounded, color: AppColors.accent),
-              title: const Text('نسخ الآية',
-                  textDirection: TextDirection.rtl,
-                  style: TextStyle(fontFamily: 'Amiri')),
+              title: Text(l('copyAyah'),
+                  style: const TextStyle(fontFamily: 'Amiri')),
               onTap: () {
                 Navigator.pop(context);
                 _copyAyah(ayah.text, ayah.numberInSurah);
@@ -461,6 +458,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   /// types; tapping a match scrolls straight to that ayah.
   void _showSurahSearch() {
     final isDark = context.read<SettingsService>().isDarkIn(context);
+    final l = L10n.of(context);
     final ctrl = TextEditingController();
     showModalBottomSheet(
       context: context,
@@ -496,7 +494,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       color:
                           isDark ? AppColors.darkText : AppColors.textPrimary),
                   decoration: InputDecoration(
-                    hintText: 'ابحث في ${widget.surah.name}...',
+                    hintText: '${l('searchInSurah')} — ${widget.surah.name}',
                     hintTextDirection: TextDirection.rtl,
                     hintStyle: TextStyle(
                         fontFamily: 'Amiri',
@@ -519,8 +517,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     ? Center(
                         child: Text(
                             ctrl.text.trim().length < 2
-                                ? 'اكتب كلمة من الآية'
-                                : 'لا توجد نتائج في هذه السورة',
+                                ? l('typeAyahWord')
+                                : l('noResultsInSurah'),
                             style: TextStyle(
                                 fontFamily: 'Amiri',
                                 color: isDark
@@ -601,6 +599,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L10n.of(context);
     final settings = context.watch<SettingsService>();
     final audio = context.watch<QuranAudioService>();
     final isDark = settings.isDarkIn(context);
@@ -759,8 +758,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                             const SizedBox(width: 4),
                                             Text(
                                               audio.isLoading
-                                                  ? 'جارٍ التحميل...'
-                                                  : 'قيد التلاوة',
+                                                  ? l('loading')
+                                                  : l('nowReciting'),
                                               style: const TextStyle(
                                                 fontSize: 11,
                                                 fontFamily: 'Amiri',
@@ -905,6 +904,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   /// Floating app-bar replacement — overlays the text instead of
   /// resizing it, same model as the Mushaf screen.
   Widget _buildTopBar(SettingsService settings, bool isDark) {
+    final l = L10n.of(context);
     final bg = isDark ? AppColors.darkBg : AppColors.background;
     final textColor = isDark ? AppColors.darkText : AppColors.textPrimary;
     return Container(
@@ -945,7 +945,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             fontSize: 18,
                             color: textColor)),
                     Text(
-                        '${widget.surah.revelationType == 'Meccan' ? 'مكية' : 'مدنية'} • ${widget.surah.numberOfAyahs} آية',
+                        '${widget.surah.revelationType == 'Meccan' ? l('meccan') : l('medinan')} • ${l.number(widget.surah.numberOfAyahs)} ${l('ayahUnit')}',
                         style: TextStyle(
                             fontSize: 11,
                             fontFamily: 'Amiri',
@@ -955,7 +955,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ]),
             ),
             IconButton(
-              tooltip: 'البحث في السورة',
+              tooltip: l('searchInSurah'),
               icon: Icon(Icons.search_rounded, color: textColor),
               onPressed: _showSurahSearch,
             ),
@@ -977,6 +977,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Widget _buildNowPlayingBar(bool isDark, QuranAudioService audio) {
+    final l = L10n.of(context);
     final ayah = _ayahs.cast<Ayah?>().firstWhere(
           (a) => a?.number == audio.currentGlobalAyah,
           orElse: () => null,
@@ -1024,8 +1025,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    ayah != null ? 'آية ${_ar(ayah.numberInSurah)}' : '',
-                    textDirection: TextDirection.rtl,
+                    ayah != null
+                        ? '${l('ayahWord')} ${l.number(ayah.numberInSurah)}'
+                        : '',
                     style: TextStyle(
                       fontFamily: 'Amiri',
                       fontWeight: FontWeight.bold,
@@ -1036,10 +1038,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ),
                   Text(
                     audio.isLoading
-                        ? 'جارٍ التحميل...'
+                        ? l('loading')
                         : (audio.isPlaying
-                            ? 'قيد التلاوة — ${audio.reciterName}'
-                            : 'متوقف مؤقتاً'),
+                            ? '${l('nowReciting')} — ${audio.reciterName}'
+                            : l('paused')),
                     style: TextStyle(
                         fontSize: 11,
                         fontFamily: 'Amiri',
@@ -1052,7 +1054,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
             ),
           ),
           IconButton(
-            tooltip: 'تغيير القارئ',
+            tooltip: l('changeReciter'),
             icon: Icon(
               Icons.record_voice_over_rounded,
               color: isDark ? AppColors.darkTextSec : AppColors.textSecondary,
@@ -1061,7 +1063,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
             onPressed: () => showReciterPicker(context, audio, isDark),
           ),
           IconButton(
-            tooltip: 'الانتقال التلقائي للآية التالية',
+            tooltip: l('autoNext'),
             icon: Icon(
               audio.autoAdvance
                   ? Icons.repeat_on_rounded
@@ -1081,6 +1083,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 
   Widget _buildInfoBar(bool isDark) {
+    final l = L10n.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
@@ -1096,17 +1099,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('الحزب ${_ar(_hizb)}',
+          Text('${l('hizbWord')} ${l.number(_hizb)}',
               style: TextStyle(
                   color: isDark ? AppColors.darkTextSec : Colors.grey[600],
                   fontSize: 12,
                   fontFamily: 'Amiri')),
-          Text('الجزء ${_ar(_juz)}',
+          Text('${l('juzWord')} ${l.number(_juz)}',
               style: TextStyle(
                   color: isDark ? AppColors.darkTextSec : Colors.grey[600],
                   fontSize: 12,
                   fontFamily: 'Amiri')),
-          Text('الصفحة ${_ar(_page)}',
+          Text('${l('pageWord')} ${l.number(_page)}',
               style: TextStyle(
                   color: isDark ? AppColors.darkPrimary : AppColors.primary,
                   fontSize: 12,
@@ -1121,6 +1124,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   /// saves the choice and refetches the surah with that edition.
   void _showTranslationSheet(SettingsService settings) {
     final isDark = settings.isDarkIn(context);
+    final l = L10n.of(context);
     showModalBottomSheet(
       context: context,
       backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
@@ -1143,7 +1147,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('الترجمة',
+                Text(l('translation'),
                     style: TextStyle(
                       color:
                           isDark ? AppColors.darkText : AppColors.textPrimary,
@@ -1161,8 +1165,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       RadioListTile<String?>(
                         value: null,
                         activeColor: AppColors.primary,
-                        title: Text('بدون ترجمة',
-                            textDirection: TextDirection.rtl,
+                        title: Text(l('noTranslation'),
                             style: TextStyle(
                                 fontFamily: 'Amiri',
                                 color: isDark
@@ -1205,7 +1208,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('حجم الخط',
+              Text(L10n.of(context)('fontSizeLbl'),
                   style: TextStyle(
                     color: isDark ? AppColors.darkText : AppColors.textPrimary,
                     fontSize: 18,

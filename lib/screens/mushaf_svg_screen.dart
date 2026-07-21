@@ -12,6 +12,7 @@ import '../services/khatma_service.dart';
 import '../services/library_events.dart';
 import '../services/quran_audio_service.dart';
 import '../services/settings_service.dart';
+import '../l10n/app_strings.dart';
 import '../theme.dart';
 import '../widgets/reciter_picker.dart';
 import 'tafsir_screen.dart';
@@ -612,6 +613,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
   void _showAyahOptions(AyahHitRegion region) {
     final isDark = context.read<SettingsService>().isDarkIn(context);
+    final l = L10n.of(context);
     final bookmark = _bookmarkFor(region);
     final audio = context.read<QuranAudioService>();
     final globalAyah =
@@ -657,7 +659,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                         ? Icons.pause_circle_rounded
                         : Icons.play_circle_rounded,
                     color: isDark ? AppColors.darkPrimary : AppColors.primary),
-                title: Text(playingThis ? 'إيقاف التلاوة' : 'تشغيل التلاوة',
+                title: Text(
+                    playingThis ? l('pauseRecitation') : l('playRecitation'),
                     textDirection: TextDirection.rtl,
                     style: TextStyle(
                         fontFamily: 'Amiri',
@@ -683,7 +686,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(Icons.menu_book_rounded,
                     color: isDark ? AppColors.darkPrimary : AppColors.primary),
-                title: Text('التفسير',
+                title: Text(l('tafsir'),
                     textDirection: TextDirection.rtl,
                     style: TextStyle(
                         fontFamily: 'Amiri',
@@ -710,7 +713,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     color: bookmark != null
                         ? AppColors.highlight(bookmark.color)
                         : (isDark ? AppColors.darkPrimary : AppColors.primary)),
-                title: Text('الفاصل',
+                title: Text(l('bookmark'),
                     textDirection: TextDirection.rtl,
                     style: TextStyle(
                         fontFamily: 'Amiri',
@@ -725,7 +728,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.highlight_rounded,
                     color: AppColors.secondary),
-                title: Text('تمييز الآية',
+                title: Text(l('highlightAyah'),
                     textDirection: TextDirection.rtl,
                     style: TextStyle(
                         fontFamily: 'Amiri',

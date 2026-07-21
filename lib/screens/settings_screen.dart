@@ -95,8 +95,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     size: 20,
                     color: isDark ? AppColors.darkPrimary : AppColors.primary),
                 title: Text(t('gpsOption'),
-                    textAlign: TextAlign.right,
-                    textDirection: TextDirection.rtl,
+                    textAlign: TextAlign.start,
                     style: TextStyle(
                         fontFamily: 'Amiri',
                         fontSize: 16,
@@ -377,11 +376,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Padding(
               padding: const EdgeInsets.only(top: 12),
               child: Align(
-                alignment: Alignment.centerRight,
+                alignment: AlignmentDirectional.centerStart,
                 child: Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  alignment: WrapAlignment.end,
+                  alignment: WrapAlignment.start,
                   children: [
                     for (final e in t.languageChoices.entries)
                       ChoiceChip(
@@ -566,11 +565,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(children: [
               const SizedBox(height: 4),
               Align(
-                alignment: Alignment.centerRight,
+                alignment: AlignmentDirectional.centerStart,
                 child: Text(
                   t('savedPagesInfo'),
-                  textDirection: TextDirection.rtl,
-                  textAlign: TextAlign.right,
+                  textAlign: TextAlign.start,
                   style: TextStyle(
                       fontFamily: 'Amiri',
                       fontSize: 14,
@@ -632,7 +630,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               isDark: isDark,
               icon: Icons.info_outline_rounded,
               title: t('versionLbl'),
-              subtitle: '2.7.0'),
+              subtitle: '2.8.0'),
           _Tile(
               isDark: isDark,
               icon: Icons.api_rounded,
@@ -660,14 +658,18 @@ class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.text, this.isDark);
   @override
   Widget build(BuildContext context) => Padding(
-      padding: const EdgeInsets.only(right: 4, bottom: 8),
-      child: Text(text,
-          textDirection: TextDirection.rtl,
-          style: const TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Amiri',
-              fontSize: 18)));
+      // Directional padding + start alignment so the label sits on the
+      // leading edge in whichever direction the language uses.
+      padding: const EdgeInsetsDirectional.only(start: 4, bottom: 8),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: Text(text,
+            style: const TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Amiri',
+                fontSize: 18)),
+      ));
 }
 
 class _Tile extends StatelessWidget {
@@ -693,31 +695,38 @@ class _Tile extends StatelessWidget {
             border: Border.all(
                 color: isDark ? AppColors.darkBorder : AppColors.border)),
         child: Column(children: [
+          // Icon leads, text follows — the Row honours the ambient
+          // direction, so Arabic puts the icon on the right and German
+          // on the left automatically.
           Row(children: [
-            const Spacer(),
-            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text(title,
-                  textDirection: TextDirection.rtl,
-                  style: TextStyle(
-                      fontFamily: 'Amiri',
-                      fontWeight: FontWeight.bold,
-                      fontSize: 19,
-                      color:
-                          isDark ? AppColors.darkText : AppColors.textPrimary)),
-              if (subtitle != null)
-                Text(subtitle!,
-                    textDirection: TextDirection.rtl,
-                    style: TextStyle(
-                        color: isDark
-                            ? AppColors.darkTextSec
-                            : AppColors.textSecondary,
-                        fontSize: 15,
-                        fontFamily: 'Amiri')),
-            ]),
-            const SizedBox(width: 12),
             Icon(icon,
                 color: isDark ? AppColors.darkPrimary : AppColors.primary,
                 size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        textAlign: TextAlign.start,
+                        style: TextStyle(
+                            fontFamily: 'Amiri',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 19,
+                            color: isDark
+                                ? AppColors.darkText
+                                : AppColors.textPrimary)),
+                    if (subtitle != null)
+                      Text(subtitle!,
+                          textAlign: TextAlign.start,
+                          style: TextStyle(
+                              color: isDark
+                                  ? AppColors.darkTextSec
+                                  : AppColors.textSecondary,
+                              fontSize: 15,
+                              fontFamily: 'Amiri')),
+                  ]),
+            ),
           ]),
           if (child != null) child!,
         ]),
