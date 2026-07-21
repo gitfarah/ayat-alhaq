@@ -29,7 +29,13 @@ class _MainScreenState extends State<MainScreen> {
     final t = L10n.of(context);
     return Scaffold(
       body: IndexedStack(index: _idx, children: _screens),
-      bottomNavigationBar: Container(
+      // The tab ORDER is fixed (only the labels follow the language) —
+      // pin the bar to LTR so switching to Arabic doesn't reverse the
+      // tabs. The screens inside the IndexedStack still follow the
+      // app-language direction for their own content.
+      bottomNavigationBar: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Container(
         decoration: BoxDecoration(
           border: Border(
               top: BorderSide(
@@ -57,6 +63,7 @@ class _MainScreenState extends State<MainScreen> {
                 label: t('tabIndex')),
           ],
         ),
+      ),
       ),
     );
   }

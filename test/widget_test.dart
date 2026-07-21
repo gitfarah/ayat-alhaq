@@ -24,7 +24,7 @@ void main() {
     await tester.pump();
 
     // The Bismillah intro shows first on a cold start…
-    expect(find.text('آيات الحق'), findsOneWidget);
+    expect(find.text('﷽'), findsOneWidget);
 
     // …and gives way to the main navigation after its timer.
     await tester.pump(const Duration(seconds: 3));

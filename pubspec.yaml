@@ -1,7 +1,7 @@
 name: quran_app_v1
 description: A Quran reading app for Android and iOS.
 publish_to: 'none'
-version: 2.8.2+13
+version: 2.9.0+14
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -34,11 +34,11 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon/icon_legacy.png"
-  adaptive_icon_background: "#FBF9F5"
-  adaptive_icon_foreground: "assets/icon/icon_fg.png"
+  image_path: "assets/icon/logo.png"
+  adaptive_icon_background: "#315052"
+  adaptive_icon_foreground: "assets/icon/logo_fg_padded.png"
   remove_alpha_ios: true
-  background_color_ios: "#FBF9F5"
+  background_color_ios: "#315052"
 
 flutter:
   uses-material-design: true
@@ -46,6 +46,7 @@ flutter:
     - assets/fonts/
     - assets/quran/
     - assets/icon/media_art.png
+    - assets/icon/logo.png
   fonts:
     - family: Amiri
       fonts:

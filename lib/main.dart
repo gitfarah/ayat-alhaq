@@ -99,72 +99,58 @@ class _SplashGateState extends State<SplashGate> {
   }
 }
 
-/// The intro itself: the Bismillah as classical calligraphy — the
-/// Unicode ligature ﷽ rendered by the Amiri font — fading in over the
-/// app's emerald/parchment backdrop.
+/// The intro: the Bismillah in classical calligraphy above the brand
+/// logo, on the logo's own deep-teal background so the two blend
+/// seamlessly. Fades in on a cold start.
 class _BismillahSplash extends StatelessWidget {
   const _BismillahSplash();
 
+  /// The logo's background colour — used for the whole splash so the
+  /// logo image sits edge-to-edge with no visible box.
+  static const Color _brandGreen = Color(0xFF315052);
+  static const Color _gold = Color(0xFFE9B85A);
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    const gold = Color(0xFFC9A64D);
-    final bg = isDark
-        ? const [Color(0xFF0E1F1A), Color(0xFF071310)]
-        : const [Color(0xFFFBF7EE), Color(0xFFEFE7D5)];
-    final ink = isDark ? gold : const Color(0xFF14453A);
-
+    final w = MediaQuery.of(context).size.width;
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-              center: const Alignment(0, -0.2), radius: 1.2, colors: bg),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: 1),
-              duration: const Duration(milliseconds: 1100),
-              curve: Curves.easeOutCubic,
-              builder: (_, t, child) => Opacity(
-                opacity: t,
-                child: Transform.scale(scale: 0.92 + 0.08 * t, child: child),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // The ligature's glyph is far larger than its font
-                  // metrics suggest — FittedBox scales it to genuinely
-                  // FIT the screen width and stay centered.
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 36),
-                    child: FittedBox(
-                      fit: BoxFit.contain,
-                      child: Text(
-                        '﷽', // Bismillah ligature, calligraphic in Amiri
-                        textDirection: TextDirection.rtl,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Amiri',
-                          fontSize: 84,
-                          color: ink,
-                        ),
+      backgroundColor: _brandGreen,
+      body: SafeArea(
+        child: Center(
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 1100),
+            curve: Curves.easeOutCubic,
+            builder: (_, t, child) => Opacity(
+              opacity: t,
+              child: Transform.scale(scale: 0.94 + 0.06 * t, child: child),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Bismillah ligature (its glyph is far larger than its
+                // font metrics, so FittedBox scales it to fit).
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 64),
+                  child: FittedBox(
+                    fit: BoxFit.contain,
+                    child: Text(
+                      '﷽',
+                      textDirection: TextDirection.rtl,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Amiri',
+                        fontSize: 56,
+                        color: _gold,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  Text(
-                    'آيات الحق',
-                    style: TextStyle(
-                      fontFamily: 'Amiri',
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: ink.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 24),
+                // Brand logo — same green background, so it blends in.
+                Image.asset('assets/icon/logo.png', width: w * 0.82),
+              ],
             ),
           ),
         ),
