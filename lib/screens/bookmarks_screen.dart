@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_strings.dart';
 import '../services/bookmark_service.dart';
@@ -133,7 +133,6 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                                   color: AppColors.highlight(b.color),
                                   size: 24)),
                           title: Text(b.surahName,
-                              textDirection: TextDirection.rtl,
                               style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,

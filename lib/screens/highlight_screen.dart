@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_strings.dart';
 import '../services/highlight_service.dart';
@@ -141,7 +141,6 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
                                           color: hc.withValues(alpha: 0.9),
                                           size: 22)),
                                   title: Text(h.surahName,
-                                      textDirection: TextDirection.rtl,
                                       style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
@@ -306,8 +305,7 @@ class _AyahPreview extends StatelessWidget {
           padding: const EdgeInsets.only(top: 4),
           child: Text(
             snap.data!,
-            textDirection: TextDirection.rtl,
-            textAlign: TextAlign.right,
+            textAlign: TextAlign.start,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(

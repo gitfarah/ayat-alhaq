@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:provider/provider.dart';
@@ -345,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
       Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           child: Align(
-              alignment: Alignment.centerRight,
+              alignment: AlignmentDirectional.centerStart,
               child: Text(
                   _ayahResults.isEmpty
                       ? '${L10n.of(context).number(_filtered.length)} ${L10n.of(context)('surahUnit')}'
@@ -382,7 +382,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                 child: Align(
-                    alignment: Alignment.centerRight,
+                    alignment: AlignmentDirectional.centerStart,
                     child: Text(L10n.of(context)('ayahResults'),
                         style: TextStyle(
                             color: isDark
@@ -423,7 +423,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         surah: surah, targetAyah: r.numberInSurah)));
           },
           title: Text(r.text,
-              textDirection: TextDirection.rtl,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -434,7 +433,6 @@ class _HomeScreenState extends State<HomeScreen> {
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Text('${r.surahName} • الآية ${_ar(r.numberInSurah)}',
-                textDirection: TextDirection.rtl,
                 style: TextStyle(
                     color: isDark ? AppColors.darkPrimary : AppColors.primary,
                     fontFamily: 'Amiri',
@@ -477,11 +475,10 @@ class _HomeScreenState extends State<HomeScreen> {
         Expanded(
             child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
               Text(
                   '${weekdays[g.weekday - 1]} ${_ar(h.hDay)} ${h.longMonthName} ${_ar(h.hYear)} هـ',
-                  textDirection: TextDirection.rtl,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -492,7 +489,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       fontFamily: 'Amiri')),
               Text(
                   '${_ar(g.day)} ${gregorianMonths[g.month - 1]} ${_ar(g.year)} م',
-                  textDirection: TextDirection.rtl,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -544,7 +540,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
                 child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                   Text(L10n.of(context)('lastRead'),
                       maxLines: 1,
@@ -586,15 +582,13 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
               child: TextField(
                   controller: _search,
-                  textDirection: TextDirection.rtl,
-                  textAlign: TextAlign.right,
+                  textAlign: TextAlign.start,
                   style: TextStyle(
                       color:
                           isDark ? AppColors.darkText : AppColors.textPrimary,
                       fontFamily: 'Amiri'),
                   decoration: InputDecoration(
                       hintText: L10n.of(context)('searchHint'),
-                      hintTextDirection: TextDirection.rtl,
                       hintStyle: TextStyle(
                           color: isDark
                               ? AppColors.darkTextSec
@@ -652,10 +646,10 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 14),
               Expanded(
                   child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                     Text(surah.name,
-                        textAlign: TextAlign.right,
+                        textAlign: TextAlign.start,
                         style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -664,7 +658,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ? AppColors.darkText
                                 : AppColors.textPrimary)),
                     const SizedBox(height: 3),
-                    Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                    Row(mainAxisAlignment: MainAxisAlignment.start, children: [
                       Text('ص ${_ar(_surahPage[surah.number] ?? 1)}',
                           style: TextStyle(
                               fontSize: 12.5,
@@ -697,7 +691,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ]),
                   ])),
               const SizedBox(width: 8),
-              Icon(Icons.chevron_left_rounded,
+              Icon(
+                  Directionality.of(context) == TextDirection.rtl
+                      ? Icons.chevron_left_rounded
+                      : Icons.chevron_right_rounded,
                   color: isDark ? AppColors.darkTextSec : AppColors.textLight,
                   size: 20),
             ]),
@@ -809,14 +806,16 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
             Icon(Icons.mosque_rounded,
                 size: 18,
                 color: isDark ? AppColors.darkPrimary : AppColors.primary),
-            const Spacer(),
-            Text(L10n.of(context)('chooseCity'),
-                textDirection: TextDirection.rtl,
-                style: TextStyle(
-                    fontFamily: 'Amiri',
-                    fontSize: 13,
-                    color:
-                        isDark ? AppColors.darkPrimary : AppColors.primary)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(L10n.of(context)('chooseCity'),
+                  textAlign: TextAlign.start,
+                  style: TextStyle(
+                      fontFamily: 'Amiri',
+                      fontSize: 13,
+                      color:
+                          isDark ? AppColors.darkPrimary : AppColors.primary)),
+            ),
           ]),
         ),
       );
@@ -838,19 +837,21 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
       child: Column(children: [
         Row(children: [
           Icon(Icons.mosque_rounded, size: 14, color: accent),
-          const Spacer(),
-          Text('${L10n.of(context)('prayerTimes')} — $_label',
-              textDirection: TextDirection.rtl,
-              style: TextStyle(
-                  fontFamily: 'Amiri',
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? AppColors.darkText : AppColors.textPrimary)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('${L10n.of(context)('prayerTimes')} — $_label',
+                textAlign: TextAlign.start,
+                style: TextStyle(
+                    fontFamily: 'Amiri',
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color:
+                        isDark ? AppColors.darkText : AppColors.textPrimary)),
+          ),
         ]),
         const SizedBox(height: 8),
         Row(
           // RTL order: Fajr appears rightmost.
-          textDirection: TextDirection.rtl,
           children: [
             for (var i = 0; i < 5; i++)
               Expanded(
