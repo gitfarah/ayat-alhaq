@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:provider/provider.dart';
 import 'package:device_preview/device_preview.dart';
 import 'services/settings_service.dart';
@@ -11,6 +12,17 @@ import 'theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Enables true background playback with lock-screen / control-center
+  // media controls. MUST run before any AudioPlayer is created.
+  try {
+    await JustAudioBackground.init(
+      androidNotificationChannelId: 'com.omar.ayat_alhaq.audio',
+      androidNotificationChannelName: 'تلاوة القرآن',
+      androidNotificationOngoing: true,
+    );
+  } catch (_) {
+    // Never let audio-session setup block app startup.
+  }
   // All orientations are allowed — the Mushaf and reader both have
   // dedicated landscape layouts.
   runApp(

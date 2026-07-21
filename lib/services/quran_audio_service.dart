@@ -1,31 +1,29 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/quran_page_meta.dart';
 
-/// Plays per-ayah Quran recitation from the alquran.cloud CDN.
-/// Ayah numbers here are always the GLOBAL sequential number (1-6236,
-/// matching Ayah.number), not the per-surah number.
+/// Plays per-ayah Quran recitation from the alquran.cloud CDN, with
+/// TRUE background playback and lock-screen / control-center media
+/// controls (via just_audio_background — configured in main() with
+/// JustAudioBackground.init). Ayah numbers here are always the GLOBAL
+/// sequential number (1-6236, matching Ayah.number).
 ///
-/// Download-first playback (mobile/desktop): when an ayah is played,
-/// its mp3 is downloaded to local storage and played from disk, and the
-/// REST of that surah's ayahs are downloaded in the background — so
-/// auto-advance to the next ayah is instant and keeps working even if
-/// the connection drops mid-surah. On web there is no filesystem, so
-/// ayahs stream directly (browsers allow cross-origin media playback).
+/// Download-first (mobile/desktop): a played ayah is downloaded to
+/// local storage and played from disk, and the REST of that surah is
+/// pulled down in the background — so auto-advance is gapless and
+/// replays work offline. Playback continues when the screen locks or
+/// the app is backgrounded, with a system now-playing control.
 class QuranAudioService extends ChangeNotifier {
   final AudioPlayer _player = AudioPlayer();
 
-  /// Verse-by-verse reciters available on cdn.islamic.network, verified
-  /// against /edition?format=audio&type=versebyverse. Most editions
-  /// exist at 128kbps; the few that don't are covered by the 64kbps
-  /// fallback.
   static const Map<String, String> reciters = {
     'ar.husary': 'محمود خليل الحصري',
     'ar.abdulsamad': 'عبدالباسط عبدالصمد',
@@ -43,9 +41,6 @@ class QuranAudioService extends ChangeNotifier {
   String get reciter => _reciter;
   String get reciterName => reciters[_reciter] ?? _reciter;
 
-  /// Whether the user has ever explicitly picked a reciter. The UI
-  /// shows the reciter list ONCE — on the first play — then sticks to
-  /// the choice until the user opens the picker again on purpose.
   bool _reciterChosen = false;
   bool get hasChosenReciter => _reciterChosen;
 
@@ -57,10 +52,7 @@ class QuranAudioService extends ChangeNotifier {
     _reciterChosen = true;
     if (id != _reciter) {
       _reciter = id;
-      // Downloads in flight belong to the old reciter — stop them.
       _cancelSurahDownload();
-      // A currently-playing ayah keeps the old voice until it ends;
-      // anything played after this uses the new reciter.
     }
     notifyListeners();
   }
@@ -78,8 +70,6 @@ class QuranAudioService extends ChangeNotifier {
   String? get error => _error;
   bool get hasActiveTrack => _currentGlobalAyah != null;
 
-  /// Background surah-download progress for the UI: null when idle,
-  /// otherwise (downloaded, total) for the surah being fetched.
   int? _dlSurah;
   int _dlDone = 0;
   int _dlTotal = 0;
@@ -87,50 +77,19 @@ class QuranAudioService extends ChangeNotifier {
   int get downloadDone => _dlDone;
   int get downloadTotal => _dlTotal;
 
-  /// The UI (ReaderScreen) sets this so the service can figure out what
-  /// "next ayah" means for auto-advance without hardcoding surah logic
-  /// here. Given the currently-playing global ayah number, return the
-  /// next global ayah number to play, or null to stop (e.g. end of surah).
   int? Function(int currentGlobalAyah)? nextAyahResolver;
 
   QuranAudioService() {
-    _configureAudioSession();
-    _player.onPlayerStateChanged.listen((state) {
-      _isPlaying = state == PlayerState.playing;
-      // The moment real playback starts, the track is no longer
-      // "loading" — without this the UI could stay stuck on the
-      // download label if play() resolved late or out of order.
-      if (state == PlayerState.playing) _isLoading = false;
-      notifyListeners();
+    _player.playerStateStream.listen((state) {
+      _isPlaying = state.playing;
+      if (state.processingState == ProcessingState.ready) _isLoading = false;
+      if (state.processingState == ProcessingState.completed) {
+        _handleComplete();
+      } else {
+        notifyListeners();
+      }
     });
-    _player.onPlayerComplete.listen((_) => _handleComplete());
     _loadReciter();
-  }
-
-  /// Configures the OS audio session for BACKGROUND playback: on iOS
-  /// the `playback` category keeps recitation running when the screen
-  /// locks or the app is backgrounded (together with the `audio`
-  /// UIBackgroundMode in Info.plist); on Android `stayAwake` + media
-  /// focus do the same.
-  Future<void> _configureAudioSession() async {
-    if (kIsWeb) return;
-    try {
-      await AudioPlayer.global.setAudioContext(AudioContext(
-        iOS: AudioContextIOS(
-          category: AVAudioSessionCategory.playback,
-          options: const {},
-        ),
-        android: const AudioContextAndroid(
-          isSpeakerphoneOn: false,
-          stayAwake: true,
-          contentType: AndroidContentType.music,
-          usageType: AndroidUsageType.media,
-          audioFocus: AndroidAudioFocus.gain,
-        ),
-      ));
-    } catch (_) {
-      // Session config failing shouldn't block normal playback.
-    }
   }
 
   Future<void> _loadReciter() async {
@@ -140,8 +99,6 @@ class QuranAudioService extends ChangeNotifier {
       _reciter = saved;
       _reciterChosen = prefs.getBool('reciterChosen') ?? false;
     } else {
-      // No saved choice, or the saved reciter was removed from the
-      // list — fall back to the default and ask again on next play.
       _reciter = _defaultReciter;
       _reciterChosen = false;
     }
@@ -164,8 +121,6 @@ class QuranAudioService extends ChangeNotifier {
         'https://cdn.alquran.cloud/media/audio/ayah/$reciter/$globalAyah',
       ];
 
-  /// Downloads one ayah's mp3 to local storage if not already present.
-  /// Returns the file when it exists/downloaded, null on failure.
   Future<File?> _ensureLocal(String reciter, int globalAyah) async {
     final file = await _localFile(reciter, globalAyah);
     if (await file.exists() && (await file.length()) > 0) return file;
@@ -176,8 +131,6 @@ class QuranAudioService extends ChangeNotifier {
             .timeout(const Duration(seconds: 30));
         if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
           await file.parent.create(recursive: true);
-          // Write via temp file + rename so a torn download never
-          // leaves a half-written mp3 that would "exist" next time.
           final tmp = File('${file.path}.part');
           await tmp.writeAsBytes(res.bodyBytes, flush: true);
           await tmp.rename(file.path);
@@ -209,18 +162,10 @@ class QuranAudioService extends ChangeNotifier {
     _dlSurah = null;
   }
 
-  /// Fetches every missing ayah of [globalAyah]'s surah — in the
-  /// chosen reciter's voice — so continuous playback through the surah
-  /// never has to wait on the network and replays work fully offline.
-  ///
-  /// Downloads run 4-at-a-time, starting from the played ayah forward
-  /// (so the immediately-next ayahs arrive first), then filling in the
-  /// skipped beginning. The download keeps going even if playback is
-  /// stopped; only switching reciters abandons it.
   Future<void> _downloadSurahAround(int globalAyah) async {
     if (kIsWeb) return;
     final (surah, first, last) = surahRangeOf(globalAyah);
-    if (_dlSurah == surah) return; // already fetching this surah
+    if (_dlSurah == surah) return;
     final generation = ++_downloadGeneration;
     final reciter = _reciter;
 
@@ -243,7 +188,6 @@ class QuranAudioService extends ChangeNotifier {
         }
         if (generation != _downloadGeneration) return;
         _dlDone++;
-        // Notify sparsely — every few files is enough for progress UI.
         if (_dlDone % 3 == 0 || _dlDone == _dlTotal) notifyListeners();
       }
     }
@@ -257,6 +201,19 @@ class QuranAudioService extends ChangeNotifier {
 
   // ── Playback ─────────────────────────────────────────────────────────
 
+  /// Media metadata shown on the lock screen / control center for the
+  /// currently playing ayah.
+  MediaItem _mediaItemFor(int globalAyah) {
+    final (surah, first, _) = surahRangeOf(globalAyah);
+    final ayahInSurah = globalAyah - first + 1;
+    return MediaItem(
+      id: '$_reciter-$globalAyah',
+      album: 'آيات الحق',
+      title: 'سورة ${QuranPageMeta.surahName(surah)} — آية $ayahInSurah',
+      artist: reciterName,
+    );
+  }
+
   Future<void> playAyah(int globalAyahNumber) async {
     _isLoading = true;
     _error = null;
@@ -264,32 +221,31 @@ class QuranAudioService extends ChangeNotifier {
     notifyListeners();
 
     final reciter = _reciter;
-    var played = false;
+    final media = _mediaItemFor(globalAyahNumber);
+    var started = false;
 
     if (!kIsWeb) {
-      // Prefer the local file; fetch just this ayah if missing.
       final file = await _ensureLocal(reciter, globalAyahNumber);
       if (file != null) {
         try {
-          await _player.stop();
-          await _player.play(DeviceFileSource(file.path));
-          played = true;
+          await _player.setAudioSource(
+              AudioSource.uri(Uri.file(file.path), tag: media));
+          _player.play();
+          started = true;
         } catch (_) {
-          played = false;
+          started = false;
         }
       }
-      // Whatever happened with THIS ayah, make sure the rest of the
-      // surah gets pulled down for gapless continuation.
       unawaited(_downloadSurahAround(globalAyahNumber));
     }
 
-    if (!played) {
-      // Web, or local path failed — stream from the CDN mirrors.
+    if (!started) {
       for (final url in _urlsFor(reciter, globalAyahNumber)) {
         try {
-          await _player.stop();
-          await _player.play(UrlSource(url));
-          played = true;
+          await _player.setAudioSource(
+              AudioSource.uri(Uri.parse(url), tag: media));
+          _player.play();
+          started = true;
           break;
         } catch (_) {
           // Try the next source.
@@ -297,7 +253,7 @@ class QuranAudioService extends ChangeNotifier {
       }
     }
 
-    if (!played) {
+    if (!started) {
       _isLoading = false;
       _currentGlobalAyah = null;
       _error = 'تعذّر تشغيل التلاوة، تحقق من اتصالك بالإنترنت';
@@ -313,15 +269,15 @@ class QuranAudioService extends ChangeNotifier {
     if (_currentGlobalAyah == globalAyahNumber && _isPlaying) {
       await _player.pause();
     } else if (_currentGlobalAyah == globalAyahNumber && !_isPlaying) {
-      await _player.resume();
+      _player.play();
     } else {
       await playAyah(globalAyahNumber);
     }
   }
 
   Future<void> stop() async {
-    // Deliberately do NOT cancel the surah download: the user asked
-    // for the whole surah — let it finish so replays work offline.
+    // Keep the surah download running — the user asked for the whole
+    // surah, so let it finish for offline replays.
     await _player.stop();
     _currentGlobalAyah = null;
     _isPlaying = false;

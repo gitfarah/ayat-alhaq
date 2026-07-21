@@ -71,6 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showCityPicker(bool isDark) {
+    final t = L10n.of(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -93,7 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: Icon(Icons.my_location_rounded,
                     size: 20,
                     color: isDark ? AppColors.darkPrimary : AppColors.primary),
-                title: Text('استخدام موقعي الحالي (GPS)',
+                title: Text(t('gpsOption'),
                     textAlign: TextAlign.right,
                     textDirection: TextDirection.rtl,
                     style: TextStyle(
@@ -209,8 +210,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('تعذّر تحميل التفسير، تحقق من اتصالك بالإنترنت')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(L10n.of(context)('tafsirDownloadError'))));
       }
     }
     _tafsirDownloading.remove(id);
@@ -222,7 +223,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _loadTafsirStatus();
     if (mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('تم حذف التفسير')));
+          .showSnackBar(SnackBar(content: Text(L10n.of(context)('deletedTafsir'))));
     }
   }
 
@@ -241,27 +242,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _confirmClearCache() async {
     final isDark = context.read<SettingsService>().isDarkIn(context);
+    final t = L10n.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('مسح صفحات المصحف المحفوظة',
+        title: Text(t('clearCacheTitle'),
             textDirection: TextDirection.rtl,
-            style: TextStyle(fontFamily: 'Amiri', fontWeight: FontWeight.bold)),
-        content: const Text(
-            'سيتم حذف جميع صفحات المصحف المحفوظة للقراءة دون اتصال. ستحتاج لإعادة تحميلها عند فتحها مجدداً.',
+            style: const TextStyle(
+                fontFamily: 'Amiri', fontWeight: FontWeight.bold)),
+        content: Text(t('clearCacheBody'),
             textDirection: TextDirection.rtl,
             textAlign: TextAlign.right,
-            style: TextStyle(fontFamily: 'Amiri', height: 1.6)),
+            style: const TextStyle(fontFamily: 'Amiri', height: 1.6)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('إلغاء')),
+              child: Text(t('cancel'))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('مسح', style: TextStyle(color: Colors.white)),
+            child: Text(t('clearBtn'), style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -274,7 +276,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         setState(() => _clearing = false);
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تم مسح الصفحات المحفوظة')));
+            SnackBar(content: Text(L10n.of(context)('clearedMsg'))));
       }
     }
   }
@@ -282,6 +284,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// One row per tafsir: name + status on the right, action button on
   /// the left (download / progress + cancel / delete).
   Widget _tafsirRow(TafsirEdition e, bool isDark) {
+    final t = L10n.of(context);
     final downloaded = _tafsirDownloaded[e.id] ?? false;
     final downloading = _tafsirDownloading.contains(e.id);
     final progress = _tafsirProgress[e.id] ?? 0;
@@ -290,13 +293,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     final String status;
     if (downloading) {
-      status = 'جارٍ التحميل... ${(progress / 114 * 100).round()}٪';
+      status = '${t('tafsirDownloadingLbl')} ${(progress / 114 * 100).round()}٪';
     } else if (downloaded) {
-      status = 'محمّل • ${_formatBytes(size)}';
+      status = '${t('tafsirLoadedLbl')} • ${_formatBytes(size)}';
     } else if (size > 0) {
-      status = 'تحميل غير مكتمل — اضغط للمتابعة';
+      status = t('tafsirIncomplete');
     } else {
-      status = 'غير محمّل';
+      status = t('tafsirNotLoaded');
     }
 
     final Widget action;
@@ -304,7 +307,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       action = Row(mainAxisSize: MainAxisSize.min, children: [
         IconButton(
             visualDensity: VisualDensity.compact,
-            tooltip: 'إيقاف',
+            tooltip: t('stop'),
             icon: const Icon(Icons.close_rounded, size: 18, color: Colors.red),
             onPressed: () => setState(() => _tafsirCancel.add(e.id))),
         SizedBox(
@@ -318,14 +321,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } else if (downloaded) {
       action = IconButton(
           visualDensity: VisualDensity.compact,
-          tooltip: 'حذف',
+          tooltip: t('delete'),
           icon: const Icon(Icons.delete_outline_rounded,
               size: 20, color: Colors.red),
           onPressed: () => _deleteTafsir(e.id));
     } else {
       action = IconButton(
           visualDensity: VisualDensity.compact,
-          tooltip: 'تحميل',
+          tooltip: t('download'),
           icon: Icon(Icons.download_rounded,
               size: 20,
               color: isDark ? AppColors.darkPrimary : AppColors.primary),
@@ -491,7 +494,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     : Icons.location_city_rounded,
                 title: t('location'),
                 subtitle: _locating
-                    ? 'جارٍ تحديد الموقع...'
+                    ? t('locating')
                     : _prayerLabel ?? t('locationUnset')),
           ),
           GestureDetector(
@@ -549,16 +552,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.download_for_offline_rounded,
             title: t('savedPages'),
             subtitle: _cacheBytes == null
-                ? 'جارٍ الحساب...'
+                ? t('calculating')
                 : _cacheBytes == 0
-                    ? 'لا توجد صفحات محفوظة بعد'
-                    : '${_formatBytes(_cacheBytes!)} على الجهاز',
+                    ? t('noSavedPages')
+                    : '${_formatBytes(_cacheBytes!)} ${t('onDevice')}',
             child: Column(children: [
               const SizedBox(height: 4),
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
-                  'كل صفحة من المصحف تُحفظ تلقائياً على جهازك بعد فتحها لأول مرة، لتتمكن من قراءتها لاحقاً دون اتصال بالإنترنت.',
+                  t('savedPagesInfo'),
                   textDirection: TextDirection.rtl,
                   textAlign: TextAlign.right,
                   style: TextStyle(
@@ -593,7 +596,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               strokeWidth: 2, color: Colors.red))
                       : const Icon(Icons.delete_outline_rounded, size: 18),
                   label: Text(
-                      _clearing ? 'جارٍ المسح...' : 'مسح الصفحات المحفوظة',
+                      _clearing ? t('clearing') : t('clearSavedPages'),
                       style: const TextStyle(fontFamily: 'Amiri')),
                 ),
               ),
@@ -606,8 +609,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.library_books_rounded,
             title: t('downloadTafsir'),
             subtitle: TafsirService.supportsDownload
-                ? 'حمّل ما تحتاجه فقط — كل تفسير على حدة'
-                : 'التحميل متاح على تطبيق الهاتف فقط',
+                ? t('tafsirSubtitleMobile')
+                : t('tafsirSubtitleWebOnly'),
             child: TafsirService.supportsDownload
                 ? Column(children: [
                     const SizedBox(height: 4),
@@ -622,7 +625,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               isDark: isDark,
               icon: Icons.info_outline_rounded,
               title: t('versionLbl'),
-              subtitle: '2.5.0'),
+              subtitle: '2.6.0'),
           _Tile(
               isDark: isDark,
               icon: Icons.api_rounded,
