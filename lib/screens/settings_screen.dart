@@ -373,21 +373,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
             isDark: isDark,
             icon: Icons.language_rounded,
             title: t('language'),
-            subtitle: L10n.languages[s.appLanguage],
+            subtitle: t.languageChoices[s.appLanguage],
             child: Padding(
               padding: const EdgeInsets.only(top: 12),
-              child: SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<String>(
-                  segments: [
-                    for (final e in L10n.languages.entries)
-                      ButtonSegment(
-                          value: e.key,
-                          label: Text(e.value,
-                              style: const TextStyle(fontFamily: 'Amiri'))),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    for (final e in t.languageChoices.entries)
+                      ChoiceChip(
+                        label: Text(e.value,
+                            style: const TextStyle(fontFamily: 'Amiri')),
+                        selected: s.appLanguage == e.key,
+                        selectedColor: (isDark
+                                ? AppColors.darkPrimary
+                                : AppColors.primary)
+                            .withValues(alpha: 0.18),
+                        onSelected: (_) => s.setAppLanguage(e.key),
+                      ),
                   ],
-                  selected: {s.appLanguage},
-                  onSelectionChanged: (sel) => s.setAppLanguage(sel.first),
                 ),
               ),
             ),
@@ -625,7 +632,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               isDark: isDark,
               icon: Icons.info_outline_rounded,
               title: t('versionLbl'),
-              subtitle: '2.6.0'),
+              subtitle: '2.7.0'),
           _Tile(
               isDark: isDark,
               icon: Icons.api_rounded,

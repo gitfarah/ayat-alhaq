@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/app_strings.dart';
 import '../services/khatma_service.dart';
 import '../services/library_events.dart';
 import '../services/settings_service.dart';
@@ -62,17 +63,16 @@ class _KhatmaScreenState extends State<KhatmaScreen> {
   }
 
   void _reset() {
+    final l = L10n.of(context);
     showDialog(
         context: context,
         builder: (_) => AlertDialog(
-              title:
-                  const Text('إعادة الختمة', textDirection: TextDirection.rtl),
-              content: const Text('هل تريد البدء من جديد؟',
-                  textDirection: TextDirection.rtl),
+              title: Text(l('resetKhatmaTitle')),
+              content: Text(l('resetKhatmaBody')),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('إلغاء')),
+                    child: Text(l('cancel'))),
                 ElevatedButton(
                     style:
                         ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -88,13 +88,14 @@ class _KhatmaScreenState extends State<KhatmaScreen> {
                       // ajza' in the fresh khatma.
                       KhatmaService.resetReadPages();
                     },
-                    child: const Text('إعادة',
-                        style: TextStyle(color: Colors.white))),
+                    child: Text(l('reset'),
+                        style: const TextStyle(color: Colors.white))),
               ],
             ));
   }
 
   void _showCongrats() {
+    final l = L10n.of(context);
     showDialog(
         context: context,
         builder: (_) => AlertDialog(
@@ -104,15 +105,14 @@ class _KhatmaScreenState extends State<KhatmaScreen> {
                 const SizedBox(height: 8),
                 const Text('🎉', style: TextStyle(fontSize: 64)),
                 const SizedBox(height: 16),
-                const Text('مبارك! أتممتَ ختمة القرآن الكريم',
+                Text(l('khatmaCongrats'),
                     textAlign: TextAlign.center,
-                    textDirection: TextDirection.rtl,
-                    style: TextStyle(
+                    style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Amiri')),
                 const SizedBox(height: 8),
-                Text('تقبّل الله منك',
+                Text(l('khatmaAccept'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -124,8 +124,8 @@ class _KhatmaScreenState extends State<KhatmaScreen> {
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12))),
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('جزاك الله خيراً',
-                        style: TextStyle(
+                    child: Text(l('khatmaThanks'),
+                        style: const TextStyle(
                             color: Colors.white, fontFamily: 'Amiri'))),
               ]),
             ));
@@ -139,12 +139,13 @@ class _KhatmaScreenState extends State<KhatmaScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = context.watch<SettingsService>().isDarkIn(context);
+    final l = L10n.of(context);
     final completed = _done.where((e) => e).length;
     final progress = completed / 30;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('الختمة'),
+        title: Text(l('tabKhatma')),
         actions: [
           IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _reset)
         ],
@@ -175,7 +176,7 @@ class _KhatmaScreenState extends State<KhatmaScreen> {
                         color: Colors.white,
                         fontSize: 38,
                         fontWeight: FontWeight.bold)),
-                Text('$completed من 30 جزءاً',
+                Text('${l.number(completed)} ${l('ofThirtyJuz')}',
                     style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.8),
                         fontFamily: 'Amiri')),
@@ -209,7 +210,7 @@ class _KhatmaScreenState extends State<KhatmaScreen> {
                         const AlwaysStoppedAnimation<Color>(Colors.white))),
             if (_start != null) ...[
               const SizedBox(height: 8),
-              Text('بدأت في: ${_start!.day}/${_start!.month}/${_start!.year}',
+              Text('${l('startedOn')}: ${_start!.day}/${_start!.month}/${_start!.year}',
                   style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.65),
                       fontSize: 12)),
@@ -219,8 +220,9 @@ class _KhatmaScreenState extends State<KhatmaScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
           child: Text(
-            'يُعلَّم الجزء تلقائياً عند قراءة جميع صفحاته في المصحف أو القراءة المتجاوبة، ويمكنك التعليم يدوياً بالضغط.',
-            textDirection: TextDirection.rtl,
+            l('khatmaAutoInfo'),
+            textDirection:
+                l.isArabic ? TextDirection.rtl : TextDirection.ltr,
             textAlign: TextAlign.center,
             style: TextStyle(
                 fontFamily: 'Amiri',
@@ -280,7 +282,7 @@ class _KhatmaScreenState extends State<KhatmaScreen> {
                                       ? AppColors.darkText
                                       : AppColors.textPrimary,
                                   fontFamily: 'Amiri')),
-                      Text('الجزء',
+                      Text(l('juzWord'),
                           style: TextStyle(
                               fontSize: 10,
                               fontFamily: 'Amiri',

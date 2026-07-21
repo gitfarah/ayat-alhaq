@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_strings.dart';
 import '../services/bookmark_service.dart';
 import '../services/library_events.dart';
 import '../services/quran_service.dart';
@@ -47,7 +48,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     await _load();
     if (mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('تم حذف الفاصل')));
+          .showSnackBar(SnackBar(content: Text(L10n.of(context)('deletedBookmark'))));
     }
   }
 
@@ -65,26 +66,22 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     } catch (_) {}
   }
 
-  String _ar(int n) {
-    const d = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-    return n.toString().split('').map((c) => d[int.parse(c)]).join();
-  }
-
   String _date(DateTime dt) =>
       '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year.toString().substring(2)}';
 
   @override
   Widget build(BuildContext context) {
     final isDark = context.watch<SettingsService>().isDarkIn(context);
+    final l = L10n.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('الفواصل'),
+        title: Text(l('tabBookmarks')),
         actions: [
           if (_items.isNotEmpty)
             TextButton(
                 onPressed: _confirmClear,
-                child: const Text('مسح الكل',
-                    style: TextStyle(
+                child: Text(l('clearAll'),
+                    style: const TextStyle(
                         color: Colors.red, fontFamily: 'Amiri', fontSize: 13))),
         ],
       ),
@@ -145,8 +142,10 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                                       ? AppColors.darkText
                                       : AppColors.textPrimary)),
                           subtitle: Text(
-                              'الآية ${_ar(b.ayahNumber)} • ${_date(b.createdAt)}',
-                              textDirection: TextDirection.rtl,
+                              '${l('ayahWord')} ${l.number(b.ayahNumber)} • ${_date(b.createdAt)}',
+                              textDirection: l.isArabic
+                                  ? TextDirection.rtl
+                                  : TextDirection.ltr,
                               style: TextStyle(
                                   color: isDark
                                       ? AppColors.darkTextSec
@@ -165,17 +164,16 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
   }
 
   void _confirmClear() {
+    final l = L10n.of(context);
     showDialog(
         context: context,
         builder: (_) => AlertDialog(
-              title:
-                  const Text('مسح الفواصل', textDirection: TextDirection.rtl),
-              content: const Text('هل تريد حذف جميع الفواصل؟',
-                  textDirection: TextDirection.rtl),
+              title: Text(l('clearBookmarksTitle')),
+              content: Text(l('clearBookmarksBody')),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('إلغاء')),
+                    child: Text(l('cancel'))),
                 ElevatedButton(
                     style:
                         ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -184,30 +182,33 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                       await BookmarkService.clearAll();
                       await _load();
                     },
-                    child: const Text('حذف الكل',
-                        style: TextStyle(color: Colors.white))),
+                    child: Text(l('deleteAll'),
+                        style: const TextStyle(color: Colors.white))),
               ],
             ));
   }
 
-  Widget _empty(bool isDark) => Center(
+  Widget _empty(bool isDark) {
+    final l = L10n.of(context);
+    return Center(
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Icon(Icons.bookmark_border_rounded,
             size: 72,
             color: isDark ? AppColors.darkTextSec : Colors.grey.shade300),
         const SizedBox(height: 16),
-        Text('لا توجد فواصل بعد',
+        Text(l('noBookmarks'),
             style: TextStyle(
                 fontSize: 18,
                 fontFamily: 'Amiri',
                 color:
                     isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
         const SizedBox(height: 8),
-        Text('اضغط على آية أثناء القراءة لحفظ فاصل',
+        Text(l('noBookmarksHint'),
             textAlign: TextAlign.center,
             style: TextStyle(
                 color: isDark ? AppColors.darkTextSec : AppColors.textLight,
                 fontFamily: 'Amiri',
                 fontSize: 13)),
       ]));
+  }
 }

@@ -11,15 +11,24 @@ class L10n {
   final String code;
   const L10n(this.code);
 
-  /// Rebuilds the caller whenever the language changes.
+  /// Rebuilds the caller whenever the (effective) language changes.
   static L10n of(BuildContext context) =>
-      L10n(context.watch<SettingsService>().appLanguage);
+      L10n(context.watch<SettingsService>().effectiveLanguage);
 
   static const Map<String, String> languages = {
     'ar': 'العربية',
     'en': 'English',
     'de': 'Deutsch',
   };
+
+  /// Language CHOICES for the settings picker — includes "follow the
+  /// device language". The label is shown in the current UI language.
+  Map<String, String> get languageChoices => {
+        'system': call('langSystem'),
+        'ar': 'العربية',
+        'en': 'English',
+        'de': 'Deutsch',
+      };
 
   bool get isArabic => code == 'ar';
 
@@ -96,6 +105,35 @@ class L10n {
       'stop': 'إيقاف',
       'delete': 'حذف',
       'download': 'تحميل',
+      'langSystem': 'تلقائي (لغة الجهاز)',
+      'clearAll': 'مسح الكل',
+      'deleteAll': 'حذف الكل',
+      'ayahWord': 'الآية',
+      'deletedBookmark': 'تم حذف الفاصل',
+      'clearBookmarksTitle': 'مسح الفواصل',
+      'clearBookmarksBody': 'هل تريد حذف جميع الفواصل؟',
+      'noBookmarks': 'لا توجد فواصل بعد',
+      'noBookmarksHint': 'اضغط مطولاً على آية أثناء القراءة لحفظ فاصل',
+      'deletedHighlight': 'تم حذف التمييز',
+      'noHighlights': 'لا توجد تمييزات',
+      'noHighlightsHint': 'اضغط مطولاً على آية أثناء القراءة للتمييز',
+      'all': 'الكل',
+      'colYellow': 'أصفر',
+      'colGreen': 'أخضر',
+      'colBlue': 'أزرق',
+      'colPink': 'وردي',
+      'colPurple': 'بنفسجي',
+      'resetKhatmaTitle': 'إعادة الختمة',
+      'resetKhatmaBody': 'هل تريد البدء من جديد؟',
+      'reset': 'إعادة',
+      'khatmaCongrats': 'مبارك! أتممتَ ختمة القرآن الكريم',
+      'khatmaAccept': 'تقبّل الله منك',
+      'khatmaThanks': 'جزاك الله خيراً',
+      'ofThirtyJuz': 'من ٣٠ جزءاً',
+      'startedOn': 'بدأت في',
+      'juzWord': 'الجزء',
+      'khatmaAutoInfo':
+          'يُعلَّم الجزء تلقائياً عند قراءة جميع صفحاته في المصحف أو القراءة المتجاوبة، ويمكنك التعليم يدوياً بالضغط.',
     },
     'en': {
       'tabHighlights': 'Highlights',
@@ -159,6 +197,35 @@ class L10n {
       'stop': 'Stop',
       'delete': 'Delete',
       'download': 'Download',
+      'langSystem': 'Automatic (device)',
+      'clearAll': 'Clear all',
+      'deleteAll': 'Delete all',
+      'ayahWord': 'Ayah',
+      'deletedBookmark': 'Bookmark deleted',
+      'clearBookmarksTitle': 'Clear bookmarks',
+      'clearBookmarksBody': 'Delete all bookmarks?',
+      'noBookmarks': 'No bookmarks yet',
+      'noBookmarksHint': 'Long-press an ayah while reading to save a bookmark',
+      'deletedHighlight': 'Highlight deleted',
+      'noHighlights': 'No highlights yet',
+      'noHighlightsHint': 'Long-press an ayah while reading to highlight it',
+      'all': 'All',
+      'colYellow': 'Yellow',
+      'colGreen': 'Green',
+      'colBlue': 'Blue',
+      'colPink': 'Pink',
+      'colPurple': 'Purple',
+      'resetKhatmaTitle': 'Restart khatma',
+      'resetKhatmaBody': 'Start over from the beginning?',
+      'reset': 'Restart',
+      'khatmaCongrats': 'Congratulations! You completed a khatma of the Holy Quran',
+      'khatmaAccept': 'May Allah accept it from you',
+      'khatmaThanks': 'May Allah reward you',
+      'ofThirtyJuz': 'of 30 juz',
+      'startedOn': 'Started on',
+      'juzWord': 'Juz',
+      'khatmaAutoInfo':
+          'A juz is marked automatically once all its pages are read in the Mushaf or responsive reader; you can also mark it manually by tapping.',
     },
     'de': {
       'tabHighlights': 'Markierungen',
@@ -222,6 +289,35 @@ class L10n {
       'stop': 'Stopp',
       'delete': 'Löschen',
       'download': 'Herunterladen',
+      'langSystem': 'Automatisch (Gerät)',
+      'clearAll': 'Alle löschen',
+      'deleteAll': 'Alle löschen',
+      'ayahWord': 'Vers',
+      'deletedBookmark': 'Lesezeichen gelöscht',
+      'clearBookmarksTitle': 'Lesezeichen löschen',
+      'clearBookmarksBody': 'Alle Lesezeichen löschen?',
+      'noBookmarks': 'Noch keine Lesezeichen',
+      'noBookmarksHint': 'Halte einen Vers beim Lesen gedrückt, um ein Lesezeichen zu speichern',
+      'deletedHighlight': 'Markierung gelöscht',
+      'noHighlights': 'Noch keine Markierungen',
+      'noHighlightsHint': 'Halte einen Vers beim Lesen gedrückt, um ihn zu markieren',
+      'all': 'Alle',
+      'colYellow': 'Gelb',
+      'colGreen': 'Grün',
+      'colBlue': 'Blau',
+      'colPink': 'Rosa',
+      'colPurple': 'Lila',
+      'resetKhatmaTitle': 'Khatma neu starten',
+      'resetKhatmaBody': 'Von vorne beginnen?',
+      'reset': 'Neu starten',
+      'khatmaCongrats': 'Glückwunsch! Du hast eine Khatma des edlen Korans vollendet',
+      'khatmaAccept': 'Möge Allah es von dir annehmen',
+      'khatmaThanks': 'Möge Allah dich belohnen',
+      'ofThirtyJuz': 'von 30 Dschus',
+      'startedOn': 'Begonnen am',
+      'juzWord': 'Dschus',
+      'khatmaAutoInfo':
+          'Ein Dschus wird automatisch markiert, sobald alle seine Seiten im Mushaf oder im responsiven Leser gelesen wurden; du kannst es auch manuell durch Tippen markieren.',
     },
   };
 }

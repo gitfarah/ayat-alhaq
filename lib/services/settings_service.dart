@@ -10,12 +10,22 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
   String? _translationEdition;
   String _appLanguage = 'ar';
 
-  /// UI language for the app chrome: 'ar' (default), 'en', or 'de'.
-  /// Quran content itself always stays Arabic.
+  /// The user's raw language CHOICE: 'system', 'ar', 'en', or 'de'.
+  /// Use [effectiveLanguage] for the actually-applied language.
   String get appLanguage => _appLanguage;
 
+  /// The language actually applied to the UI. When the choice is
+  /// 'system', it follows the phone's language (Arabic for anything the
+  /// app doesn't translate). Quran content itself always stays Arabic.
+  String get effectiveLanguage {
+    if (_appLanguage != 'system') return _appLanguage;
+    final code =
+        WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+    return (code == 'en' || code == 'de') ? code : 'ar';
+  }
+
   Future<void> setAppLanguage(String code) async {
-    if (!['ar', 'en', 'de'].contains(code)) return;
+    if (!['system', 'ar', 'en', 'de'].contains(code)) return;
     _appLanguage = code;
     (await SharedPreferences.getInstance()).setString('appLanguage', code);
     notifyListeners();
@@ -77,6 +87,12 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void didChangePlatformBrightness() {
     if (_themeMode == ThemeMode.system) notifyListeners();
+  }
+
+  @override
+  void didChangeLocales(List<Locale>? locales) {
+    // Follow the phone's language live when set to "system".
+    if (_appLanguage == 'system') notifyListeners();
   }
 
   @override

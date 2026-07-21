@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_strings.dart';
 import '../services/highlight_service.dart';
 import '../services/library_events.dart';
 import '../services/quran_service.dart';
@@ -66,34 +67,31 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
     await _load();
     if (mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('تم حذف التمييز')));
+          .showSnackBar(SnackBar(content: Text(L10n.of(context)('deletedHighlight'))));
     }
   }
 
-  String _ar(int n) {
-    const d = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-    return n.toString().split('').map((c) => d[int.parse(c)]).join();
-  }
-
-  static const _colorLabel = {
-    'yellow': 'أصفر',
-    'green': 'أخضر',
-    'blue': 'أزرق',
-    'pink': 'وردي',
-    'purple': 'بنفسجي'
-  };
+  static String _colorName(L10n l, String key) => switch (key) {
+        'yellow' => l('colYellow'),
+        'green' => l('colGreen'),
+        'blue' => l('colBlue'),
+        'pink' => l('colPink'),
+        'purple' => l('colPurple'),
+        _ => key,
+      };
 
   @override
   Widget build(BuildContext context) {
     final isDark = context.watch<SettingsService>().isDarkIn(context);
+    final l = L10n.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('التمييزات')),
+      appBar: AppBar(title: Text(l('tabHighlights'))),
       body: _loading
           ? Center(
               child: CircularProgressIndicator(
                   color: isDark ? AppColors.darkPrimary : AppColors.primary))
           : Column(children: [
-              if (_items.isNotEmpty) _filterBar(isDark),
+              if (_items.isNotEmpty) _filterBar(isDark, l),
               Expanded(
                   child: _shown.isEmpty
                       ? _empty(isDark)
@@ -156,8 +154,10 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
                                         CrossAxisAlignment.stretch,
                                     children: [
                                       Text(
-                                          'الآية ${_ar(h.ayahNumber)} • ${_colorLabel[h.color] ?? h.color}',
-                                          textDirection: TextDirection.rtl,
+                                          '${l('ayahWord')} ${l.number(h.ayahNumber)} • ${_colorName(l, h.color)}',
+                                          textDirection: l.isArabic
+                                              ? TextDirection.rtl
+                                              : TextDirection.ltr,
                                           style: TextStyle(
                                               color: isDark
                                                   ? AppColors.darkTextSec
@@ -182,46 +182,49 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
     );
   }
 
-  Widget _filterBar(bool isDark) => SizedBox(
+  Widget _filterBar(bool isDark, L10n l) => SizedBox(
       height: 48,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         children: [
           _Chip(
-              label: 'الكل',
+              label: l('all'),
               color:
                   isDark ? AppColors.darkTextSec : AppColors.textSecondary,
               selected: _filter == null,
               onTap: () => setState(() => _filter = null)),
           ...AppColors.highlights.entries.map((e) => _Chip(
-              label: _colorLabel[e.key] ?? e.key,
+              label: _colorName(l, e.key),
               color: e.value,
               selected: _filter == e.key,
               onTap: () => setState(() => _filter = e.key))),
         ],
       ));
 
-  Widget _empty(bool isDark) => Center(
+  Widget _empty(bool isDark) {
+    final l = L10n.of(context);
+    return Center(
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Icon(Icons.highlight_outlined,
             size: 72,
             color: isDark ? AppColors.darkTextSec : Colors.grey.shade300),
         const SizedBox(height: 16),
-        Text('لا توجد تمييزات',
+        Text(l('noHighlights'),
             style: TextStyle(
                 fontSize: 18,
                 fontFamily: 'Amiri',
                 color:
                     isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
         const SizedBox(height: 8),
-        Text('اضغط على آية أثناء القراءة للتمييز',
+        Text(l('noHighlightsHint'),
             textAlign: TextAlign.center,
             style: TextStyle(
                 color: isDark ? AppColors.darkTextSec : AppColors.textLight,
                 fontFamily: 'Amiri',
                 fontSize: 13)),
       ]));
+  }
 }
 
 class _Chip extends StatelessWidget {
