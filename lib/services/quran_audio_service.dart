@@ -26,9 +26,9 @@ class QuranAudioService extends ChangeNotifier {
   final AudioPlayer _player = AudioPlayer();
 
   static const Map<String, String> reciters = {
+    'ar.mahermuaiqly': 'ماهر المعيقلي',
     'ar.husary': 'محمود خليل الحصري',
     'ar.abdulsamad': 'عبدالباسط عبدالصمد',
-    'ar.mahermuaiqly': 'ماهر المعيقلي',
     'ar.saoodshuraym': 'سعود الشريم',
     'ar.hudhaify': 'علي الحذيفي',
     'ar.muhammadayyoub': 'محمد أيوب',
@@ -36,7 +36,7 @@ class QuranAudioService extends ChangeNotifier {
     'ar.ahmedajamy': 'أحمد العجمي',
   };
 
-  static const String _defaultReciter = 'ar.husary';
+  static const String _defaultReciter = 'ar.mahermuaiqly';
 
   String _reciter = _defaultReciter;
   String get reciter => _reciter;
