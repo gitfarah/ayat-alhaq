@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../theme.dart';
 
 /// Ornamental surah-name header modeled on the decorated cartouches of
@@ -38,7 +38,7 @@ class SurahFrame extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontFamily: 'Amiri',
+              fontFamily: 'ScheherazadeNew',
               fontSize: fontSize,
               fontWeight: FontWeight.bold,
               color: text,

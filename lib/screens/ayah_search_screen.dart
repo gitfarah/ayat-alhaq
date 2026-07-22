@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/surah.dart';
@@ -125,14 +125,14 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
             style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                fontFamily: 'Amiri',
+                fontFamily: 'ScheherazadeNew',
                 color: isDark ? AppColors.darkText : AppColors.textPrimary)),
         subtitle: Text(
             '${s.revelationType == 'Meccan' ? 'مكية' : 'مدنية'} • ${_ar(s.numberOfAyahs)} آية',
             textAlign: TextAlign.right,
             textDirection: TextDirection.rtl,
             style: TextStyle(
-                fontFamily: 'Amiri',
+                fontFamily: 'ScheherazadeNew',
                 fontSize: 13,
                 color:
                     isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
@@ -181,7 +181,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                     style: TextStyle(
                         color:
                             isDark ? AppColors.darkText : AppColors.textPrimary,
-                        fontFamily: 'Amiri'),
+                        fontFamily: 'ScheherazadeNew'),
                     decoration: InputDecoration(
                         hintText: 'اكتب كلمة أو جزءاً من آية...',
                         hintTextDirection: TextDirection.rtl,
@@ -189,7 +189,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                             color: isDark
                                 ? AppColors.darkTextSec
                                 : AppColors.textLight,
-                            fontFamily: 'Amiri',
+                            fontFamily: 'ScheherazadeNew',
                             fontSize: 14),
                         border: InputBorder.none,
                         contentPadding:
@@ -208,12 +208,12 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                       style: TextStyle(
                           color: subColor,
                           fontSize: 13,
-                          fontFamily: 'Amiri')))),
+                          fontFamily: 'ScheherazadeNew')))),
         Expanded(
           child: _error != null
               ? Center(
                   child: Text(_error!,
-                      style: TextStyle(color: subColor, fontFamily: 'Amiri')))
+                      style: TextStyle(color: subColor, fontFamily: 'ScheherazadeNew')))
               : (_searchedOnce &&
                       _results.isEmpty &&
                       _surahResults.isEmpty &&
@@ -223,7 +223,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                           style: TextStyle(
                               color: subColor,
                               fontSize: 16,
-                              fontFamily: 'Amiri')))
+                              fontFamily: 'ScheherazadeNew')))
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: _surahResults.length + _results.length,
@@ -254,7 +254,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                                 style: TextStyle(
                                     fontSize: 16,
                                     height: 1.8,
-                                    fontFamily: 'Amiri',
+                                    fontFamily: 'ScheherazadeNew',
                                     color: isDark
                                         ? AppColors.darkText
                                         : AppColors.textPrimary)),
@@ -267,7 +267,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                                       color: isDark
                                           ? AppColors.darkPrimary
                                           : AppColors.primary,
-                                      fontFamily: 'Amiri',
+                                      fontFamily: 'ScheherazadeNew',
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold)),
                             ),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 /// "Sacred Clarity" design system
 class AppColors {
@@ -90,7 +90,7 @@ class AppColors {
 }
 
 class AppTypography {
-  static const String arabicFont = 'Amiri';
+  static const String arabicFont = 'ScheherazadeNew';
   static const String uiFont = 'PlusJakartaSans';
   static const String serifFont = 'SourceSerif4';
 

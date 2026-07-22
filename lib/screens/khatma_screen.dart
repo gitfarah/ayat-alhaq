@@ -110,13 +110,13 @@ class _KhatmaScreenState extends State<KhatmaScreen> {
                     style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        fontFamily: 'Amiri')),
+                        fontFamily: 'ScheherazadeNew')),
                 const SizedBox(height: 8),
                 Text(l('khatmaAccept'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontFamily: 'Amiri')),
+                        fontFamily: 'ScheherazadeNew')),
                 const SizedBox(height: 24),
                 ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -126,7 +126,7 @@ class _KhatmaScreenState extends State<KhatmaScreen> {
                     onPressed: () => Navigator.pop(context),
                     child: Text(l('khatmaThanks'),
                         style: const TextStyle(
-                            color: Colors.white, fontFamily: 'Amiri'))),
+                            color: Colors.white, fontFamily: 'ScheherazadeNew'))),
               ]),
             ));
   }
@@ -179,7 +179,7 @@ class _KhatmaScreenState extends State<KhatmaScreen> {
                 Text('${l.number(completed)} ${l('ofThirtyJuz')}',
                     style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.8),
-                        fontFamily: 'Amiri')),
+                        fontFamily: 'ScheherazadeNew')),
               ]),
               SizedBox(
                   width: 64,
@@ -225,7 +225,7 @@ class _KhatmaScreenState extends State<KhatmaScreen> {
                 l.isArabic ? TextDirection.rtl : TextDirection.ltr,
             textAlign: TextAlign.center,
             style: TextStyle(
-                fontFamily: 'Amiri',
+                fontFamily: 'ScheherazadeNew',
                 fontSize: 11,
                 height: 1.6,
                 color: isDark
@@ -281,11 +281,11 @@ class _KhatmaScreenState extends State<KhatmaScreen> {
                                   color: isDark
                                       ? AppColors.darkText
                                       : AppColors.textPrimary,
-                                  fontFamily: 'Amiri')),
+                                  fontFamily: 'ScheherazadeNew')),
                       Text(l('juzWord'),
                           style: TextStyle(
                               fontSize: 10,
-                              fontFamily: 'Amiri',
+                              fontFamily: 'ScheherazadeNew',
                               color:
                                   done ? Colors.white70 : AppColors.textLight)),
                     ]),

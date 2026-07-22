@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_strings.dart';
 import '../services/settings_service.dart';
@@ -97,7 +97,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: Text(t('gpsOption'),
                     textAlign: TextAlign.start,
                     style: TextStyle(
-                        fontFamily: 'Amiri',
+                        fontFamily: 'ScheherazadeNew',
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: isDark
@@ -124,7 +124,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   textAlign: TextAlign.right,
                   textDirection: TextDirection.rtl,
                   style: TextStyle(
-                      fontFamily: 'Amiri',
+                      fontFamily: 'ScheherazadeNew',
                       fontSize: 18,
                       fontWeight:
                           selected ? FontWeight.bold : FontWeight.normal,
@@ -168,7 +168,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       textAlign: TextAlign.right,
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
-                          fontFamily: 'Amiri',
+                          fontFamily: 'ScheherazadeNew',
                           fontSize: 17,
                           fontWeight: e.key == _prayerMethod
                               ? FontWeight.bold
@@ -250,11 +250,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: Text(t('clearCacheTitle'),
             textDirection: TextDirection.rtl,
             style: const TextStyle(
-                fontFamily: 'Amiri', fontWeight: FontWeight.bold)),
+                fontFamily: 'ScheherazadeNew', fontWeight: FontWeight.bold)),
         content: Text(t('clearCacheBody'),
             textDirection: TextDirection.rtl,
             textAlign: TextAlign.right,
-            style: const TextStyle(fontFamily: 'Amiri', height: 1.6)),
+            style: const TextStyle(fontFamily: 'ScheherazadeNew', height: 1.6)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -343,14 +343,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Text(e.name,
               textDirection: TextDirection.rtl,
               style: TextStyle(
-                  fontFamily: 'Amiri',
+                  fontFamily: 'ScheherazadeNew',
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: isDark ? AppColors.darkText : AppColors.textPrimary)),
           Text(status,
               textDirection: TextDirection.rtl,
               style: TextStyle(
-                  fontFamily: 'Amiri', fontSize: 13, color: subColor)),
+                  fontFamily: 'ScheherazadeNew', fontSize: 13, color: subColor)),
         ]),
       ]),
     );
@@ -385,7 +385,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     for (final e in t.languageChoices.entries)
                       ChoiceChip(
                         label: Text(e.value,
-                            style: const TextStyle(fontFamily: 'Amiri')),
+                            style: const TextStyle(fontFamily: 'ScheherazadeNew')),
                         selected: s.appLanguage == e.key,
                         selectedColor: (isDark
                                 ? AppColors.darkPrimary
@@ -416,18 +416,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ButtonSegment(
                         value: ThemeMode.dark,
                         label: Text(t('themeDark'),
-                            style: const TextStyle(fontFamily: 'Amiri')),
+                            style: const TextStyle(fontFamily: 'ScheherazadeNew')),
                         icon: const Icon(Icons.dark_mode_rounded, size: 16)),
                     ButtonSegment(
                         value: ThemeMode.system,
                         label: Text(t('themeSystem'),
-                            style: const TextStyle(fontFamily: 'Amiri')),
+                            style: const TextStyle(fontFamily: 'ScheherazadeNew')),
                         icon: const Icon(Icons.brightness_auto_rounded,
                             size: 16)),
                     ButtonSegment(
                         value: ThemeMode.light,
                         label: Text(t('themeLight'),
-                            style: const TextStyle(fontFamily: 'Amiri')),
+                            style: const TextStyle(fontFamily: 'ScheherazadeNew')),
                         icon: const Icon(Icons.light_mode_rounded, size: 16)),
                   ],
                   selected: {s.themeMode},
@@ -456,7 +456,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       textDirection: TextDirection.rtl,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontFamily: 'Amiri',
+                          fontFamily: 'ScheherazadeNew',
                           fontSize: s.fontSize,
                           color: isDark
                               ? AppColors.darkText
@@ -540,7 +540,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: Text(e.value,
                             textDirection: TextDirection.rtl,
                             style: TextStyle(
-                                fontFamily: 'Amiri',
+                                fontFamily: 'ScheherazadeNew',
                                 fontSize: 16,
                                 color: isDark
                                     ? AppColors.darkText
@@ -570,7 +570,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   t('savedPagesInfo'),
                   textAlign: TextAlign.start,
                   style: TextStyle(
-                      fontFamily: 'Amiri',
+                      fontFamily: 'ScheherazadeNew',
                       fontSize: 14,
                       color: isDark
                           ? AppColors.darkTextSec
@@ -602,7 +602,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       : const Icon(Icons.delete_outline_rounded, size: 18),
                   label: Text(
                       _clearing ? t('clearing') : t('clearSavedPages'),
-                      style: const TextStyle(fontFamily: 'Amiri')),
+                      style: const TextStyle(fontFamily: 'ScheherazadeNew')),
                 ),
               ),
             ]),
@@ -630,7 +630,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               isDark: isDark,
               icon: Icons.info_outline_rounded,
               title: t('versionLbl'),
-              subtitle: '2.9.0'),
+              subtitle: '2.10.0'),
           _Tile(
               isDark: isDark,
               icon: Icons.api_rounded,
@@ -667,7 +667,7 @@ class _SectionLabel extends StatelessWidget {
             style: const TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.bold,
-                fontFamily: 'Amiri',
+                fontFamily: 'ScheherazadeNew',
                 fontSize: 18)),
       ));
 }
@@ -710,7 +710,7 @@ class _Tile extends StatelessWidget {
                     Text(title,
                         textAlign: TextAlign.start,
                         style: TextStyle(
-                            fontFamily: 'Amiri',
+                            fontFamily: 'ScheherazadeNew',
                             fontWeight: FontWeight.bold,
                             fontSize: 19,
                             color: isDark
@@ -724,7 +724,7 @@ class _Tile extends StatelessWidget {
                                   ? AppColors.darkTextSec
                                   : AppColors.textSecondary,
                               fontSize: 15,
-                              fontFamily: 'Amiri')),
+                              fontFamily: 'ScheherazadeNew')),
                   ]),
             ),
           ]),

@@ -99,22 +99,21 @@ class _SplashGateState extends State<SplashGate> {
   }
 }
 
-/// The intro: the Bismillah in classical calligraphy above the brand
-/// logo, on the logo's own deep-teal background so the two blend
-/// seamlessly. Fades in on a cold start.
+/// The intro: the Bismillah calligraphy (large) above the brand
+/// wordmark (smaller), on the Bismillah image's own dark-green
+/// background so the artwork sits edge-to-edge with no visible box.
+/// Fades in on a cold start.
 class _BismillahSplash extends StatelessWidget {
   const _BismillahSplash();
 
-  /// The logo's background colour — used for the whole splash so the
-  /// logo image sits edge-to-edge with no visible box.
-  static const Color _brandGreen = Color(0xFF315052);
-  static const Color _gold = Color(0xFFE9B85A);
+  /// Matches the Bismillah artwork's background so the splash blends.
+  static const Color _bismillahGreen = Color(0xFF064D47);
 
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
     return Scaffold(
-      backgroundColor: _brandGreen,
+      backgroundColor: _bismillahGreen,
       body: SafeArea(
         child: Center(
           child: TweenAnimationBuilder<double>(
@@ -129,27 +128,13 @@ class _BismillahSplash extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Bismillah ligature (its glyph is far larger than its
-                // font metrics, so FittedBox scales it to fit).
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 64),
-                  child: FittedBox(
-                    fit: BoxFit.contain,
-                    child: Text(
-                      '﷽',
-                      textDirection: TextDirection.rtl,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'Amiri',
-                        fontSize: 56,
-                        color: _gold,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Brand logo — same green background, so it blends in.
-                Image.asset('assets/icon/logo.png', width: w * 0.82),
+                // Bismillah artwork — same green background, blends in.
+                Image.asset('assets/icon/bismillah.png', width: w * 0.80),
+                const SizedBox(height: 20),
+                // Brand wordmark, deliberately SMALLER than the
+                // Bismillah (transparent background so no box shows).
+                Image.asset('assets/icon/logo_transparent.png',
+                    width: w * 0.42),
               ],
             ),
           ),

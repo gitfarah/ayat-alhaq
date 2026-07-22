@@ -2,6 +2,7 @@
 // verifies the main navigation renders. Replaces the Flutter template's
 // counter test, which never matched this app and always failed.
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -23,8 +24,8 @@ void main() {
     );
     await tester.pump();
 
-    // The Bismillah intro shows first on a cold start…
-    expect(find.text('﷽'), findsOneWidget);
+    // The Bismillah intro (image artwork) shows first on a cold start…
+    expect(find.byType(Image), findsWidgets);
 
     // …and gives way to the main navigation after its timer.
     await tester.pump(const Duration(seconds: 3));

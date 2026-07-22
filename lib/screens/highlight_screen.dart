@@ -144,7 +144,7 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
                                       style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
-                                          fontFamily: 'Amiri',
+                                          fontFamily: 'ScheherazadeNew',
                                           color: isDark
                                               ? AppColors.darkText
                                               : AppColors.textPrimary)),
@@ -161,7 +161,7 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
                                               color: isDark
                                                   ? AppColors.darkTextSec
                                                   : AppColors.textSecondary,
-                                              fontFamily: 'Amiri',
+                                              fontFamily: 'ScheherazadeNew',
                                               fontSize: 13)),
                                       _AyahPreview(
                                           surahNumber: h.surahNumber,
@@ -212,7 +212,7 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
         Text(l('noHighlights'),
             style: TextStyle(
                 fontSize: 18,
-                fontFamily: 'Amiri',
+                fontFamily: 'ScheherazadeNew',
                 color:
                     isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
         const SizedBox(height: 8),
@@ -220,7 +220,7 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
                 color: isDark ? AppColors.darkTextSec : AppColors.textLight,
-                fontFamily: 'Amiri',
+                fontFamily: 'ScheherazadeNew',
                 fontSize: 13)),
       ]));
   }
@@ -262,7 +262,7 @@ class _Chip extends StatelessWidget {
                         : (isDark
                             ? AppColors.darkTextSec
                             : AppColors.textSecondary),
-                    fontFamily: 'Amiri',
+                    fontFamily: 'ScheherazadeNew',
                     fontSize: 13,
                     fontWeight:
                         selected ? FontWeight.bold : FontWeight.normal))));
@@ -309,7 +309,7 @@ class _AyahPreview extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontFamily: 'Amiri',
+              fontFamily: 'ScheherazadeNew',
               fontSize: 15,
               height: 1.7,
               color: isDark ? AppColors.darkText : AppColors.textPrimary,

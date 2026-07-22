@@ -1,7 +1,7 @@
 name: quran_app_v1
 description: A Quran reading app for Android and iOS.
 publish_to: 'none'
-version: 2.9.0+14
+version: 2.10.0+15
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -34,11 +34,11 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon/logo.png"
-  adaptive_icon_background: "#315052"
-  adaptive_icon_foreground: "assets/icon/logo_fg_padded.png"
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#315152"
+  adaptive_icon_foreground: "assets/icon/app_icon_fg_padded.png"
   remove_alpha_ios: true
-  background_color_ios: "#315052"
+  background_color_ios: "#315152"
 
 flutter:
   uses-material-design: true
@@ -47,7 +47,18 @@ flutter:
     - assets/quran/
     - assets/icon/media_art.png
     - assets/icon/logo.png
+    - assets/icon/logo_transparent.png
+    - assets/icon/bismillah.png
   fonts:
+    - family: ScheherazadeNew
+      fonts:
+        - asset: assets/fonts/ScheherazadeNew-Regular.ttf
+        - asset: assets/fonts/ScheherazadeNew-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/ScheherazadeNew-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/ScheherazadeNew-Bold.ttf
+          weight: 700
     - family: Amiri
       fonts:
         - asset: assets/fonts/Amiri-Regular.ttf

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../services/quran_audio_service.dart';
 import '../theme.dart';
 
@@ -27,7 +27,7 @@ Future<bool> showReciterPicker(
             Text('اختر القارئ',
                 textDirection: TextDirection.rtl,
                 style: TextStyle(
-                    fontFamily: 'Amiri',
+                    fontFamily: 'ScheherazadeNew',
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: isDark ? AppColors.darkText : AppColors.textPrimary)),
@@ -35,7 +35,7 @@ Future<bool> showReciterPicker(
             Text('يبقى هذا الاختيار محفوظاً حتى تغيّره',
                 textDirection: TextDirection.rtl,
                 style: TextStyle(
-                    fontFamily: 'Amiri',
+                    fontFamily: 'ScheherazadeNew',
                     fontSize: 12,
                     color: isDark
                         ? AppColors.darkTextSec
@@ -55,7 +55,7 @@ Future<bool> showReciterPicker(
                     textAlign: TextAlign.right,
                     textDirection: TextDirection.rtl,
                     style: TextStyle(
-                        fontFamily: 'Amiri',
+                        fontFamily: 'ScheherazadeNew',
                         fontSize: 16,
                         color: isDark
                             ? AppColors.darkText

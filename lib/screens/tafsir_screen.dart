@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -172,7 +172,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
             color: bodyText,
             fontWeight: FontWeight.bold,
             fontSize: 18,
-            fontFamily: 'Amiri',
+            fontFamily: 'ScheherazadeNew',
           ),
         ),
         centerTitle: true,
@@ -211,7 +211,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
                     fontSize: 22,
                     height: 1.8,
                     color: Colors.white,
-                    fontFamily: 'Amiri',
+                    fontFamily: 'ScheherazadeNew',
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -253,7 +253,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
                 style: TextStyle(
                   color: bodyText,
                   fontSize: 15,
-                  fontFamily: 'Amiri',
+                  fontFamily: 'ScheherazadeNew',
                 ),
                 items: _tafsirOptions.map((tafsir) {
                   return DropdownMenuItem<int>(
@@ -321,7 +321,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
                                 lineHeight: const LineHeight(2.0),
                                 textAlign: TextAlign.right,
                                 direction: TextDirection.rtl,
-                                fontFamily: 'Amiri',
+                                fontFamily: 'ScheherazadeNew',
                                 color: bodyText,
                               ),
                               "p": Style(
