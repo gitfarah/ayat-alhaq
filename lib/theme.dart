@@ -57,9 +57,13 @@ class AppColors {
   static const Color inverseSurface = Color(0xFF30312E);
   static const Color inverseOnSurface = Color(0xFFF2F0ED);
 
+  // Brand gold — the metallic gold used across buttons, cards, badges
+  // and decorative accents (user-chosen #D4AF37).
+  static const Color gold = Color(0xFFD4AF37);
+
   // Legacy aliases kept for compatibility with earlier code
-  static const Color accent = secondary;
-  static const Color accentGold = Color(0xFFB5860D);
+  static const Color accent = gold;
+  static const Color accentGold = gold;
   static const Color textPrimary = onSurface;
   static const Color textSecondary = onSurfaceVariant;
   static const Color textLight = outline;

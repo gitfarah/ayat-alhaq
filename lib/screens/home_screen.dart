@@ -459,18 +459,18 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-          color: AppColors.secondary.withValues(alpha: isDark ? 0.16 : 0.08),
+          color: AppColors.gold.withValues(alpha: isDark ? 0.16 : 0.12),
           borderRadius: BorderRadius.circular(14),
-          border:
-              Border.all(color: AppColors.secondary.withValues(alpha: 0.25))),
+          border: Border.all(color: AppColors.gold.withValues(alpha: 0.4))),
       child: Row(children: [
         Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-                color: AppColors.secondary.withValues(alpha: 0.15),
+                color: AppColors.gold.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(10)),
-            child: const Icon(Icons.calendar_month_rounded,
-                color: AppColors.secondary, size: 18)),
+            child: Icon(Icons.calendar_month_rounded,
+                color: isDark ? AppColors.gold : const Color(0xFF8A6D00),
+                size: 18)),
         const SizedBox(width: 8),
         Expanded(
             child: Column(
@@ -631,17 +631,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                      color: AppColors.primary
-                          .withValues(alpha: isDark ? 0.2 : 0.08),
-                      shape: BoxShape.circle),
+                      // Gold surah-number badge with a gold ring — the
+                      // main pop of the app's accent colour on each card.
+                      color: AppColors.gold
+                          .withValues(alpha: isDark ? 0.22 : 0.16),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: AppColors.gold
+                              .withValues(alpha: isDark ? 0.55 : 0.5),
+                          width: 1.2)),
                   child: Center(
                       child: Text(_ar(surah.number),
                           style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
                               color: isDark
-                                  ? AppColors.darkPrimary
-                                  : AppColors.primary,
+                                  ? AppColors.gold
+                                  : const Color(0xFF8A6D00),
                               fontFamily: 'ScheherazadeNew')))),
               const SizedBox(width: 14),
               Expanded(

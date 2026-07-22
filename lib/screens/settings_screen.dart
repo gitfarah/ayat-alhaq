@@ -412,23 +412,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<ThemeMode>(
+                  // No leading icons and no selected-check, with tight
+                  // padding — the three labels ("System"/"النظام"/…) were
+                  // wrapping and breaking apart when squeezed by icons.
+                  showSelectedIcon: false,
+                  style: SegmentedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 4, vertical: 8),
+                    textStyle: const TextStyle(
+                        fontFamily: 'ScheherazadeNew',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600),
+                  ),
                   segments: [
                     ButtonSegment(
                         value: ThemeMode.dark,
                         label: Text(t('themeDark'),
-                            style: const TextStyle(fontFamily: 'ScheherazadeNew')),
-                        icon: const Icon(Icons.dark_mode_rounded, size: 16)),
+                            maxLines: 1, overflow: TextOverflow.visible)),
                     ButtonSegment(
                         value: ThemeMode.system,
                         label: Text(t('themeSystem'),
-                            style: const TextStyle(fontFamily: 'ScheherazadeNew')),
-                        icon: const Icon(Icons.brightness_auto_rounded,
-                            size: 16)),
+                            maxLines: 1, overflow: TextOverflow.visible)),
                     ButtonSegment(
                         value: ThemeMode.light,
                         label: Text(t('themeLight'),
-                            style: const TextStyle(fontFamily: 'ScheherazadeNew')),
-                        icon: const Icon(Icons.light_mode_rounded, size: 16)),
+                            maxLines: 1, overflow: TextOverflow.visible)),
                   ],
                   selected: {s.themeMode},
                   onSelectionChanged: (sel) => s.setThemeMode(sel.first),
@@ -630,7 +638,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               isDark: isDark,
               icon: Icons.info_outline_rounded,
               title: t('versionLbl'),
-              subtitle: '2.10.0'),
+              subtitle: '2.11.0'),
           _Tile(
               isDark: isDark,
               icon: Icons.api_rounded,
@@ -641,11 +649,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: Icons.menu_book_rounded,
               title: t('pagesSource'),
               subtitle: 'quranpedia.net (مجمع الملك فهد)'),
-          _Tile(
-              isDark: isDark,
-              icon: Icons.font_download_outlined,
-              title: t('fontLbl'),
-              subtitle: 'Amiri — مفتوح المصدر'),
         ],
       ),
     );
