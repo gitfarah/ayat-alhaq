@@ -61,6 +61,10 @@ class AppColors {
   // and decorative accents (user-chosen #D4AF37).
   static const Color gold = Color(0xFFD4AF37);
 
+  // Deep emerald used as the bottom-navigation background (matches the
+  // brand and the requested layout).
+  static const Color navBar = Color(0xFF143D2B);
+
   // Legacy aliases kept for compatibility with earlier code
   static const Color accent = gold;
   static const Color accentGold = gold;

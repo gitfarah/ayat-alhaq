@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../l10n/app_strings.dart';
-import '../services/settings_service.dart';
 import '../theme.dart';
 import 'home_screen.dart';
 import 'bookmarks_screen.dart';
@@ -25,7 +23,6 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.watch<SettingsService>().isDarkIn(context);
     final t = L10n.of(context);
     return Scaffold(
       body: IndexedStack(index: _idx, children: _screens),
@@ -36,13 +33,23 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: Directionality(
         textDirection: TextDirection.ltr,
         child: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
+          color: AppColors.navBar,
           border: Border(
-              top: BorderSide(
-                  color: isDark ? AppColors.darkBorder : AppColors.border,
-                  width: 0.5)),
+              top: BorderSide(color: AppColors.gold, width: 1.2)),
         ),
         child: BottomNavigationBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: AppColors.gold,
+          unselectedItemColor: const Color(0xFFB6C7BC),
+          selectedLabelStyle: const TextStyle(
+              fontFamily: 'ScheherazadeNew',
+              fontWeight: FontWeight.bold,
+              fontSize: 13),
+          unselectedLabelStyle: const TextStyle(
+              fontFamily: 'ScheherazadeNew', fontSize: 12),
           currentIndex: _idx,
           onTap: (i) => setState(() => _idx = i),
           items: [

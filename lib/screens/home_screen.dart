@@ -296,20 +296,33 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(L10n.of(context)('tabIndex')),
-        actions: [
-          IconButton(
-              icon: Icon(
-                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                  color: theme.colorScheme.primary),
-              onPressed: () => s.toggleDarkIn(context)),
-          IconButton(
-              icon: Icon(Icons.settings_rounded,
-                  color: theme.colorScheme.primary),
-              onPressed: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()))),
-        ],
+      // Pinned LTR so the two icons always sit on fixed sides —
+      // settings on the LEFT, day/night toggle on the RIGHT — with the
+      // (centered) title unaffected, regardless of the app language.
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: AppBar(
+            centerTitle: true,
+            leading: IconButton(
+                icon: Icon(Icons.settings_rounded,
+                    color: theme.colorScheme.primary),
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()))),
+            title: Text(L10n.of(context)('tabIndex'),
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            actions: [
+              IconButton(
+                  icon: Icon(
+                      isDark
+                          ? Icons.light_mode_rounded
+                          : Icons.dark_mode_rounded,
+                      color: theme.colorScheme.primary),
+                  onPressed: () => s.toggleDarkIn(context)),
+            ],
+          ),
+        ),
       ),
       body: _loading
           ? Center(
