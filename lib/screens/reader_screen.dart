@@ -41,6 +41,28 @@ class _ReaderScreenState extends State<ReaderScreen> {
   int _page = 1, _juz = 1, _hizb = 1;
   bool _barsVisible = true;
 
+  /// Auto-follow: the reader scrolls to keep the currently-reciting
+  /// ayah on screen. [_lastAudioAyah] guards against re-scrolling to
+  /// the same ayah on every audio notification.
+  QuranAudioService? _audioSvc;
+  int? _lastAudioAyah;
+
+  void _followAudio() {
+    final a = _audioSvc;
+    if (!mounted || a == null || !a.hasActiveTrack) return;
+    final g = a.currentGlobalAyah;
+    if (g == null || g == _lastAudioAyah) return;
+    _lastAudioAyah = g;
+    final idx = _ayahs.indexWhere((x) => x.number == g);
+    if (idx == -1 || !_scroll.isAttached) return;
+    _scroll.scrollTo(
+      index: idx + _headerOffset,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+      alignment: 0.3, // keep the ayah in the upper third
+    );
+  }
+
   /// Bars + system chrome together (same model as the Mushaf screen):
   /// a fast tap anywhere toggles them, scrolling hides them, and
   /// long-pressing an ayah opens its options.
@@ -115,11 +137,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
       // Give the audio service a way to resolve "what comes next" for
       // auto-advance, scoped to THIS surah's loaded ayah list. Cleared
       // in dispose() so a stale closure never outlives this screen.
-      context.read<QuranAudioService>().nextAyahResolver = (currentGlobalAyah) {
+      final audio = context.read<QuranAudioService>();
+      audio.nextAyahResolver = (currentGlobalAyah) {
         final idx = _ayahs.indexWhere((a) => a.number == currentGlobalAyah);
         if (idx == -1 || idx + 1 >= _ayahs.length) return null;
         return _ayahs[idx + 1].number;
       };
+      // Follow the recitation on screen (scroll to the playing ayah).
+      _audioSvc = audio;
+      audio.removeListener(_followAudio);
+      audio.addListener(_followAudio);
 
       final scrollTarget = widget.targetAyah ?? widget.targetAyahNumber;
       if (scrollTarget != null) {
@@ -587,6 +614,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     // Never leave the app stuck in immersive mode after this screen.
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _positions.itemPositions.removeListener(_onScroll);
+    _audioSvc?.removeListener(_followAudio);
     // Clear the resolver so it doesn't reference this screen's disposed
     // _ayahs list if audio is still playing when the user navigates away.
     try {

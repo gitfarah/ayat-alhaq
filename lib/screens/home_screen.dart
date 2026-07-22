@@ -251,38 +251,45 @@ class _HomeScreenState extends State<HomeScreen> {
                       isDark ? AppColors.darkTextSec : AppColors.textSecondary,
                   fontFamily: 'ScheherazadeNew')),
           const SizedBox(height: 24),
-          Row(children: [
-            Expanded(
-                child: _ModeBtn(
-                    icon: Icons.menu_book_rounded,
-                    label: 'المصحف',
-                    sub: 'قراءة بالصفحات',
-                    color: AppColors.primary,
-                    isDark: isDark,
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => MushafSvgScreen(
-                                  startPage: _surahPage[surah.number] ?? 1)));
-                    })),
-            const SizedBox(width: 14),
-            Expanded(
-                child: _ModeBtn(
-                    icon: Icons.format_align_right_rounded,
-                    label: 'الآيات',
-                    sub: 'قراءة متجاوبة',
-                    color: AppColors.accent,
-                    isDark: isDark,
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => ReaderScreen(surah: surah)));
-                    })),
-          ]),
+          // Fixed order in every language: Mushaf on the LEFT, the
+          // responsive reader on the RIGHT (pinned LTR so the app
+          // language can't reverse them).
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Row(children: [
+              Expanded(
+                  child: _ModeBtn(
+                      icon: Icons.menu_book_rounded,
+                      label: 'المصحف',
+                      sub: 'قراءة بالصفحات',
+                      color: AppColors.primary,
+                      isDark: isDark,
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => MushafSvgScreen(
+                                    startPage:
+                                        _surahPage[surah.number] ?? 1)));
+                      })),
+              const SizedBox(width: 14),
+              Expanded(
+                  child: _ModeBtn(
+                      icon: Icons.format_align_right_rounded,
+                      label: 'الآيات',
+                      sub: 'قراءة متجاوبة',
+                      color: AppColors.accent,
+                      isDark: isDark,
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => ReaderScreen(surah: surah)));
+                      })),
+            ]),
+          ),
         ]),
         ),
       ),

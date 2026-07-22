@@ -334,24 +334,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onPressed: () => _downloadTafsir(e.id));
     }
 
+    // Name/status on the leading edge, action on the trailing edge —
+    // follows the app-language direction (name right in Arabic, left in
+    // English/German) instead of being forced one way.
     return Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Row(children: [
+        Expanded(
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(e.name,
+                    textAlign: TextAlign.start,
+                    style: TextStyle(
+                        fontFamily: 'ScheherazadeNew',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isDark
+                            ? AppColors.darkText
+                            : AppColors.textPrimary)),
+                Text(status,
+                    textAlign: TextAlign.start,
+                    style: TextStyle(
+                        fontFamily: 'ScheherazadeNew',
+                        fontSize: 13,
+                        color: subColor)),
+              ]),
+        ),
+        const SizedBox(width: 8),
         action,
-        const Spacer(),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text(e.name,
-              textDirection: TextDirection.rtl,
-              style: TextStyle(
-                  fontFamily: 'ScheherazadeNew',
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? AppColors.darkText : AppColors.textPrimary)),
-          Text(status,
-              textDirection: TextDirection.rtl,
-              style: TextStyle(
-                  fontFamily: 'ScheherazadeNew', fontSize: 13, color: subColor)),
-        ]),
       ]),
     );
   }
@@ -638,7 +649,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               isDark: isDark,
               icon: Icons.info_outline_rounded,
               title: t('versionLbl'),
-              subtitle: '2.12.0'),
+              subtitle: '1.0.10'),
           _Tile(
               isDark: isDark,
               icon: Icons.api_rounded,
