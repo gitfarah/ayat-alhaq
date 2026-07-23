@@ -1,0 +1,117 @@
+name: iOS App Store release (signed)
+
+# Manual trigger only. This builds a SIGNED IPA and uploads it to App
+# Store Connect (it then appears under TestFlight / the build list, from
+# where you submit it for review).
+#
+# It stays inert until the repository has the secrets listed below —
+# all of which come from your paid Apple Developer account. Add them
+# under: GitHub repo → Settings → Secrets and variables → Actions.
+#
+#   APPLE_TEAM_ID                  Your 10-char Team ID (Apple Developer → Membership)
+#   IOS_PROVISION_PROFILE_NAME     The App Store provisioning profile's exact NAME
+#   IOS_DIST_CERT_P12_BASE64       Apple Distribution cert exported as .p12, then base64
+#   IOS_DIST_CERT_PASSWORD         The password you set when exporting the .p12
+#   IOS_PROVISION_PROFILE_BASE64   The .mobileprovision file, base64
+#   IOS_KEYCHAIN_PASSWORD          Any random string (used for a temp keychain)
+#   ASC_API_KEY_ID                 App Store Connect API key ID
+#   ASC_API_ISSUER_ID              App Store Connect API issuer ID
+#   ASC_API_KEY_P8_BASE64          The AuthKey_XXXX.p8 file, base64
+#
+# To base64 a file:  macOS/Linux `base64 -i file`  •  Windows PowerShell
+#   [Convert]::ToBase64String([IO.File]::ReadAllBytes("file")) | Set-Clipboard
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Install distribution certificate & provisioning profile
+        env:
+          CERT_B64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          CERT_PWD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          PROFILE_B64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          KC_PWD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+        run: |
+          CERT_PATH="$RUNNER_TEMP/dist.p12"
+          PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          KEYCHAIN="$RUNNER_TEMP/app-signing.keychain-db"
+
+          echo "$CERT_B64"    | base64 --decode > "$CERT_PATH"
+          echo "$PROFILE_B64" | base64 --decode > "$PROFILE_PATH"
+
+          security create-keychain -p "$KC_PWD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KC_PWD" "$KEYCHAIN"
+          security import "$CERT_PATH" -P "$CERT_PWD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KC_PWD" "$KEYCHAIN"
+          security list-keychain -d user -s "$KEYCHAIN" login.keychain
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/"
+
+      - name: Configure manual signing for the archive
+        run: |
+          cat >> ios/Flutter/Release.xcconfig <<EOF
+          CODE_SIGN_STYLE=Manual
+          DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }}
+          PROVISIONING_PROFILE_SPECIFIER=${{ secrets.IOS_PROVISION_PROFILE_NAME }}
+          CODE_SIGN_IDENTITY=Apple Distribution
+          EOF
+
+      - name: Write ExportOptions.plist
+        run: |
+          cat > ios/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store</string>
+            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.omar.ayat_alhaq</key>
+              <string>${{ secrets.IOS_PROVISION_PROFILE_NAME }}</string>
+            </dict>
+            <key>uploadSymbols</key><true/>
+            <key>uploadBitcode</key><false/>
+            <key>destination</key><string>export</string>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Build signed IPA
+        run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+
+      - name: Upload to App Store Connect
+        env:
+          KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_API_ISSUER_ID }}
+          KEY_B64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+        run: |
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          echo "$KEY_B64" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8"
+          IPA="$(ls build/ios/ipa/*.ipa | head -1)"
+          echo "Uploading $IPA"
+          xcrun altool --upload-app --type ios --file "$IPA" \
+            --apiKey "$KEY_ID" --apiIssuer "$ISSUER"
+
+      - name: Save a copy of the signed IPA as an artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AyatAlHaq-signed-ipa
+          path: build/ios/ipa/*.ipa
+          retention-days: 14

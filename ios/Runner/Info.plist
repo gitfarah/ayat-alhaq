@@ -3,10 +3,21 @@
 <plist version="1.0">
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>يُستخدم موقعك لحساب مواقيت الصلاة لمدينتك فقط.</string>
+	<string>Your location is used only to calculate accurate prayer times for your area. يُستخدم موقعك لحساب مواقيت الصلاة في منطقتك فقط.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
+	</array>
+	<!-- Export compliance: the app uses only standard HTTPS (exempt
+	     encryption), so App Store uploads won't prompt for the
+	     encryption question. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>ar</string>
+		<string>en</string>
+		<string>de</string>
 	</array>
 	<key>CFBundleDisplayName</key>
 	<string>آيات الحق</string>
