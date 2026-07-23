@@ -777,7 +777,7 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
     Icons.wb_twilight_rounded, // Fajr — dawn
     Icons.wb_sunny_rounded, // Dhuhr — high sun
     Icons.wb_sunny_outlined, // Asr — afternoon sun
-    Icons.nights_stay_rounded, // Maghrib — dusk
+    Icons.wb_twilight_rounded, // Maghrib — sunset (sun at the horizon)
     Icons.nightlight_round, // Isha — night
   ];
   static const List<Color> _prayerColors = [
@@ -915,65 +915,63 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
           ),
         ]),
         const SizedBox(height: 10),
-        // Fixed LTR order (Fajr → Isha) so it reads the same in every
-        // language; each prayer shows its sun-status icon, name and time.
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: Row(
-            children: [
-              for (var i = 0; i < 5; i++)
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    decoration: BoxDecoration(
+        // Follows the app-language direction: in Arabic the row reads
+        // right-to-left (Fajr on the right), in English/German left-to-
+        // right (Fajr on the left). Each prayer shows its sun-status
+        // icon, name and time.
+        Row(
+          children: [
+            for (var i = 0; i < 5; i++)
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                      color: i == next
+                          ? accent.withValues(alpha: 0.14)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      border: i == next
+                          ? Border.all(color: accent.withValues(alpha: 0.35))
+                          : null),
+                  child: Column(children: [
+                    Icon(_prayerIcons[i],
+                        size: 20,
                         color: i == next
-                            ? accent.withValues(alpha: 0.14)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                        border: i == next
-                            ? Border.all(
-                                color: accent.withValues(alpha: 0.35))
-                            : null),
-                    child: Column(children: [
-                      Icon(_prayerIcons[i],
-                          size: 20,
-                          color: i == next
-                              ? accent
-                              : _prayerColors[i].withValues(
-                                  alpha: isDark ? 0.9 : 1)),
-                      const SizedBox(height: 5),
-                      Text(_prayerName(l, i),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontFamily: 'ScheherazadeNew',
-                              fontSize: 12.5,
-                              fontWeight: i == next
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              color: i == next
-                                  ? accent
-                                  : (isDark
-                                      ? AppColors.darkTextSec
-                                      : AppColors.textSecondary))),
-                      const SizedBox(height: 2),
-                      Text(_digits(times.all[i]),
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: i == next
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              color: i == next
-                                  ? accent
-                                  : (isDark
-                                      ? AppColors.darkText
-                                      : AppColors.textPrimary))),
-                    ]),
-                  ),
+                            ? accent
+                            : _prayerColors[i]
+                                .withValues(alpha: isDark ? 0.9 : 1)),
+                    const SizedBox(height: 5),
+                    Text(_prayerName(l, i),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontFamily: 'ScheherazadeNew',
+                            fontSize: 12.5,
+                            fontWeight: i == next
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: i == next
+                                ? accent
+                                : (isDark
+                                    ? AppColors.darkTextSec
+                                    : AppColors.textSecondary))),
+                    const SizedBox(height: 2),
+                    Text(_digits(times.all[i]),
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: i == next
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: i == next
+                                ? accent
+                                : (isDark
+                                    ? AppColors.darkText
+                                    : AppColors.textPrimary))),
+                  ]),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ]),
     );
