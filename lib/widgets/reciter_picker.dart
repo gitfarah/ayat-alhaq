@@ -44,19 +44,27 @@ Future<bool> showReciterPicker(
             for (final e in QuranAudioService.reciters.entries)
               ListTile(
                 dense: true,
+                selected: e.key == audio.reciter,
+                selectedTileColor: AppColors.gold.withValues(alpha: 0.16),
+                shape: e.key == audio.reciter
+                    ? RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(
+                            color: AppColors.gold, width: 1.3))
+                    : null,
                 onTap: () => Navigator.pop(context, e.key),
                 trailing: e.key == audio.reciter
-                    ? Icon(Icons.check_circle_rounded,
-                        color:
-                            isDark ? AppColors.darkPrimary : AppColors.primary,
-                        size: 20)
+                    ? const Icon(Icons.check_circle_rounded,
+                        color: AppColors.gold, size: 20)
                     : null,
                 title: Text(e.value,
-                    textAlign: TextAlign.right,
-                    textDirection: TextDirection.rtl,
+                    textAlign: TextAlign.start,
                     style: TextStyle(
                         fontFamily: 'ScheherazadeNew',
                         fontSize: 16,
+                        fontWeight: e.key == audio.reciter
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                         color: isDark
                             ? AppColors.darkText
                             : AppColors.textPrimary)),

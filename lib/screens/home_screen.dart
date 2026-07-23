@@ -770,12 +770,40 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
   PrayerTimes? _times;
   String? _label;
   bool _loaded = false;
+  String _lang = 'ar';
+
+  /// Sun-status colours per prayer (dawn → night), used for the icons.
+  static const List<IconData> _prayerIcons = [
+    Icons.wb_twilight_rounded, // Fajr — dawn
+    Icons.wb_sunny_rounded, // Dhuhr — high sun
+    Icons.wb_sunny_outlined, // Asr — afternoon sun
+    Icons.nights_stay_rounded, // Maghrib — dusk
+    Icons.nightlight_round, // Isha — night
+  ];
+  static const List<Color> _prayerColors = [
+    Color(0xFFEBA23B),
+    Color(0xFFF2B705),
+    Color(0xFFE08D2F),
+    Color(0xFFC85C2E),
+    Color(0xFF5B79A8),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _load();
     LibraryEvents.prayer.addListener(_load);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload when the app language changes (city names / GPS geocoding
+    // are language-specific) or on the first build.
+    final lang = context.read<SettingsService>().effectiveLanguage;
+    if (lang != _lang || !_loaded) {
+      _lang = lang;
+      _load();
+    }
   }
 
   @override
@@ -786,7 +814,7 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
 
   Future<void> _load() async {
     try {
-      final label = await PrayerService.locationLabel();
+      final label = await PrayerService.locationLabel(_lang);
       final times = label == null ? null : await PrayerService.getTodayTimes();
       if (!mounted) return;
       setState(() {
@@ -800,17 +828,28 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
     }
   }
 
-  String _ar(String hhmm) {
+  /// Localizes digits (Arabic-Indic for Arabic, Western otherwise).
+  String _digits(String s) {
+    if (_lang != 'ar') return s;
     const d = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-    return hhmm
+    return s
         .split('')
         .map((c) => int.tryParse(c) != null ? d[int.parse(c)] : c)
         .join();
   }
 
+  String _prayerName(L10n l, int i) => [
+        l('prayerFajr'),
+        l('prayerDhuhr'),
+        l('prayerAsr'),
+        l('prayerMaghrib'),
+        l('prayerIsha'),
+      ][i];
+
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
+    final l = L10n.of(context); // also makes this rebuild on lang change
     if (!_loaded) return const SizedBox.shrink();
 
     // Not configured yet — a one-tap prompt.
@@ -875,47 +914,66 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
                         isDark ? AppColors.darkText : AppColors.textPrimary)),
           ),
         ]),
-        const SizedBox(height: 8),
-        Row(
-          // RTL order: Fajr appears rightmost.
-          children: [
-            for (var i = 0; i < 5; i++)
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  decoration: BoxDecoration(
-                      color: i == next
-                          ? accent.withValues(alpha: 0.14)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10)),
-                  child: Column(children: [
-                    Text(PrayerTimes.names[i],
-                        style: TextStyle(
-                            fontFamily: 'ScheherazadeNew',
-                            fontSize: 13,
-                            fontWeight:
-                                i == next ? FontWeight.bold : FontWeight.normal,
-                            color: i == next
-                                ? accent
-                                : (isDark
-                                    ? AppColors.darkTextSec
-                                    : AppColors.textSecondary))),
-                    const SizedBox(height: 2),
-                    Text(_ar(times.all[i]),
-                        style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight:
-                                i == next ? FontWeight.bold : FontWeight.normal,
-                            color: i == next
-                                ? accent
-                                : (isDark
-                                    ? AppColors.darkText
-                                    : AppColors.textPrimary))),
-                  ]),
+        const SizedBox(height: 10),
+        // Fixed LTR order (Fajr → Isha) so it reads the same in every
+        // language; each prayer shows its sun-status icon, name and time.
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Row(
+            children: [
+              for (var i = 0; i < 5; i++)
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                        color: i == next
+                            ? accent.withValues(alpha: 0.14)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        border: i == next
+                            ? Border.all(
+                                color: accent.withValues(alpha: 0.35))
+                            : null),
+                    child: Column(children: [
+                      Icon(_prayerIcons[i],
+                          size: 20,
+                          color: i == next
+                              ? accent
+                              : _prayerColors[i].withValues(
+                                  alpha: isDark ? 0.9 : 1)),
+                      const SizedBox(height: 5),
+                      Text(_prayerName(l, i),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontFamily: 'ScheherazadeNew',
+                              fontSize: 12.5,
+                              fontWeight: i == next
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: i == next
+                                  ? accent
+                                  : (isDark
+                                      ? AppColors.darkTextSec
+                                      : AppColors.textSecondary))),
+                      const SizedBox(height: 2),
+                      Text(_digits(times.all[i]),
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: i == next
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: i == next
+                                  ? accent
+                                  : (isDark
+                                      ? AppColors.darkText
+                                      : AppColors.textPrimary))),
+                    ]),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ]),
     );

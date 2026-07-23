@@ -30,6 +30,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _prayerLabel;
   int _prayerMethod = 3;
   bool _locating = false;
+  String _lang = 'ar';
 
   @override
   void initState() {
@@ -39,9 +40,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadPrayerConfig();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Location/method labels are language-specific — reload on change.
+    final lang = context.read<SettingsService>().effectiveLanguage;
+    if (lang != _lang) {
+      _lang = lang;
+      _loadPrayerConfig();
+    }
+  }
+
   Future<void> _loadPrayerConfig() async {
     final city = await PrayerService.selectedCity();
-    final label = await PrayerService.locationLabel();
+    final label = await PrayerService.locationLabel(_lang);
     final method = await PrayerService.selectedMethod();
     if (mounted) {
       setState(() {
@@ -59,7 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _loadPrayerConfig();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✓ تم تحديد موقعك')));
+            SnackBar(content: Text(L10n.of(context)('locationSet'))));
       }
     } catch (e) {
       if (mounted) {
@@ -110,19 +122,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
             final selected = c.city == _prayerCity?.city;
             return ListTile(
               dense: true,
+              selected: selected,
+              selectedTileColor: AppColors.gold.withValues(alpha: 0.16),
+              shape: selected
+                  ? RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(
+                          color: AppColors.gold, width: 1.3))
+                  : null,
               onTap: () async {
                 Navigator.pop(ctx);
                 await PrayerService.setCity(c);
                 _loadPrayerConfig();
               },
               trailing: selected
-                  ? Icon(Icons.check_rounded,
-                      color:
-                          isDark ? AppColors.darkPrimary : AppColors.primary)
+                  ? const Icon(Icons.check_circle_rounded,
+                      color: AppColors.gold)
                   : null,
-              title: Text(c.label,
-                  textAlign: TextAlign.right,
-                  textDirection: TextDirection.rtl,
+              title: Text(_lang == 'ar' ? c.label : c.city,
+                  textAlign: TextAlign.start,
                   style: TextStyle(
                       fontFamily: 'ScheherazadeNew',
                       fontSize: 18,
@@ -151,32 +169,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               for (final e in PrayerService.methods.entries)
-                ListTile(
-                  dense: true,
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    await PrayerService.setMethod(e.key);
-                    _loadPrayerConfig();
-                  },
-                  trailing: e.key == _prayerMethod
-                      ? Icon(Icons.check_rounded,
-                          color: isDark
-                              ? AppColors.darkPrimary
-                              : AppColors.primary)
-                      : null,
-                  title: Text(e.value,
-                      textAlign: TextAlign.right,
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                          fontFamily: 'ScheherazadeNew',
-                          fontSize: 17,
-                          fontWeight: e.key == _prayerMethod
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          color: isDark
-                              ? AppColors.darkText
-                              : AppColors.textPrimary)),
-                ),
+                Builder(builder: (_) {
+                  final selected = e.key == _prayerMethod;
+                  return ListTile(
+                    dense: true,
+                    selected: selected,
+                    selectedTileColor: AppColors.gold.withValues(alpha: 0.16),
+                    shape: selected
+                        ? RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(
+                                color: AppColors.gold, width: 1.3))
+                        : null,
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      await PrayerService.setMethod(e.key);
+                      _loadPrayerConfig();
+                    },
+                    trailing: selected
+                        ? const Icon(Icons.check_circle_rounded,
+                            color: AppColors.gold)
+                        : null,
+                    title: Text(PrayerService.methodName(e.key, _lang),
+                        textAlign: TextAlign.start,
+                        style: TextStyle(
+                            fontFamily: 'ScheherazadeNew',
+                            fontSize: 17,
+                            fontWeight:
+                                selected ? FontWeight.bold : FontWeight.normal,
+                            color: isDark
+                                ? AppColors.darkText
+                                : AppColors.textPrimary)),
+                  );
+                }),
             ],
           ),
         ),
@@ -528,7 +553,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 isDark: isDark,
                 icon: Icons.calculate_rounded,
                 title: t('calcMethod'),
-                subtitle: PrayerService.methods[_prayerMethod] ?? ''),
+                subtitle: PrayerService.methodName(_prayerMethod, _lang)),
           ),
           const SizedBox(height: 16),
           _SectionLabel(t('recitation'), isDark),
@@ -550,21 +575,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     for (final e in QuranAudioService.reciters.entries)
-                      RadioListTile<String>(
-                        value: e.key,
-                        dense: true,
-                        visualDensity: VisualDensity.compact,
-                        activeColor:
-                            isDark ? AppColors.darkPrimary : AppColors.primary,
-                        title: Text(e.value,
-                            textDirection: TextDirection.rtl,
-                            style: TextStyle(
-                                fontFamily: 'ScheherazadeNew',
-                                fontSize: 16,
-                                color: isDark
-                                    ? AppColors.darkText
-                                    : AppColors.textPrimary)),
-                      ),
+                      Builder(builder: (_) {
+                        final sel = e.key ==
+                            context.watch<QuranAudioService>().reciter;
+                        return RadioListTile<String>(
+                          value: e.key,
+                          dense: true,
+                          visualDensity: VisualDensity.compact,
+                          selected: sel,
+                          tileColor: sel
+                              ? AppColors.gold.withValues(alpha: 0.16)
+                              : null,
+                          shape: sel
+                              ? RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  side: const BorderSide(
+                                      color: AppColors.gold, width: 1.1))
+                              : null,
+                          activeColor: AppColors.gold,
+                          title: Text(e.value,
+                              textAlign: TextAlign.start,
+                              style: TextStyle(
+                                  fontFamily: 'ScheherazadeNew',
+                                  fontSize: 16,
+                                  fontWeight:
+                                      sel ? FontWeight.bold : FontWeight.normal,
+                                  color: isDark
+                                      ? AppColors.darkText
+                                      : AppColors.textPrimary)),
+                        );
+                      }),
                   ],
                 ),
               ),

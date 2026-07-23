@@ -111,6 +111,21 @@ class PrayerService {
     12: 'ديانة (تركيا)',
   };
 
+  static const Map<int, String> _methodsEn = {
+    3: 'Muslim World League',
+    4: 'Umm al-Qura (Makkah)',
+    5: 'Egyptian General Authority',
+    1: 'Univ. of Islamic Sciences, Karachi',
+    2: 'ISNA (North America)',
+    8: 'Gulf Region',
+    12: 'Diyanet (Turkey)',
+  };
+
+  /// Calculation-method label in the app language (Arabic name for
+  /// 'ar', an English name otherwise).
+  static String methodName(int id, String lang) =>
+      lang == 'ar' ? (methods[id] ?? '') : (_methodsEn[id] ?? methods[id] ?? '');
+
   /// Selected city, or null when unconfigured OR in GPS mode.
   static Future<PrayerCity?> selectedCity() async {
     final p = await SharedPreferences.getInstance();
@@ -128,11 +143,66 @@ class PrayerService {
     return p.getString('prayerMode') == 'gps';
   }
 
-  /// Display label for the configured location — the city name, or
-  /// "موقعي الحالي" in GPS mode; null when nothing is configured yet.
-  static Future<String?> locationLabel() async {
-    if (await isGpsMode()) return 'موقعي الحالي';
-    return (await selectedCity())?.label;
+  static String _myLocation(String lang) => lang == 'ar'
+      ? 'موقعي الحالي'
+      : (lang == 'de' ? 'Mein Standort' : 'My location');
+
+  /// Display label for the configured location IN [lang]:
+  /// - City mode: the Arabic name for 'ar', otherwise the city's
+  ///   English name.
+  /// - GPS mode: the actual city name reverse-geocoded from the saved
+  ///   coordinates in the requested language (cached), falling back to
+  ///   a generic "my location" if geocoding is unavailable.
+  /// Returns null when nothing is configured yet.
+  static Future<String?> locationLabel(String lang) async {
+    final p = await SharedPreferences.getInstance();
+    if (await isGpsMode()) {
+      final lat = p.getDouble('prayerLat');
+      final lng = p.getDouble('prayerLng');
+      if (lat == null || lng == null) return null;
+      final key =
+          'gpsName_${lang}_${lat.toStringAsFixed(2)}_${lng.toStringAsFixed(2)}';
+      final cached = p.getString(key);
+      if (cached != null && cached.isNotEmpty) return cached;
+      try {
+        final name = await _reverseGeocode(lat, lng, lang);
+        if (name.isNotEmpty) {
+          await p.setString(key, name);
+          await p.setString('gpsNameAny', name);
+          return name;
+        }
+      } catch (_) {
+        // Offline or geocoder unavailable — use a fallback below.
+      }
+      return p.getString('gpsNameAny') ?? _myLocation(lang);
+    }
+    final city = await selectedCity();
+    if (city == null) return null;
+    return lang == 'ar' ? city.label : city.city;
+  }
+
+  /// Reverse-geocodes coordinates to a city name in [lang] via the
+  /// OpenStreetMap Nominatim service (no extra dependency, localized
+  /// through the accept-language parameter).
+  static Future<String> _reverseGeocode(
+      double lat, double lng, String lang) async {
+    final url =
+        'https://nominatim.openstreetmap.org/reverse?lat=$lat&lon=$lng&format=json&zoom=10&accept-language=$lang';
+    final r = await http.get(Uri.parse(url), headers: {
+      'User-Agent': 'AyatAlHaq/1.0 (quran prayer times)'
+    }).timeout(const Duration(seconds: 15));
+    if (r.statusCode != 200) throw Exception('geocode failed');
+    final data = jsonDecode(r.body);
+    final addr = (data['address'] ?? {}) as Map<String, dynamic>;
+    return (addr['city'] ??
+            addr['town'] ??
+            addr['village'] ??
+            addr['municipality'] ??
+            addr['county'] ??
+            addr['state'] ??
+            data['name'] ??
+            '')
+        .toString();
   }
 
   static Future<int> selectedMethod() async {
