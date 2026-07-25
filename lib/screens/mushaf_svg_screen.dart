@@ -12,9 +12,11 @@ import '../services/khatma_service.dart';
 import '../services/library_events.dart';
 import '../services/quran_audio_service.dart';
 import '../services/settings_service.dart';
+import '../services/surah_header_service.dart';
 import '../l10n/app_strings.dart';
 import '../theme.dart';
 import '../widgets/reciter_picker.dart';
+import '../widgets/surah_banner_painter.dart';
 import 'tafsir_screen.dart';
 
 class MushafSvgScreen extends StatefulWidget {
@@ -79,6 +81,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     // page(s), turn the page automatically.
     _audioService = context.read<QuranAudioService>();
     _audioService!.addListener(_followRecitation);
+    // Ornamental surah-name frames (measured band positions).
+    if (!SurahHeaderService.isLoaded) {
+      SurahHeaderService.load().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Auto-advance simply moves to the next global ayah — the Mushaf
       // view isn't scoped to one surah, so recitation flows across
@@ -1291,6 +1299,21 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             width: renderWidth,
             height: renderHeight,
             child: Stack(children: [
+              // Ornamental surah-name frames — painted BEHIND the page
+              // artwork so the surah names the SVG already draws land
+              // inside the band, like a printed Mushaf.
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: SurahBannerPainter(
+                      bands: SurahHeaderService.forPage(data.pageNumber),
+                      scaleX: scaleX,
+                      scaleY: scaleY,
+                      isDark: isDark,
+                    ),
+                  ),
+                ),
+              ),
               Positioned.fill(
                 child: isDark
                     ? ColorFiltered(

@@ -30,6 +30,11 @@ class QuranPageMeta {
   /// instead of 594, which shifted every surah after it by one page and
   /// caused surah 112 (Al-Ikhlas) to silently disappear from page 604's
   /// header. Verified against the standard King Fahd Complex layout.
+  /// FIXED: surah 103 (Al-Asr) was recorded as 600; the Mushaf page data
+  /// places its first ayah on 601 (page 600 ends with At-Takathur), so
+  /// "go to surah" opened the wrong page and page headers were off.
+  /// The whole table was cross-checked against the page metadata and
+  /// this was the only remaining mismatch.
   static const List<int> surahStartPages = [
     1, 2, 50, 77, 106, 128, 151, 177, 187, 208,
     221, 235, 249, 255, 262, 267, 282, 293, 305, 312,
@@ -41,7 +46,7 @@ class QuranPageMeta {
     570, 572, 574, 575, 577, 578, 580, 582, 583, 585,
     586, 587, 587, 589, 590, 591, 591, 592, 593, 594,
     595, 595, 596, 596, 597, 597, 598, 598, 599, 599,
-    600, 600, 600, 601, 601, 602, 602, 602, 603, 603,
+    600, 600, 601, 601, 601, 602, 602, 602, 603, 603,
     603, 604, 604, 604,
   ];
 
