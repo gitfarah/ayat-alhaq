@@ -82,7 +82,7 @@ jobs:
             <key>signingStyle</key><string>manual</string>
             <key>provisioningProfiles</key>
             <dict>
-              <key>com.omar.ayat_alhaq</key>
+              <key>com.omar.ayatalhaq</key>
               <string>${{ secrets.IOS_PROVISION_PROFILE_NAME }}</string>
             </dict>
             <key>uploadSymbols</key><true/>

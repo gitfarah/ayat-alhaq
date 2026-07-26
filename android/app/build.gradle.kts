@@ -27,7 +27,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.omar.ayat_alhaq"
+        applicationId = "com.omar.ayatalhaq"
         // geolocator requires 23+; flutter.minSdkVersion is already ≥23
         // on current Flutter, kept explicit for clarity.
         minSdk = maxOf(23, flutter.minSdkVersion)

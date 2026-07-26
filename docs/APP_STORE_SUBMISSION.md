@@ -3,7 +3,7 @@
 Everything needed to publish the iOS app, prepared ahead of the Apple
 Developer account. Once the account exists, follow **Part B**.
 
-- **Bundle ID:** `com.omar.ayat_alhaq`
+- **Bundle ID:** `com.omar.ayatalhaq`
 - **App name:** آيات الحق (Ayat al-Haq)
 - **Version / build:** `1.0.10 (21)` — set in `pubspec.yaml`
 - **Category:** Reference (secondary: Lifestyle)
@@ -102,7 +102,7 @@ so you won't be asked at upload.
 
 ### 1. Create the App ID and App Store record
 1. developer.apple.com → Certificates, IDs & Profiles → **Identifiers** →
-   register an App ID for `com.omar.ayat_alhaq` (enable **Background Modes**;
+   register an App ID for `com.omar.ayatalhaq` (enable **Background Modes**;
    no other special capabilities are needed).
 2. appstoreconnect.apple.com → **Apps → +** → create the app, pick the
    bundle ID above, set the name **آيات الحق**.
