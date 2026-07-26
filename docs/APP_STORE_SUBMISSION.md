@@ -19,6 +19,12 @@ Developer account. Once the account exists, follow **Part B**.
 - Subtitle (AR): *القرآن الكريم، التلاوة ومواقيت الصلاة*
 - Subtitle (DE): *Koran, Rezitation & Gebetszeiten*
 
+### Promotional Text (170 chars max — shown above the Description; the
+only listing field you can edit anytime WITHOUT a new App Review)
+- EN: *Read, listen, and reflect on the Holy Quran — fully offline, in Arabic, English or German. No ads, no account, no tracking.*
+- AR: *اقرأ واستمع وتدبّر القرآن الكريم — بالكامل دون اتصال، بالعربية والإنجليزية والألمانية. بدون إعلانات، بدون حساب، بدون تتبع.*
+- DE: *Lies, höre und reflektiere über den Heiligen Koran — komplett offline, auf Arabisch, Englisch oder Deutsch. Keine Werbung, kein Konto, kein Tracking.*
+
 ### Keywords (100 chars, EN example)
 `quran,koran,mushaf,tafsir,recitation,prayer times,adhan,islam,muslim,offline,arabic,khatma`
 

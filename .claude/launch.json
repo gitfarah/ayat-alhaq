@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "quran-app-web",
+      "runtimeExecutable": "D:\\flutter\\bin\\flutter.bat",
+      "runtimeArgs": ["run", "-d", "chrome", "--web-port", "5757"],
+      "port": 5757
+    }
+  ]
+}
