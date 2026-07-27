@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -369,13 +371,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
   int _spreadBase(int page) => page.isOdd ? page : page - 1;
 
-  /// Two-page spread only on genuinely large screens (desktop or a
-  /// tablet in landscape). A PHONE rotated to landscape is still a
-  /// small screen — it keeps a single page, zoomed to full width and
-  /// vertically scrollable (see _buildPageArtwork).
+  /// Two-page spread only on a large screen in LANDSCAPE (tablet or
+  /// desktop). A big iPad held in portrait keeps a single page: two
+  /// side-by-side pages there use barely half the screen height, since
+  /// each column is a tall narrow strip fitted by its width. A PHONE
+  /// rotated to landscape is also still a single page, zoomed to full
+  /// width and vertically scrollable (see _buildPageArtwork).
   bool _isWideScreen(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    if (size.width >= 1000) return true;
     return size.width > size.height && size.shortestSide >= 600;
   }
 
@@ -1512,11 +1515,30 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     color: isDark ? AppColors.darkPrimary : AppColors.primary));
           }
           final ayahs = snap.data!;
-          // The type size IS the zoom, and its baseline scales with the
-          // COLUMN this page is typeset into — sized for a phone width
-          // alone, a tablet gets a small block of text floating in an
-          // empty screen instead of a page that fills it.
-          final base = (constraints.maxWidth / 18.5).clamp(19.0, 42.0);
+          // The type size IS the zoom. Its baseline is chosen so this
+          // page's own text roughly FILLS the box it is typeset into:
+          // a paragraph's ink area is (character count x glyph box) and
+          // the glyph box grows with the square of the type size, so
+          // the size that fills width x height is the square root of
+          // the area available per character. Width alone was not
+          // enough — on a large tablet it left a short block of text
+          // floating above an empty screen.
+          // Only BASE characters occupy width — with full tashkeel
+          // nearly half the code units are combining marks, and counting
+          // those had the estimate land at half the intended size.
+          var chars = 60; // headers and margins
+          for (final a in ayahs) {
+            chars += 4; // ayah marker and surrounding spaces
+            for (final cp in a.text.runes) {
+              final mark = (cp >= 0x064B && cp <= 0x065F) ||
+                  cp == 0x0670 ||
+                  (cp >= 0x06D6 && cp <= 0x06ED);
+              if (!mark) chars++;
+            }
+          }
+          final base = math
+              .sqrt(constraints.maxWidth * constraints.maxHeight / chars)
+              .clamp(19.0, 46.0);
           final fontSize = base * _zoom;
 
           // Split the page into runs of consecutive ayahs from the same
@@ -1534,8 +1556,13 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
             physics: const ClampingScrollPhysics(),
+            // Fill the screen height even when the type ends short of
+            // it — the parchment reads as a full page, not a floating
+            // card.
             child: Container(
               width: double.infinity,
+              constraints:
+                  BoxConstraints(minHeight: constraints.maxHeight - 32),
               decoration: BoxDecoration(
                 color: cream,
                 borderRadius: BorderRadius.circular(14),
