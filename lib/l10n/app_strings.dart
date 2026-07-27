@@ -168,6 +168,11 @@ class L10n {
       'myLocation': 'موقعي الحالي',
       'locating2': 'جارٍ تحديد الموقع...',
       'locationSet': '✓ تم تحديد موقعك',
+      'tajweedLbl': 'ألوان التجويد',
+      'tajweedOn': 'مفعّلة — تُلوَّن الآيات حسب أحكام التجويد',
+      'tajweedOff': 'غير مفعّلة',
+      'tajweedNote':
+          'تُطبَّق الألوان في وضع «الآيات» (القراءة المتجاوبة). صفحات المصحف صور جاهزة، فلا يمكن تلوينها.',
     },
     'en': {
       'tabHighlights': 'Highlights',
@@ -294,6 +299,11 @@ class L10n {
       'myLocation': 'My location',
       'locating2': 'Locating…',
       'locationSet': '✓ Location set',
+      'tajweedLbl': 'Tajweed colours',
+      'tajweedOn': 'On — ayahs are coloured by tajweed rule',
+      'tajweedOff': 'Off',
+      'tajweedNote':
+          'Colours apply in the verse-by-verse reader. Mushaf pages are pre-rendered images and cannot be recoloured.',
     },
     'de': {
       'tabHighlights': 'Markierungen',
@@ -420,6 +430,11 @@ class L10n {
       'myLocation': 'Mein Standort',
       'locating2': 'Standort wird ermittelt…',
       'locationSet': '✓ Standort festgelegt',
+      'tajweedLbl': 'Tajweed-Farben',
+      'tajweedOn': 'An — Verse werden nach Tajweed-Regeln eingefärbt',
+      'tajweedOff': 'Aus',
+      'tajweedNote':
+          'Die Farben gelten im Vers-für-Vers-Leser. Mushaf-Seiten sind fertige Bilder und können nicht eingefärbt werden.',
     },
   };
 }

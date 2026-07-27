@@ -9,6 +9,16 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
   int? _lastPage;
   String? _translationEdition;
   String _appLanguage = 'ar';
+  bool _tajweed = false;
+
+  /// Colour the ayah text by tajweed rule in the responsive reader.
+  bool get tajweed => _tajweed;
+
+  Future<void> setTajweed(bool on) async {
+    _tajweed = on;
+    (await SharedPreferences.getInstance()).setBool('tajweed', on);
+    notifyListeners();
+  }
 
   /// The user's raw language CHOICE: 'system', 'ar', 'en', or 'de'.
   /// Use [effectiveLanguage] for the actually-applied language.
@@ -121,6 +131,7 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
     final edition = p.getString('translationEdition');
     _translationEdition = (edition == null || edition.isEmpty) ? null : edition;
     _appLanguage = p.getString('appLanguage') ?? 'ar';
+    _tajweed = p.getBool('tajweed') ?? false;
     notifyListeners();
   }
 

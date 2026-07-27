@@ -10,6 +10,7 @@ import '../services/highlight_service.dart';
 import '../services/khatma_service.dart';
 import '../services/settings_service.dart';
 import '../services/quran_audio_service.dart';
+import '../services/tajweed_service.dart';
 import '../l10n/app_strings.dart';
 import '../theme.dart';
 import '../widgets/reciter_picker.dart';
@@ -90,6 +91,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
   void initState() {
     super.initState();
     _loadAll();
+    // Tajweed colouring data (only actually used when the setting is on,
+    // but loading it up front keeps the toggle instant).
+    if (!TajweedService.isLoaded) {
+      TajweedService.load().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   /// Edition the currently shown ayahs were loaded with (may lag the
@@ -609,6 +617,25 @@ class _ReaderScreenState extends State<ReaderScreen> {
     return number.toString().split('').map((d) => ar[int.parse(d)]).join();
   }
 
+  /// The ayah's text as spans — one plain span normally, or a coloured
+  /// span per tajweed rule when the setting is on and data is available.
+  List<InlineSpan> _ayahSpans(
+      Ayah ayah, SettingsService settings, bool isDark) {
+    if (!settings.tajweed) return [TextSpan(text: ayah.text)];
+    final segs =
+        TajweedService.segments(widget.surah.number, ayah.numberInSurah);
+    if (segs == null) return [TextSpan(text: ayah.text)];
+    return [
+      for (final s in segs)
+        TextSpan(
+          text: s.text,
+          style: s.isPlain
+              ? null
+              : TextStyle(color: TajweedService.colorFor(s.rule)),
+        ),
+    ];
+  }
+
   @override
   void dispose() {
     // Never leave the app stuck in immersive mode after this screen.
@@ -819,7 +846,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                           fontFamily: 'ScheherazadeNew',
                                         ),
                                         children: [
-                                          TextSpan(text: ayah.text),
+                                          ..._ayahSpans(ayah, settings,
+                                              isDark),
                                           const WidgetSpan(
                                               child: SizedBox(width: 6)),
                                           WidgetSpan(

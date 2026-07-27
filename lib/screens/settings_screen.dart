@@ -6,6 +6,7 @@ import '../services/mushaf_svg_service.dart';
 import '../services/prayer_service.dart';
 import '../services/quran_audio_service.dart';
 import '../services/tafsir_service.dart';
+import '../services/tajweed_service.dart';
 import '../theme.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -533,6 +534,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ]),
             ]),
           ),
+          _Tile(
+            isDark: isDark,
+            icon: Icons.palette_rounded,
+            title: t('tajweedLbl'),
+            subtitle: s.tajweed ? t('tajweedOn') : t('tajweedOff'),
+            child: Column(children: [
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Switch(
+                  value: s.tajweed,
+                  activeThumbColor: AppColors.gold,
+                  onChanged: (v) => s.setTajweed(v),
+                ),
+              ),
+              if (s.tajweed) ...[
+                const SizedBox(height: 4),
+                // Legend so the colours are learnable, not guesswork.
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.start,
+                  children: [
+                    for (final rule in TajweedService.legendOrder)
+                      Row(mainAxisSize: MainAxisSize.min, children: [
+                        Container(
+                          width: 13,
+                          height: 13,
+                          decoration: BoxDecoration(
+                            color: TajweedService.ruleColors[rule],
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          TajweedService.ruleNames[_lang]?[rule] ??
+                              TajweedService.ruleNames['en']![rule]!,
+                          style: TextStyle(
+                              fontFamily: 'ScheherazadeNew',
+                              fontSize: 13,
+                              color: isDark
+                                  ? AppColors.darkText
+                                  : AppColors.textPrimary),
+                        ),
+                      ]),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 10),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(t('tajweedNote'),
+                    textAlign: TextAlign.start,
+                    style: TextStyle(
+                        fontFamily: 'ScheherazadeNew',
+                        fontSize: 13,
+                        height: 1.5,
+                        color: isDark
+                            ? AppColors.darkTextSec
+                            : AppColors.textSecondary)),
+              ),
+            ]),
+          ),
           const SizedBox(height: 16),
           _SectionLabel(t('prayerTimes'), isDark),
           GestureDetector(
@@ -689,7 +752,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               isDark: isDark,
               icon: Icons.info_outline_rounded,
               title: t('versionLbl'),
-              subtitle: '1.0.11'),
+              subtitle: '1.1.0'),
           _Tile(
               isDark: isDark,
               icon: Icons.api_rounded,

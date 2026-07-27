@@ -52,6 +52,21 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// owned by MushafSvgService and survives leaving this screen.
   bool _fullyDownloaded = false;
 
+  /// Pinch-to-zoom on the page. While zoomed in, page swiping is turned
+  /// off so a drag pans the page instead of flipping to the next one.
+  final TransformationController _zoomCtrl = TransformationController();
+  bool _isZoomed = false;
+
+  void _onZoomChanged() {
+    final zoomed = _zoomCtrl.value.getMaxScaleOnAxis() > 1.02;
+    if (zoomed != _isZoomed) setState(() => _isZoomed = zoomed);
+  }
+
+  /// Returns to the un-zoomed page view (used before turning a page).
+  void _resetZoom() {
+    if (_isZoomed) _zoomCtrl.value = Matrix4.identity();
+  }
+
   /// Tap feedback: the just-tapped ayah flashes briefly so the user
   /// sees exactly which ayah the tap registered on.
   AyahHitRegion? _flashRegion;
@@ -97,6 +112,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       _maybeShowGestureHint();
     });
     MushafSvgService.bulkProgress.addListener(_onBulkProgress);
+    _zoomCtrl.addListener(_onZoomChanged);
   }
 
   // ── PageView index mapping (wide screens page by 2-page spreads) ──
@@ -240,6 +256,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     MushafSvgService.bulkProgress.removeListener(_onBulkProgress);
     // Never leave the app stuck in immersive mode after this screen.
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _zoomCtrl.removeListener(_onZoomChanged);
+    _zoomCtrl.dispose();
     _pageCtrl?.dispose();
     _flashCtrl.dispose();
     LibraryEvents.bookmarks.removeListener(_loadMarks);
@@ -971,9 +989,15 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           child: PageView.builder(
             controller: _pageCtrl,
             reverse: true,
+            // While the page is zoomed in, a drag should pan the page
+            // rather than flip to the next one.
+            physics: _isZoomed
+                ? const NeverScrollableScrollPhysics()
+                : const PageScrollPhysics(),
             itemCount: _pageCount,
             onPageChanged: (i) {
               _setBars(false);
+              _resetZoom();
               _onPageSettled(_pageForIndex(i));
             },
             itemBuilder: (ctx, i) => _buildPageItem(i, isDark),
@@ -1424,13 +1448,29 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           ),
         );
 
-        if (!scrollZoom) return page;
+        // Pinch to zoom (two fingers), then drag to pan — like a
+        // printed Mushaf held closer. Wrapping the whole page stack
+        // keeps ayah hit-testing correct, because Flutter maps taps
+        // back through the zoom transform before they reach the
+        // gesture layer below.
+        Widget zoomable(Widget child) => InteractiveViewer(
+              transformationController: _zoomCtrl,
+              minScale: 1.0,
+              maxScale: 5.0,
+              // Keep the page within view; no rubber-banding off-screen.
+              constrained: true,
+              panEnabled: true,
+              scaleEnabled: true,
+              child: child,
+            );
+
+        if (!scrollZoom) return zoomable(page);
         // Phone landscape: full-width page, scrolled vertically.
         return SingleChildScrollView(
           child: SizedBox(
             width: renderWidth,
             height: renderHeight,
-            child: page,
+            child: zoomable(page),
           ),
         );
       },
