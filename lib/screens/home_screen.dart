@@ -677,7 +677,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(surah.name,
                         textAlign: TextAlign.start,
                         style: TextStyle(
-                            fontSize: 20,
+                            fontSize: 27,
                             fontWeight: FontWeight.bold,
                             fontFamily: 'QuranHafs',
                             color: isDark

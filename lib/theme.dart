@@ -98,9 +98,10 @@ class AppColors {
 }
 
 class AppTypography {
+  // Almarai carries the whole UI; only Quran verses use QuranHafs.
   static const String arabicFont = 'Almarai';
-  static const String uiFont = 'PlusJakartaSans';
-  static const String serifFont = 'SourceSerif4';
+  static const String uiFont = 'Almarai';
+  static const String serifFont = 'Almarai';
 
   static const TextStyle quranDisplay = TextStyle(
     fontFamily: arabicFont,

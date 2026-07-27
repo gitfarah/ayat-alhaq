@@ -123,7 +123,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
             textAlign: TextAlign.right,
             textDirection: TextDirection.rtl,
             style: TextStyle(
-                fontSize: 18,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
                 fontFamily: 'QuranHafs',
                 color: isDark ? AppColors.darkText : AppColors.textPrimary)),

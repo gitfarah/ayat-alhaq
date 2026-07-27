@@ -752,7 +752,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               isDark: isDark,
               icon: Icons.info_outline_rounded,
               title: t('versionLbl'),
-              subtitle: '1.3.1'),
+              subtitle: '1.3.2'),
           _Tile(
               isDark: isDark,
               icon: Icons.api_rounded,

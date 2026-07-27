@@ -270,8 +270,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       borderRadius: BorderRadius.circular(12))),
               onPressed: () => Navigator.pop(context, true),
               child: const Text('تنزيل الآن',
-                  style: TextStyle(
-                      color: Colors.white, fontFamily: 'Almarai'))),
+                  style:
+                      TextStyle(color: Colors.white, fontFamily: 'Almarai'))),
         ],
       ),
     );
@@ -461,8 +461,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 color: isDark ? AppColors.darkText : AppColors.textPrimary),
             decoration: InputDecoration(
                 hintText: '١ — ٦٠٤',
-                hintStyle: TextStyle(
-                    color: Colors.grey[400], fontFamily: 'Almarai'),
+                hintStyle:
+                    TextStyle(color: Colors.grey[400], fontFamily: 'Almarai'),
                 filled: true,
                 fillColor: isDark ? AppColors.darkSurfaceAlt : Colors.white,
                 border: OutlineInputBorder(
@@ -486,8 +486,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 }
               },
               child: const Text('انتقال',
-                  style: TextStyle(
-                      color: Colors.white, fontFamily: 'Almarai'))),
+                  style:
+                      TextStyle(color: Colors.white, fontFamily: 'Almarai'))),
         ],
       ),
     );
@@ -520,8 +520,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   leading: Icon(Icons.menu_book_rounded, color: iconColor),
                   title: Text('الانتقال إلى سورة',
                       textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                          fontFamily: 'Almarai', color: textColor)),
+                      style:
+                          TextStyle(fontFamily: 'Almarai', color: textColor)),
                   onTap: () {
                     Navigator.pop(context);
                     _showSurahPicker();
@@ -531,8 +531,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       Icon(Icons.auto_awesome_mosaic_rounded, color: iconColor),
                   title: Text('الانتقال إلى جزء',
                       textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                          fontFamily: 'Almarai', color: textColor)),
+                      style:
+                          TextStyle(fontFamily: 'Almarai', color: textColor)),
                   onTap: () {
                     Navigator.pop(context);
                     _showJuzPicker();
@@ -541,36 +541,37 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   leading: Icon(Icons.tag_rounded, color: iconColor),
                   title: Text('الانتقال إلى صفحة',
                       textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                          fontFamily: 'Almarai', color: textColor)),
+                      style:
+                          TextStyle(fontFamily: 'Almarai', color: textColor)),
                   onTap: () {
                     Navigator.pop(context);
                     _jumpDialog();
                   }),
               // Only the reflowing text edition can be coloured — the
-            // other editions are page artwork.
-            if (MushafSvgService.edition.isText)
-              Builder(builder: (_) {
-                final s = context.watch<SettingsService>();
-                return SwitchListTile(
-                  value: s.tajweed,
-                  activeColor: AppColors.gold,
-                  secondary: Icon(Icons.palette_rounded, color: iconColor),
-                  title: Text(L10n.of(context)('tajweedLbl'),
-                      style: TextStyle(
-                          fontFamily: 'Almarai', color: textColor)),
-                  subtitle: Text(
-                      L10n.of(context)(s.tajweed ? 'tajweedOn' : 'tajweedOff'),
-                      style: TextStyle(
-                          fontFamily: 'Almarai',
-                          fontSize: 12,
-                          color: isDark
-                              ? AppColors.darkTextSec
-                              : AppColors.textSecondary)),
-                  onChanged: (v) => s.setTajweed(v),
-                );
-              }),
-            if (MushafSvgService.supportsFullOfflineDownload)
+              // other editions are page artwork.
+              if (MushafSvgService.edition.isText)
+                Builder(builder: (_) {
+                  final s = context.watch<SettingsService>();
+                  return SwitchListTile(
+                    value: s.tajweed,
+                    activeColor: AppColors.gold,
+                    secondary: Icon(Icons.palette_rounded, color: iconColor),
+                    title: Text(L10n.of(context)('tajweedLbl'),
+                        style:
+                            TextStyle(fontFamily: 'Almarai', color: textColor)),
+                    subtitle: Text(
+                        L10n.of(context)(
+                            s.tajweed ? 'tajweedOn' : 'tajweedOff'),
+                        style: TextStyle(
+                            fontFamily: 'Almarai',
+                            fontSize: 12,
+                            color: isDark
+                                ? AppColors.darkTextSec
+                                : AppColors.textSecondary)),
+                    onChanged: (v) => s.setTajweed(v),
+                  );
+                }),
+              if (MushafSvgService.supportsFullOfflineDownload)
                 Builder(builder: (_) {
                   final prog = MushafSvgService.bulkProgress.value;
                   return ListTile(
@@ -737,9 +738,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 textAlign: TextAlign.right,
                 textDirection: TextDirection.rtl,
                 style: TextStyle(
-                    fontFamily: 'QuranHafs',
-                    fontSize: 16,
-                    color: textColor)),
+                    fontFamily: 'QuranHafs', fontSize: 16, color: textColor)),
             leading: Text('ص ${_ar(QuranPageMeta.surahStartPages[i])}',
                 style: TextStyle(
                     fontFamily: 'Almarai',
@@ -1266,8 +1265,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           color: Colors.white),
                       label: const Text('إعادة المحاولة',
                           style: TextStyle(
-                              color: Colors.white,
-                              fontFamily: 'Almarai'))),
+                              color: Colors.white, fontFamily: 'Almarai'))),
                 ]));
           }
           if (!snap.hasData) {
@@ -1504,88 +1502,96 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     final cream = isDark ? AppColors.darkSurfaceAlt : AppColors.mushafParchment;
     final ink = isDark ? AppColors.darkText : AppColors.textPrimary;
 
-    return FutureBuilder<List<PageAyah>>(
-      future: future,
-      builder: (ctx, snap) {
-        if (!snap.hasData) {
-          return Center(
-              child: CircularProgressIndicator(
-                  color: isDark ? AppColors.darkPrimary : AppColors.primary));
-        }
-        final ayahs = snap.data!;
-        // The type size IS the zoom — 1.0 fits the page comfortably.
-        final fontSize = 21.0 * _zoom;
-
-        // Split the page into runs of consecutive ayahs from the same
-        // surah; a page can start mid-surah and finish inside the next.
-        final blocks = <List<PageAyah>>[];
-        for (final a in ayahs) {
-          if (blocks.isEmpty ||
-              blocks.last.first.surahNumber != a.surahNumber) {
-            blocks.add([a]);
-          } else {
-            blocks.last.add(a);
+    return LayoutBuilder(builder: (context, constraints) {
+      return FutureBuilder<List<PageAyah>>(
+        future: future,
+        builder: (ctx, snap) {
+          if (!snap.hasData) {
+            return Center(
+                child: CircularProgressIndicator(
+                    color: isDark ? AppColors.darkPrimary : AppColors.primary));
           }
-        }
+          final ayahs = snap.data!;
+          // The type size IS the zoom, and its baseline scales with the
+          // COLUMN this page is typeset into — sized for a phone width
+          // alone, a tablet gets a small block of text floating in an
+          // empty screen instead of a page that fills it.
+          final base = (constraints.maxWidth / 18.5).clamp(19.0, 42.0);
+          final fontSize = base * _zoom;
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
-          physics: const ClampingScrollPhysics(),
-          child: Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: cream,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                  color: AppColors.mushafBorderGold.withValues(alpha: 0.55),
-                  width: 1.2),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final block in blocks) ...[
-                  // A surah that BEGINS on this page gets its name band
-                  // and the Basmala, as the printed page does.
-                  if (block.first.numberInSurah == 1) ...[
-                    _textSurahHeader(block.first.surahNumber, isDark, fontSize),
-                    if (block.first.surahNumber != 1 &&
-                        block.first.surahNumber != 9)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Text(QuranService.basmala,
-                            textAlign: TextAlign.center,
-                            textDirection: TextDirection.rtl,
-                            style: TextStyle(
-                                fontFamily: 'QuranHafs',
-                                fontSize: fontSize * 0.92,
-                                height: 1.9,
-                                color: isDark
-                                    ? AppColors.darkPrimary
-                                    : AppColors.primary)),
-                      ),
+          // Split the page into runs of consecutive ayahs from the same
+          // surah; a page can start mid-surah and finish inside the next.
+          final blocks = <List<PageAyah>>[];
+          for (final a in ayahs) {
+            if (blocks.isEmpty ||
+                blocks.last.first.surahNumber != a.surahNumber) {
+              blocks.add([a]);
+            } else {
+              blocks.last.add(a);
+            }
+          }
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+            physics: const ClampingScrollPhysics(),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: cream,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: AppColors.mushafBorderGold.withValues(alpha: 0.55),
+                    width: 1.2),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final block in blocks) ...[
+                    // A surah that BEGINS on this page gets its name band
+                    // and the Basmala, as the printed page does.
+                    if (block.first.numberInSurah == 1) ...[
+                      _textSurahHeader(
+                          block.first.surahNumber, isDark, fontSize),
+                      if (block.first.surahNumber != 1 &&
+                          block.first.surahNumber != 9)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Text(QuranService.basmala,
+                              textAlign: TextAlign.center,
+                              textDirection: TextDirection.rtl,
+                              style: TextStyle(
+                                  fontFamily: 'QuranHafs',
+                                  fontSize: fontSize * 0.92,
+                                  height: 1.9,
+                                  color: isDark
+                                      ? AppColors.darkPrimary
+                                      : AppColors.primary)),
+                        ),
+                    ],
+                    Text.rich(
+                      TextSpan(children: [
+                        for (final a in block)
+                          ..._ayahSpans(a, isDark, fontSize),
+                      ]),
+                      // Justified edge to edge, like the printed page.
+                      textAlign: TextAlign.justify,
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                          fontFamily: 'QuranHafs',
+                          fontSize: fontSize,
+                          height: 2.0,
+                          color: ink),
+                    ),
+                    const SizedBox(height: 6),
                   ],
-                  Text.rich(
-                    TextSpan(children: [
-                      for (final a in block) ..._ayahSpans(a, isDark, fontSize),
-                    ]),
-                    // Justified edge to edge, like the printed page.
-                    textAlign: TextAlign.justify,
-                    textDirection: TextDirection.rtl,
-                    style: TextStyle(
-                        fontFamily: 'QuranHafs',
-                        fontSize: fontSize,
-                        height: 2.0,
-                        color: ink),
-                  ),
-                  const SizedBox(height: 6),
                 ],
-              ],
+              ),
             ),
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
+    });
   }
 
   /// Name band for a surah starting on a reflowing text page — the same
@@ -1650,9 +1656,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               recognizer: recognizer,
               style: TextStyle(
                   backgroundColor: bg,
-                  color: seg.isPlain
-                      ? null
-                      : TajweedService.colorFor(seg.rule))),
+                  color:
+                      seg.isPlain ? null : TajweedService.colorFor(seg.rule))),
       // End-of-ayah mark: bare Arabic-Indic digits. The KFGQPC HAFS
       // font itself sets them inside the ornate medallion — that is its
       // own convention — and unlike a drawn WidgetSpan (directionally
@@ -2043,4 +2048,3 @@ class _AyahMarkPainter extends CustomPainter {
     return true;
   }
 }
-
