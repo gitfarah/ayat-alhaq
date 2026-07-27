@@ -5,9 +5,13 @@ import 'package:path_provider/path_provider.dart';
 /// gigabytes of free space, so caching the entire ~230MB Mushaf here
 /// is practical and safe.
 class MushafFileStorage {
+  /// Pages are stored per mushaf edition so switching riwayah never
+  /// mixes pages from different editions.
+  static String edition = 'hafs';
+
   static Future<Directory> _dir() async {
     final base = await getApplicationDocumentsDirectory();
-    final dir = Directory('${base.path}/mushaf_pages');
+    final dir = Directory('${base.path}/mushaf_pages/$edition');
     if (!await dir.exists()) await dir.create(recursive: true);
     return dir;
   }

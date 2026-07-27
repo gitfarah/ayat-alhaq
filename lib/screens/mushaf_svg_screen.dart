@@ -52,19 +52,28 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// owned by MushafSvgService and survives leaving this screen.
   bool _fullyDownloaded = false;
 
-  /// Pinch-to-zoom on the page. While zoomed in, page swiping is turned
-  /// off so a drag pans the page instead of flipping to the next one.
-  final TransformationController _zoomCtrl = TransformationController();
-  bool _isZoomed = false;
+  /// Responsive zoom: pinching changes how WIDE the page is drawn. At
+  /// 1.0 the whole page fits the screen; above that the page is laid
+  /// out wider (so the script grows) and the reader scrolls vertically
+  /// — the page is never dragged around in two dimensions.
+  double _zoom = 1.0;
+  double _zoomStart = 1.0;
+  static const double _minZoom = 1.0;
+  static const double _maxZoom = 3.5;
 
-  void _onZoomChanged() {
-    final zoomed = _zoomCtrl.value.getMaxScaleOnAxis() > 1.02;
-    if (zoomed != _isZoomed) setState(() => _isZoomed = zoomed);
+  bool get _isZoomed => _zoom > 1.01;
+
+  void _onScaleStart(ScaleStartDetails d) => _zoomStart = _zoom;
+
+  void _onScaleUpdate(ScaleUpdateDetails d) {
+    if (d.pointerCount < 2) return; // one finger = swipe/tap, not zoom
+    final next = (_zoomStart * d.scale).clamp(_minZoom, _maxZoom);
+    if ((next - _zoom).abs() > 0.005) setState(() => _zoom = next);
   }
 
-  /// Returns to the un-zoomed page view (used before turning a page).
+  /// Returns to the fitted page (used when turning a page).
   void _resetZoom() {
-    if (_isZoomed) _zoomCtrl.value = Matrix4.identity();
+    if (_isZoomed) setState(() => _zoom = 1.0);
   }
 
   /// Tap feedback: the just-tapped ayah flashes briefly so the user
@@ -112,7 +121,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       _maybeShowGestureHint();
     });
     MushafSvgService.bulkProgress.addListener(_onBulkProgress);
-    _zoomCtrl.addListener(_onZoomChanged);
   }
 
   // ── PageView index mapping (wide screens page by 2-page spreads) ──
@@ -256,8 +264,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     MushafSvgService.bulkProgress.removeListener(_onBulkProgress);
     // Never leave the app stuck in immersive mode after this screen.
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    _zoomCtrl.removeListener(_onZoomChanged);
-    _zoomCtrl.dispose();
     _pageCtrl?.dispose();
     _flashCtrl.dispose();
     LibraryEvents.bookmarks.removeListener(_loadMarks);
@@ -512,6 +518,25 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   Navigator.pop(context);
                   _jumpDialog();
                 }),
+            ListTile(
+                leading: Icon(Icons.auto_stories_rounded, color: iconColor),
+                title: Text(L10n.of(context)('mushafEdition'),
+                    style: TextStyle(
+                        fontFamily: 'ScheherazadeNew', color: textColor)),
+                subtitle: Text(
+                    L10n.of(context).isArabic
+                        ? MushafSvgService.edition.nameAr
+                        : MushafSvgService.edition.nameEn,
+                    style: TextStyle(
+                        fontFamily: 'ScheherazadeNew',
+                        fontSize: 13,
+                        color: isDark
+                            ? AppColors.darkTextSec
+                            : AppColors.textSecondary)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showEditionPicker();
+                }),
             if (MushafSvgService.supportsFullOfflineDownload)
               Builder(builder: (_) {
                 final prog = MushafSvgService.bulkProgress.value;
@@ -546,6 +571,72 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           ],
         ),
         ),
+      ),
+    );
+  }
+
+  /// Picker for the Mushaf edition (riwayah). Switching clears the
+  /// loaded pages so the new edition's artwork is fetched.
+  void _showEditionPicker() {
+    final isDark = context.read<SettingsService>().isDarkIn(context);
+    final l = L10n.of(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(height: 14),
+          Text(l('mushafEdition'),
+              style: TextStyle(
+                  fontFamily: 'ScheherazadeNew',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? AppColors.darkText : AppColors.textPrimary)),
+          const SizedBox(height: 8),
+          for (final e in MushafSvgService.editions)
+            Builder(builder: (_) {
+              final sel = e.id == MushafSvgService.edition.id;
+              return ListTile(
+                dense: true,
+                selected: sel,
+                selectedTileColor: AppColors.gold.withValues(alpha: 0.16),
+                shape: sel
+                    ? RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(
+                            color: AppColors.gold, width: 1.3))
+                    : null,
+                trailing: sel
+                    ? const Icon(Icons.check_circle_rounded,
+                        color: AppColors.gold)
+                    : null,
+                title: Text(l.isArabic ? e.nameAr : e.nameEn,
+                    textAlign: TextAlign.start,
+                    style: TextStyle(
+                        fontFamily: 'ScheherazadeNew',
+                        fontSize: 17,
+                        fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                        color: isDark
+                            ? AppColors.darkText
+                            : AppColors.textPrimary)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  if (sel) return;
+                  await context.read<SettingsService>().setMushafEdition(e.id);
+                  if (!mounted) return;
+                  // Drop cached page futures so the new edition loads.
+                  setState(() {
+                    _pageFutures.clear();
+                    _zoom = 1.0;
+                  });
+                  _onPageSettled(_pageNum);
+                },
+              );
+            }),
+          const SizedBox(height: 10),
+        ]),
       ),
     );
   }
@@ -1320,6 +1411,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           renderHeight = constraints.maxHeight;
           renderWidth = renderHeight * aspectRatio;
         }
+        // Responsive zoom: the page grows in place, keeping its full
+        // width on screen, and the extra height is scrolled through.
+        if (_zoom > 1.0) {
+          renderWidth = constraints.maxWidth * _zoom;
+          renderHeight = renderWidth / aspectRatio;
+        }
 
         final scaleX = renderWidth / data.viewBoxWidth;
         final scaleY = renderHeight / data.viewBoxHeight;
@@ -1336,7 +1433,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 child: IgnorePointer(
                   child: CustomPaint(
                     painter: SurahBannerPainter(
-                      bands: SurahHeaderService.forPage(data.pageNumber),
+                      // The bands were measured from the Hafs pages;
+                      // other riwayat break lines differently, so the
+                      // frames would land on the wrong rows there.
+                      bands: MushafSvgService.edition.id == 'hafs'
+                          ? SurahHeaderService.forPage(data.pageNumber)
+                          : const [],
                       scaleX: scaleX,
                       scaleY: scaleY,
                       isDark: isDark,
@@ -1459,24 +1561,30 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         // keeps ayah hit-testing correct, because Flutter maps taps
         // back through the zoom transform before they reach the
         // gesture layer below.
-        Widget zoomable(Widget child) => InteractiveViewer(
-              transformationController: _zoomCtrl,
-              minScale: 1.0,
-              maxScale: 5.0,
-              // Keep the page within view; no rubber-banding off-screen.
-              constrained: true,
-              panEnabled: true,
-              scaleEnabled: true,
-              child: child,
-            );
-
-        if (!scrollZoom) return zoomable(page);
-        // Phone landscape: full-width page, scrolled vertically.
-        return SingleChildScrollView(
-          child: SizedBox(
-            width: renderWidth,
-            height: renderHeight,
-            child: zoomable(page),
+        // Pinching sets how WIDE the page is drawn (width grows with the
+        // zoom level), and the page is then read by scrolling. Scrolling
+        // is bounded to the page, so unlike free 2-D panning the page can
+        // never be flung off-screen or left half-visible.
+        final scrollable = _isZoomed || scrollZoom;
+        return GestureDetector(
+          onScaleStart: _onScaleStart,
+          onScaleUpdate: _onScaleUpdate,
+          child: SingleChildScrollView(
+            // vertical
+            physics: scrollable
+                ? const ClampingScrollPhysics()
+                : const NeverScrollableScrollPhysics(),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: _isZoomed
+                  ? const ClampingScrollPhysics()
+                  : const NeverScrollableScrollPhysics(),
+              child: SizedBox(
+                width: renderWidth,
+                height: renderHeight,
+                child: page,
+              ),
+            ),
           ),
         );
       },

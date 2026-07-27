@@ -98,11 +98,44 @@ class MushafPageData {
 /// the entire 604-page Mushaf for full offline use), or a small rolling
 /// SharedPreferences cache on web (browser storage quotas can't hold
 /// the whole Mushaf, so only the last few visited pages stay cached).
+/// A Mushaf edition (riwayah). Each is a complete 604-page set with the
+/// same file layout, so switching only changes the source folder.
+class MushafEdition {
+  /// Folder name in the quranpedia repo, also the storage namespace.
+  final String id;
+  final String nameAr;
+  final String nameEn;
+
+  const MushafEdition(this.id, this.nameAr, this.nameEn);
+}
+
 class MushafSvgService {
-  static const String _svgBaseUrl =
-      'https://raw.githubusercontent.com/quranpedia/quran-svg/main/mushafs/hafs/kfqc/svg';
-  static const String _jsonBaseUrl =
-      'https://raw.githubusercontent.com/quranpedia/quran-svg/main/mushafs/hafs/kfqc/json';
+  /// The editions offered in the app. All share the `kfqc` layout.
+  static const List<MushafEdition> editions = [
+    MushafEdition('hafs', 'مصحف حفص', 'Hafs'),
+    MushafEdition('warsh', 'مصحف ورش', 'Warsh'),
+    MushafEdition('qalon', 'مصحف قالون', 'Qalon'),
+  ];
+
+  static const String _repo =
+      'https://raw.githubusercontent.com/quranpedia/quran-svg/main/mushafs';
+
+  static MushafEdition _edition = editions.first;
+  static MushafEdition get edition => _edition;
+
+  /// Switches edition: clears the in-memory pages and re-points storage
+  /// so cached pages of different riwayat never mix.
+  static void setEdition(String id) {
+    final next = editions.firstWhere((e) => e.id == id,
+        orElse: () => editions.first);
+    if (next.id == _edition.id) return;
+    _edition = next;
+    _memoryCache.clear();
+    MushafFileStorage.edition = next.id;
+  }
+
+  static String get _svgBaseUrl => '$_repo/${_edition.id}/kfqc/svg';
+  static String get _jsonBaseUrl => '$_repo/${_edition.id}/kfqc/json';
 
   static const int totalPages = 604;
 

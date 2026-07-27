@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'mushaf_svg_service.dart';
 
 class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
   ThemeMode _themeMode = ThemeMode.system;
@@ -10,6 +11,18 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
   String? _translationEdition;
   String _appLanguage = 'ar';
   bool _tajweed = false;
+  String _mushafEdition = 'hafs';
+
+  /// Chosen Mushaf edition (riwayah) for the page view.
+  String get mushafEdition => _mushafEdition;
+
+  Future<void> setMushafEdition(String id) async {
+    if (id == _mushafEdition) return;
+    _mushafEdition = id;
+    MushafSvgService.setEdition(id);
+    (await SharedPreferences.getInstance()).setString('mushafEdition', id);
+    notifyListeners();
+  }
 
   /// Colour the ayah text by tajweed rule in the responsive reader.
   bool get tajweed => _tajweed;
@@ -132,6 +145,8 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
     _translationEdition = (edition == null || edition.isEmpty) ? null : edition;
     _appLanguage = p.getString('appLanguage') ?? 'ar';
     _tajweed = p.getBool('tajweed') ?? false;
+    _mushafEdition = p.getString('mushafEdition') ?? 'hafs';
+    MushafSvgService.setEdition(_mushafEdition);
     notifyListeners();
   }
 

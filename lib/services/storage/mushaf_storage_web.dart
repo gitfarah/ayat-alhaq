@@ -5,11 +5,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// ~230MB Mushaf, so only a small rolling cache of recently viewed
 /// pages is kept here. Full offline download is not offered on web.
 class MushafFileStorage {
+  /// Pages are stored per mushaf edition so switching riwayah never
+  /// mixes pages from different editions.
+  static String edition = 'hafs';
+
   static String _svgKey(int page) =>
-      'mushaf_svg_${page.toString().padLeft(3, '0')}';
+      'mushaf_svg_${edition}_${page.toString().padLeft(3, '0')}';
   static String _jsonKey(int page) =>
-      'mushaf_json_${page.toString().padLeft(3, '0')}';
-  static const String _indexKey = 'mushaf_cached_pages';
+      'mushaf_json_${edition}_${page.toString().padLeft(3, '0')}';
+  static String get _indexKey => 'mushaf_cached_pages_$edition';
   static const int maxWebPages = 8;
 
   static Future<bool> hasPage(int page) async {
