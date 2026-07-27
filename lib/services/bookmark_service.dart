@@ -10,6 +10,10 @@ class Bookmark {
   final String color;
   final DateTime createdAt;
 
+  /// Mushaf page the mark was made on, or null when it was made in the
+  /// verse-by-verse reader. Opening the mark returns to that same mode.
+  final int? page;
+
   Bookmark({
     required this.surahNumber,
     required this.ayahNumber,
@@ -17,7 +21,10 @@ class Bookmark {
     this.note,
     this.color = 'green',
     required this.createdAt,
+    this.page,
   });
+
+  bool get isFromMushaf => page != null;
 
   Map<String, dynamic> toJson() => {
         'surahNumber': surahNumber,
@@ -26,6 +33,7 @@ class Bookmark {
         'note': note,
         'color': color,
         'createdAt': createdAt.toIso8601String(),
+        'page': page,
       };
 
   factory Bookmark.fromJson(Map<String, dynamic> json) => Bookmark(
@@ -35,6 +43,9 @@ class Bookmark {
         note: json['note'],
         color: json['color'] ?? 'green',
         createdAt: DateTime.parse(json['createdAt']),
+        // Older saved marks have no page — they open in the reader,
+        // which is where they were made before this was tracked.
+        page: json['page'] as int?,
       );
 }
 

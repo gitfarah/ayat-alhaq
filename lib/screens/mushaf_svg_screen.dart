@@ -836,6 +836,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                             surahName: _surahName(region.surahNumber),
                             color: e.key,
                             createdAt: DateTime.now(),
+                            // Remember this was made in the Mushaf, so
+                            // opening it later returns to the page.
+                            page: _pageNum,
                           ));
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -924,6 +927,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                         surahName: _surahName(region.surahNumber),
                         color: e.key,
                         createdAt: DateTime.now(),
+                        // Remember this was made in the Mushaf, so
+                        // opening it later returns to the page.
+                        page: _pageNum,
                       ));
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(

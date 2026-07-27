@@ -6,6 +6,7 @@ import '../services/library_events.dart';
 import '../services/quran_service.dart';
 import '../services/settings_service.dart';
 import '../theme.dart';
+import 'mushaf_svg_screen.dart';
 import 'reader_screen.dart';
 
 class HighlightsScreen extends StatefulWidget {
@@ -50,6 +51,15 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
 
   Future<void> _open(Highlight h) async {
     try {
+      // Return to the mode the mark was made in.
+      if (h.isFromMushaf) {
+        await Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => MushafSvgScreen(startPage: h.page)));
+        await _load();
+        return;
+      }
       final surahs = await QuranService.getAllSurahs();
       final s = surahs.firstWhere((x) => x.number == h.surahNumber);
       if (!mounted) return;
