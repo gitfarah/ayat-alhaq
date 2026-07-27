@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -18,6 +20,7 @@ import '../l10n/app_strings.dart';
 import '../theme.dart';
 import '../widgets/reciter_picker.dart';
 import '../widgets/surah_banner_painter.dart';
+import '../widgets/surah_frame.dart';
 import 'tafsir_screen.dart';
 
 class MushafSvgScreen extends StatefulWidget {
@@ -113,12 +116,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     // page(s), turn the page automatically.
     _audioService = context.read<QuranAudioService>();
     _audioService!.addListener(_followRecitation);
-    // Ornamental surah-name frames (measured band positions).
-    if (!SurahHeaderService.isLoaded) {
-      SurahHeaderService.load().then((_) {
-        if (mounted) setState(() {});
-      });
-    }
+    // Ornamental surah-name frames (measured band positions, per edition).
+    _loadHeaderBands();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Auto-advance simply moves to the next global ayah — the Mushaf
       // view isn't scoped to one surah, so recitation flows across
@@ -250,12 +249,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 fontFamily: 'ScheherazadeNew',
                 height: 1.8,
                 fontSize: 14,
-                color: isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
+                color:
+                    isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('لاحقاً', style: TextStyle(color: Colors.grey))),
+              child:
+                  const Text('لاحقاً', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
               style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
@@ -263,7 +264,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       borderRadius: BorderRadius.circular(12))),
               onPressed: () => Navigator.pop(context, true),
               child: const Text('تنزيل الآن',
-                  style: TextStyle(color: Colors.white, fontFamily: 'ScheherazadeNew'))),
+                  style: TextStyle(
+                      color: Colors.white, fontFamily: 'ScheherazadeNew'))),
         ],
       ),
     );
@@ -338,16 +340,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     });
   }
 
-  Bookmark? _bookmarkFor(AyahHitRegion r) => _bookmarks
-      .cast<Bookmark?>()
-      .firstWhere(
+  Bookmark? _bookmarkFor(AyahHitRegion r) =>
+      _bookmarks.cast<Bookmark?>().firstWhere(
           (b) =>
               b!.surahNumber == r.surahNumber && b.ayahNumber == r.ayahNumber,
           orElse: () => null);
 
-  Highlight? _highlightFor(AyahHitRegion r) => _highlights
-      .cast<Highlight?>()
-      .firstWhere(
+  Highlight? _highlightFor(AyahHitRegion r) =>
+      _highlights.cast<Highlight?>().firstWhere(
           (h) =>
               h!.surahNumber == r.surahNumber && h.ayahNumber == r.ayahNumber,
           orElse: () => null);
@@ -455,8 +455,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 color: isDark ? AppColors.darkText : AppColors.textPrimary),
             decoration: InputDecoration(
                 hintText: '١ — ٦٠٤',
-                hintStyle:
-                    TextStyle(color: Colors.grey[400], fontFamily: 'ScheherazadeNew'),
+                hintStyle: TextStyle(
+                    color: Colors.grey[400], fontFamily: 'ScheherazadeNew'),
                 filled: true,
                 fillColor: isDark ? AppColors.darkSurfaceAlt : Colors.white,
                 border: OutlineInputBorder(
@@ -480,7 +480,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 }
               },
               child: const Text('انتقال',
-                  style: TextStyle(color: Colors.white, fontFamily: 'ScheherazadeNew'))),
+                  style: TextStyle(
+                      color: Colors.white, fontFamily: 'ScheherazadeNew'))),
         ],
       ),
     );
@@ -498,78 +499,81 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => SafeArea(
         child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 6),
-            ListTile(
-                leading: Icon(Icons.menu_book_rounded, color: iconColor),
-                title: Text('الانتقال إلى سورة',
-                    textDirection: TextDirection.rtl,
-                    style: TextStyle(fontFamily: 'ScheherazadeNew', color: textColor)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showSurahPicker();
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 6),
+              ListTile(
+                  leading: Icon(Icons.menu_book_rounded, color: iconColor),
+                  title: Text('الانتقال إلى سورة',
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                          fontFamily: 'ScheherazadeNew', color: textColor)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showSurahPicker();
+                  }),
+              ListTile(
+                  leading:
+                      Icon(Icons.auto_awesome_mosaic_rounded, color: iconColor),
+                  title: Text('الانتقال إلى جزء',
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                          fontFamily: 'ScheherazadeNew', color: textColor)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showJuzPicker();
+                  }),
+              ListTile(
+                  leading: Icon(Icons.tag_rounded, color: iconColor),
+                  title: Text('الانتقال إلى صفحة',
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                          fontFamily: 'ScheherazadeNew', color: textColor)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _jumpDialog();
+                  }),
+              if (MushafSvgService.supportsFullOfflineDownload)
+                Builder(builder: (_) {
+                  final prog = MushafSvgService.bulkProgress.value;
+                  return ListTile(
+                      leading: Icon(
+                          _fullyDownloaded
+                              ? Icons.offline_pin_rounded
+                              : (prog != null
+                                  ? Icons.downloading_rounded
+                                  : Icons.download_rounded),
+                          color: iconColor),
+                      title: Text(
+                          _fullyDownloaded
+                              ? 'المصحف كامل محفوظ دون اتصال ✓'
+                              : (prog != null
+                                  ? 'جارٍ التنزيل (${_ar(prog.$1)}/${_ar(prog.$2)}) — اضغط للإيقاف'
+                                  : 'تنزيل المصحف كاملاً دون اتصال'),
+                          textDirection: TextDirection.rtl,
+                          style: TextStyle(
+                              fontFamily: 'ScheherazadeNew', color: textColor)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        if (_fullyDownloaded) return;
+                        if (MushafSvgService.bulkRunning) {
+                          MushafSvgService.cancelBulkDownload();
+                        } else {
+                          MushafSvgService.startBulkDownload();
+                        }
+                      });
                 }),
-            ListTile(
-                leading: Icon(Icons.auto_awesome_mosaic_rounded,
-                    color: iconColor),
-                title: Text('الانتقال إلى جزء',
-                    textDirection: TextDirection.rtl,
-                    style: TextStyle(fontFamily: 'ScheherazadeNew', color: textColor)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showJuzPicker();
-                }),
-            ListTile(
-                leading: Icon(Icons.tag_rounded, color: iconColor),
-                title: Text('الانتقال إلى صفحة',
-                    textDirection: TextDirection.rtl,
-                    style: TextStyle(fontFamily: 'ScheherazadeNew', color: textColor)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _jumpDialog();
-                }),
-            if (MushafSvgService.supportsFullOfflineDownload)
-              Builder(builder: (_) {
-                final prog = MushafSvgService.bulkProgress.value;
-                return ListTile(
-                    leading: Icon(
-                        _fullyDownloaded
-                            ? Icons.offline_pin_rounded
-                            : (prog != null
-                                ? Icons.downloading_rounded
-                                : Icons.download_rounded),
-                        color: iconColor),
-                    title: Text(
-                        _fullyDownloaded
-                            ? 'المصحف كامل محفوظ دون اتصال ✓'
-                            : (prog != null
-                                ? 'جارٍ التنزيل (${_ar(prog.$1)}/${_ar(prog.$2)}) — اضغط للإيقاف'
-                                : 'تنزيل المصحف كاملاً دون اتصال'),
-                        textDirection: TextDirection.rtl,
-                        style:
-                            TextStyle(fontFamily: 'ScheherazadeNew', color: textColor)),
-                    onTap: () {
-                      Navigator.pop(context);
-                      if (_fullyDownloaded) return;
-                      if (MushafSvgService.bulkRunning) {
-                        MushafSvgService.cancelBulkDownload();
-                      } else {
-                        MushafSvgService.startBulkDownload();
-                      }
-                    });
-              }),
-            const SizedBox(height: 8),
-          ],
-        ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -649,12 +653,22 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     );
   }
 
+  /// Loads the current edition's surah-name bands if they aren't in yet.
+  void _loadHeaderBands() {
+    final id = MushafSvgService.edition.id;
+    if (SurahHeaderService.isLoaded(id)) return;
+    SurahHeaderService.load(id).then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
   /// Switches the Mushaf edition: persists the choice, drops the loaded
   /// pages so the new edition builds its own, and refits the page.
   Future<void> _applyEdition(String id) async {
     if (id == MushafSvgService.edition.id) return;
     await context.read<SettingsService>().setMushafEdition(id);
     if (!mounted) return;
+    _loadHeaderBands();
     setState(() {
       _pageFutures.clear();
       _textFutures.clear();
@@ -694,7 +708,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 textAlign: TextAlign.right,
                 textDirection: TextDirection.rtl,
                 style: TextStyle(
-                    fontFamily: 'ScheherazadeNew', fontSize: 16, color: textColor)),
+                    fontFamily: 'ScheherazadeNew',
+                    fontSize: 16,
+                    color: textColor)),
             leading: Text('ص ${_ar(QuranPageMeta.surahStartPages[i])}',
                 style: TextStyle(
                     fontFamily: 'ScheherazadeNew',
@@ -722,9 +738,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           child: GridView.builder(
             shrinkWrap: true,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 6,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10),
+                crossAxisCount: 6, mainAxisSpacing: 10, crossAxisSpacing: 10),
             itemCount: 30,
             itemBuilder: (ctx, i) => GestureDetector(
               onTap: () {
@@ -734,8 +748,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               child: Container(
                 decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border:
-                        Border.all(color: gold.withValues(alpha: 0.5))),
+                    border: Border.all(color: gold.withValues(alpha: 0.5))),
                 child: Center(
                     child: Text(_ar(i + 1),
                         style: TextStyle(
@@ -768,118 +781,122 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       // screens — the content is taller than the sheet's max height there.
       builder: (_) => SingleChildScrollView(
         child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Center(
-                child: Container(
-                    width: 36,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 14),
-                    decoration: BoxDecoration(
-                        color: Colors.grey.withValues(alpha: 0.3),
-                        borderRadius: BorderRadius.circular(2)))),
-            Text(
-                '${_surahName(region.surahNumber)} — آية ${_ar(region.ayahNumber)}',
-                textDirection: TextDirection.rtl,
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'ScheherazadeNew',
-                    color:
-                        isDark ? AppColors.darkText : AppColors.textPrimary)),
-            const Divider(height: 24),
-            ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                    playingThis
-                        ? Icons.pause_circle_rounded
-                        : Icons.play_circle_rounded,
-                    color: isDark ? AppColors.darkPrimary : AppColors.primary),
-                title: Text(
-                    playingThis ? l('pauseRecitation') : l('playRecitation'),
-                    textDirection: TextDirection.rtl,
-                    style: TextStyle(
-                        fontFamily: 'ScheherazadeNew',
-                        color: isDark
-                            ? AppColors.darkText
-                            : AppColors.textPrimary)),
-                onTap: () async {
-                  Navigator.pop(context);
-                  // First-ever playback: pick a reciter once; the
-                  // choice then sticks until changed on purpose.
-                  if (!mounted) return;
-                  final ok =
-                      await ensureReciterChosen(context, audio, isDark);
-                  if (!ok) return;
-                  await audio.togglePlayPause(globalAyah);
-                  // Playback failures only set audio.error — surface it.
-                  if (mounted && audio.error != null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(audio.error!)));
-                  }
-                }),
-            ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.menu_book_rounded,
-                    color: isDark ? AppColors.darkPrimary : AppColors.primary),
-                title: Text(l('tafsir'),
-                    textDirection: TextDirection.rtl,
-                    style: TextStyle(
-                        fontFamily: 'ScheherazadeNew',
-                        color: isDark
-                            ? AppColors.darkText
-                            : AppColors.textPrimary)),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => TafsirScreen(
-                                surahNumber: region.surahNumber,
-                                surahName: _surahName(region.surahNumber),
-                                ayahNumber: region.ayahNumber,
-                              )));
-                }),
-            ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                    bookmark != null
-                        ? Icons.bookmark_rounded
-                        : Icons.bookmark_add_rounded,
-                    color: bookmark != null
-                        ? AppColors.highlight(bookmark.color)
-                        : (isDark ? AppColors.darkPrimary : AppColors.primary)),
-                title: Text(l('bookmark'),
-                    textDirection: TextDirection.rtl,
-                    style: TextStyle(
-                        fontFamily: 'ScheherazadeNew',
-                        color: isDark
-                            ? AppColors.darkText
-                            : AppColors.textPrimary)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showBookmarkPicker(region);
-                }),
-            ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.highlight_rounded,
-                    color: AppColors.secondary),
-                title: Text(l('highlightAyah'),
-                    textDirection: TextDirection.rtl,
-                    style: TextStyle(
-                        fontFamily: 'ScheherazadeNew',
-                        color: isDark
-                            ? AppColors.darkText
-                            : AppColors.textPrimary)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showHighlightPicker(region);
-                }),
-          ],
-        ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Center(
+                  child: Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2)))),
+              Text(
+                  '${_surahName(region.surahNumber)} — آية ${_ar(region.ayahNumber)}',
+                  textDirection: TextDirection.rtl,
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'ScheherazadeNew',
+                      color:
+                          isDark ? AppColors.darkText : AppColors.textPrimary)),
+              const Divider(height: 24),
+              ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                      playingThis
+                          ? Icons.pause_circle_rounded
+                          : Icons.play_circle_rounded,
+                      color:
+                          isDark ? AppColors.darkPrimary : AppColors.primary),
+                  title: Text(
+                      playingThis ? l('pauseRecitation') : l('playRecitation'),
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                          fontFamily: 'ScheherazadeNew',
+                          color: isDark
+                              ? AppColors.darkText
+                              : AppColors.textPrimary)),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    // First-ever playback: pick a reciter once; the
+                    // choice then sticks until changed on purpose.
+                    if (!mounted) return;
+                    final ok =
+                        await ensureReciterChosen(context, audio, isDark);
+                    if (!ok) return;
+                    await audio.togglePlayPause(globalAyah);
+                    // Playback failures only set audio.error — surface it.
+                    if (mounted && audio.error != null) {
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(SnackBar(content: Text(audio.error!)));
+                    }
+                  }),
+              ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.menu_book_rounded,
+                      color:
+                          isDark ? AppColors.darkPrimary : AppColors.primary),
+                  title: Text(l('tafsir'),
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                          fontFamily: 'ScheherazadeNew',
+                          color: isDark
+                              ? AppColors.darkText
+                              : AppColors.textPrimary)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => TafsirScreen(
+                                  surahNumber: region.surahNumber,
+                                  surahName: _surahName(region.surahNumber),
+                                  ayahNumber: region.ayahNumber,
+                                )));
+                  }),
+              ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                      bookmark != null
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_add_rounded,
+                      color: bookmark != null
+                          ? AppColors.highlight(bookmark.color)
+                          : (isDark
+                              ? AppColors.darkPrimary
+                              : AppColors.primary)),
+                  title: Text(l('bookmark'),
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                          fontFamily: 'ScheherazadeNew',
+                          color: isDark
+                              ? AppColors.darkText
+                              : AppColors.textPrimary)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showBookmarkPicker(region);
+                  }),
+              ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.highlight_rounded,
+                      color: AppColors.secondary),
+                  title: Text(l('highlightAyah'),
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                          fontFamily: 'ScheherazadeNew',
+                          color: isDark
+                              ? AppColors.darkText
+                              : AppColors.textPrimary)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showHighlightPicker(region);
+                  }),
+            ],
+          ),
         ),
       ),
     );
@@ -920,8 +937,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                             region.surahNumber, region.ayahNumber);
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('تم إزالة الفاصل')));
+                              const SnackBar(content: Text('تم إزالة الفاصل')));
                         }
                       },
                       child: Container(
@@ -972,8 +988,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                                   : null,
                               boxShadow: [
                                 BoxShadow(
-                                    color:
-                                        Colors.black.withValues(alpha: 0.1),
+                                    color: Colors.black.withValues(alpha: 0.1),
                                     blurRadius: 4)
                               ]),
                           child: const Icon(Icons.bookmark_rounded,
@@ -1097,60 +1112,60 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Scaffold(
-      backgroundColor: bgColor,
-      body: Stack(children: [
-        // ── The pages: ALWAYS full-bleed. The bars float on top and
-        // never resize the page, so toggling them causes no zoom jump.
-        // PageView gives real finger-following page turns; reverse =
-        // RTL book order (swipe right, like flipping a printed page,
-        // advances).
-        Positioned.fill(
-          child: PageView.builder(
-            controller: _pageCtrl,
-            reverse: true,
-            // While the page is zoomed in, a drag should pan the page
-            // rather than flip to the next one.
-            physics: _isZoomed
-                ? const NeverScrollableScrollPhysics()
-                : const PageScrollPhysics(),
-            itemCount: _pageCount,
-            onPageChanged: (i) {
-              _setBars(false);
-              _resetZoom();
-              _onPageSettled(_pageForIndex(i));
-            },
-            itemBuilder: (ctx, i) => _buildPageItem(i, isDark),
+        backgroundColor: bgColor,
+        body: Stack(children: [
+          // ── The pages: ALWAYS full-bleed. The bars float on top and
+          // never resize the page, so toggling them causes no zoom jump.
+          // PageView gives real finger-following page turns; reverse =
+          // RTL book order (swipe right, like flipping a printed page,
+          // advances).
+          Positioned.fill(
+            child: PageView.builder(
+              controller: _pageCtrl,
+              reverse: true,
+              // While the page is zoomed in, a drag should pan the page
+              // rather than flip to the next one.
+              physics: _isZoomed
+                  ? const NeverScrollableScrollPhysics()
+                  : const PageScrollPhysics(),
+              itemCount: _pageCount,
+              onPageChanged: (i) {
+                _setBars(false);
+                _resetZoom();
+                _onPageSettled(_pageForIndex(i));
+              },
+              itemBuilder: (ctx, i) => _buildPageItem(i, isDark),
+            ),
           ),
-        ),
-        // ── Top bar overlay (slides away in immersive reading)
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: AnimatedSlide(
-            offset: _barsVisible ? Offset.zero : const Offset(0, -1.1),
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-            child: _buildTopBar(isDark, bgColor, textColor),
+          // ── Top bar overlay (slides away in immersive reading)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: AnimatedSlide(
+              offset: _barsVisible ? Offset.zero : const Offset(0, -1.1),
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              child: _buildTopBar(isDark, bgColor, textColor),
+            ),
           ),
-        ),
-        // ── Bottom overlay: audio controls + page navigation
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: AnimatedSlide(
-            offset: _barsVisible ? Offset.zero : const Offset(0, 1.1),
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              if (audio.hasActiveTrack) _buildAudioBar(audio, isDark),
-              _buildNavBar(isDark),
-            ]),
+          // ── Bottom overlay: audio controls + page navigation
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: AnimatedSlide(
+              offset: _barsVisible ? Offset.zero : const Offset(0, 1.1),
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                if (audio.hasActiveTrack) _buildAudioBar(audio, isDark),
+                _buildNavBar(isDark),
+              ]),
+            ),
           ),
-        ),
-      ]),
-    ),
+        ]),
+      ),
     );
   }
 
@@ -1167,14 +1182,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         onTap: () => _setBars(!_barsVisible),
         onScaleStart: _onScaleStart,
         onScaleUpdate: _onScaleUpdate,
-        child: SafeArea(
-          child: !_wide || base + 1 > 604
-              ? _buildTextPage(base, isDark)
-              : Row(children: [
-                  Expanded(child: _buildTextPage(base + 1, isDark)),
-                  Expanded(child: _buildTextPage(base, isDark)),
-                ]),
-        ),
+        // No SafeArea here: the page pads itself around the floating
+        // bars, which already sit inside the safe area.
+        child: !_wide || base + 1 > 604
+            ? _buildTextPage(base, isDark)
+            : Row(children: [
+                Expanded(child: _buildTextPage(base + 1, isDark)),
+                Expanded(child: _buildTextPage(base, isDark)),
+              ]),
       );
     }
 
@@ -1222,14 +1237,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           color: Colors.white),
                       label: const Text('إعادة المحاولة',
                           style: TextStyle(
-                              color: Colors.white, fontFamily: 'ScheherazadeNew'))),
+                              color: Colors.white,
+                              fontFamily: 'ScheherazadeNew'))),
                 ]));
           }
           if (!snap.hasData) {
             return Center(
                 child: CircularProgressIndicator(
-                    color:
-                        isDark ? AppColors.darkPrimary : AppColors.primary));
+                    color: isDark ? AppColors.darkPrimary : AppColors.primary));
           }
           final pages = snap.data!;
           final content = pages.length == 1
@@ -1278,11 +1293,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     return Container(
       decoration: BoxDecoration(
         color: bgColor.withValues(alpha: 0.97),
-        border:
-            Border(bottom: BorderSide(color: gold.withValues(alpha: 0.5))),
+        border: Border(bottom: BorderSide(color: gold.withValues(alpha: 0.5))),
         boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08), blurRadius: 6),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 6),
         ],
       ),
       child: SafeArea(
@@ -1335,35 +1348,35 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 220),
-                    child: Text(surahLabel,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 220),
+                      child: Text(surahLabel,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontFamily: 'ScheherazadeNew',
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: headerText,
+                              height: 1.25)),
+                    ),
+                    const SizedBox(width: 14),
+                    Container(
+                        width: 1,
+                        height: 18,
+                        color: gold.withValues(alpha: 0.45)),
+                    const SizedBox(width: 14),
+                    Text('الجزء ${_ar(juz)} • الحزب ${_ar(hizb)}',
                         style: TextStyle(
                             fontFamily: 'ScheherazadeNew',
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: headerText,
-                            height: 1.25)),
-                  ),
-                  const SizedBox(width: 14),
-                  Container(
-                      width: 1,
-                      height: 18,
-                      color: gold.withValues(alpha: 0.45)),
-                  const SizedBox(width: 14),
-                  Text('الجزء ${_ar(juz)} • الحزب ${_ar(hizb)}',
-                      style: TextStyle(
-                          fontFamily: 'ScheherazadeNew',
-                          fontSize: 12,
-                          color: subText)),
-                ],
-              ),
+                            fontSize: 12,
+                            color: subText)),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1478,15 +1491,21 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         // surah; a page can start mid-surah and finish inside the next.
         final blocks = <List<PageAyah>>[];
         for (final a in ayahs) {
-          if (blocks.isEmpty || blocks.last.first.surahNumber != a.surahNumber) {
+          if (blocks.isEmpty ||
+              blocks.last.first.surahNumber != a.surahNumber) {
             blocks.add([a]);
           } else {
             blocks.last.add(a);
           }
         }
 
+        // The bars FLOAT over the page, so the text has to start below
+        // the top bar and end above the nav bar — otherwise the first
+        // surah frame slides under the header and is cut off.
+        final inset = MediaQuery.paddingOf(context);
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+          padding: EdgeInsets.fromLTRB(
+              14, inset.top + _topBarHeight + 10, 14, inset.bottom + 88),
           physics: const ClampingScrollPhysics(),
           child: Container(
             width: double.infinity,
@@ -1544,28 +1563,20 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     );
   }
 
-  /// Name band for a surah starting on a reflowing text page.
-  Widget _textSurahHeader(int surah, bool isDark, double fontSize) {
-    final emerald = isDark ? AppColors.primaryContainer : AppColors.primary;
-    return Container(
-      margin: const EdgeInsets.only(top: 4, bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
-      decoration: BoxDecoration(
-        color: emerald,
-        borderRadius: BorderRadius.circular(10),
-        border: const Border.fromBorderSide(
-            BorderSide(color: AppColors.mushafBorderGold, width: 1.2)),
-      ),
-      child: Text('سورة ${_surahName(surah)}',
-          textAlign: TextAlign.center,
-          textDirection: TextDirection.rtl,
-          style: TextStyle(
-              fontFamily: 'ScheherazadeNew',
-              fontSize: fontSize * 0.85,
-              fontWeight: FontWeight.bold,
-              color: AppColors.mushafBorderGold)),
-    );
-  }
+  /// Height of the floating top bar (back/page row plus the juz-hizb
+  /// strip), excluding the status-bar inset.
+  static const double _topBarHeight = 96;
+
+  /// Name band for a surah starting on a reflowing text page — the same
+  /// ornamental cartouche the reader uses, not a plain box.
+  Widget _textSurahHeader(int surah, bool isDark, double fontSize) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: SurahFrame(
+          title: 'سورة ${_surahName(surah)}',
+          isDark: isDark,
+          fontSize: fontSize * 0.9,
+        ),
+      );
 
   /// One ayah's text plus its end-of-ayah marker, tinted for the mark
   /// it carries (bookmark/highlight) or for being recited right now,
@@ -1603,12 +1614,18 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           text: '${a.text} ',
           recognizer: recognizer,
           style: TextStyle(backgroundColor: bg)),
-      TextSpan(
-          text: '۝${_ar(a.numberInSurah)} ',
-          recognizer: recognizer,
-          style: TextStyle(
-              fontSize: fontSize * 0.95,
-              color: isDark ? AppColors.darkPrimary : AppColors.primary)),
+      // The end-of-ayah mark is drawn, not typed: U+06DD leaves the
+      // number sitting BESIDE the ornament in most fonts instead of
+      // enclosed by it, which is not how a Mushaf prints it.
+      WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: _AyahNumberMark(
+          number: _ar(a.numberInSurah),
+          size: fontSize * 1.5,
+          color: isDark ? AppColors.darkPrimary : AppColors.primary,
+          textColor: isDark ? AppColors.darkText : AppColors.textPrimary,
+        ),
+      ),
     ];
   }
 
@@ -1645,14 +1662,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 child: IgnorePointer(
                   child: CustomPaint(
                     painter: SurahBannerPainter(
-                      // The bands were measured from the Hafs pages;
-                      // other riwayat break lines differently, so the
-                      // frames would land on the wrong rows there.
-                      bands: MushafSvgService.edition.id == 'hafs'
-                          ? SurahHeaderService.forPage(data.pageNumber)
-                          : const [],
+                      bands: SurahHeaderService.forPage(data.pageNumber,
+                          edition: MushafSvgService.edition.id),
                       scaleX: scaleX,
                       scaleY: scaleY,
+                      minX: data.viewBoxMinX,
+                      minY: data.viewBoxMinY,
                       isDark: isDark,
                     ),
                   ),
@@ -1705,8 +1720,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                                         ? AppColors.darkSecondary
                                         : AppColors.secondary)
                                     .withValues(
-                                        alpha:
-                                            (1 - _flashCtrl.value) * 0.40)
+                                        alpha: (1 - _flashCtrl.value) * 0.40)
                               )
                             else if (_playingGlobalAyah != null &&
                                 _regionGlobal(r) == _playingGlobalAyah)
@@ -1732,6 +1746,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       ],
                       scaleX: scaleX,
                       scaleY: scaleY,
+                      minX: data.viewBoxMinX,
+                      minY: data.viewBoxMinY,
                     ),
                   ),
                 ),
@@ -1746,8 +1762,10 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   behavior: HitTestBehavior.opaque,
                   onTap: () => _setBars(!_barsVisible),
                   onLongPressStart: (details) {
-                    final vx = details.localPosition.dx / scaleX;
-                    final vy = details.localPosition.dy / scaleY;
+                    final vx =
+                        details.localPosition.dx / scaleX + data.viewBoxMinX;
+                    final vy =
+                        details.localPosition.dy / scaleY + data.viewBoxMinY;
                     for (final region in data.ayahRegions) {
                       if (region.ayahNumber > 0 &&
                           region.surahNumber > 0 &&
@@ -1828,9 +1846,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         children: [
           IconButton(
             icon: Icon(Icons.stop_circle_rounded,
-                color: isDark
-                    ? AppColors.darkTextSec
-                    : AppColors.textSecondary),
+                color:
+                    isDark ? AppColors.darkTextSec : AppColors.textSecondary),
             onPressed: audio.stop,
           ),
           IconButton(
@@ -1850,8 +1867,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           IconButton(
             tooltip: 'تغيير القارئ',
             icon: Icon(Icons.record_voice_over_rounded,
-                color:
-                    isDark ? AppColors.darkTextSec : AppColors.textSecondary,
+                color: isDark ? AppColors.darkTextSec : AppColors.textSecondary,
                 size: 20),
             onPressed: () => showReciterPicker(context, audio, isDark),
           ),
@@ -1869,7 +1885,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               style: TextStyle(
                   fontSize: 12,
                   fontFamily: 'ScheherazadeNew',
-                  color: isDark ? AppColors.darkTextSec : AppColors.textSecondary),
+                  color:
+                      isDark ? AppColors.darkTextSec : AppColors.textSecondary),
             ),
           ),
         ],
@@ -1942,10 +1959,17 @@ class _AyahMarkPainter extends CustomPainter {
   final double scaleX;
   final double scaleY;
 
+  /// viewBox origin — polygons are in the page's coordinate space, which
+  /// does not start at 0 0 for every edition.
+  final double minX;
+  final double minY;
+
   _AyahMarkPainter({
     required this.marks,
     required this.scaleX,
     required this.scaleY,
+    this.minX = 0,
+    this.minY = 0,
   });
 
   @override
@@ -1954,9 +1978,9 @@ class _AyahMarkPainter extends CustomPainter {
       final path = Path();
       for (final ring in region.rings) {
         if (ring.length < 6) continue;
-        path.moveTo(ring[0] * scaleX, ring[1] * scaleY);
+        path.moveTo((ring[0] - minX) * scaleX, (ring[1] - minY) * scaleY);
         for (var i = 2; i + 1 < ring.length; i += 2) {
-          path.lineTo(ring[i] * scaleX, ring[i + 1] * scaleY);
+          path.lineTo((ring[i] - minX) * scaleX, (ring[i + 1] - minY) * scaleY);
         }
         path.close();
       }
@@ -1968,16 +1992,96 @@ class _AyahMarkPainter extends CustomPainter {
   bool shouldRepaint(_AyahMarkPainter oldDelegate) =>
       oldDelegate.scaleX != scaleX ||
       oldDelegate.scaleY != scaleY ||
+      oldDelegate.minX != minX ||
+      oldDelegate.minY != minY ||
       !_sameMarks(oldDelegate.marks);
 
   bool _sameMarks(List<(AyahHitRegion, Color)> other) {
     if (other.length != marks.length) return false;
     for (var i = 0; i < marks.length; i++) {
-      if (!identical(other[i].$1, marks[i].$1) ||
-          other[i].$2 != marks[i].$2) {
+      if (!identical(other[i].$1, marks[i].$1) || other[i].$2 != marks[i].$2) {
         return false;
       }
     }
     return true;
   }
+}
+
+/// The printed end-of-ayah medallion: a gold rosette with the ayah
+/// number sitting INSIDE it.
+class _AyahNumberMark extends StatelessWidget {
+  final String number;
+  final double size;
+  final Color color;
+  final Color textColor;
+
+  const _AyahNumberMark({
+    required this.number,
+    required this.size,
+    required this.color,
+    required this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: size * 0.1),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: CustomPaint(
+          painter: _RosettePainter(color),
+          child: Center(
+            child: Text(
+              number,
+              textDirection: TextDirection.rtl,
+              style: TextStyle(
+                fontFamily: 'ScheherazadeNew',
+                // Long numbers (٢٨٦) have to shrink to stay inside.
+                fontSize: size * (number.length > 2 ? 0.38 : 0.46),
+                fontWeight: FontWeight.bold,
+                color: textColor,
+                height: 1,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Eight-lobed rosette, the shape Mushaf printers use for the ayah mark.
+class _RosettePainter extends CustomPainter {
+  final Color color;
+
+  const _RosettePainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final r = size.width / 2;
+    final petal = r * 0.30;
+    final ring = r - petal * 0.75;
+
+    final fill = Paint()..color = color.withValues(alpha: 0.13);
+    final stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(0.8, r * 0.07)
+      ..color = color;
+
+    // Eight lobes around the rim, then the rim itself on top of them.
+    for (var i = 0; i < 8; i++) {
+      final a = i * math.pi / 4;
+      final o = Offset(c.dx + ring * math.cos(a), c.dy + ring * math.sin(a));
+      canvas.drawCircle(o, petal, fill);
+      canvas.drawCircle(o, petal, stroke);
+    }
+    canvas.drawCircle(
+        c, ring * 0.86, Paint()..color = color.withValues(alpha: 0.10));
+    canvas.drawCircle(c, ring * 0.86, stroke);
+  }
+
+  @override
+  bool shouldRepaint(_RosettePainter old) => old.color != color;
 }

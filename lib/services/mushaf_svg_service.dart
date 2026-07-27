@@ -83,12 +83,20 @@ class MushafPageData {
   final double viewBoxWidth;
   final double viewBoxHeight;
 
+  /// Origin of the viewBox. Zero for Hafs, but Warsh and Qalon pages
+  /// start at x = -6, and every ayah polygon is expressed in that same
+  /// space — so it has to be subtracted before scaling to the screen.
+  final double viewBoxMinX;
+  final double viewBoxMinY;
+
   MushafPageData({
     required this.pageNumber,
     required this.svgContent,
     required this.ayahRegions,
     required this.viewBoxWidth,
     required this.viewBoxHeight,
+    this.viewBoxMinX = 0,
+    this.viewBoxMinY = 0,
   });
 }
 
@@ -223,19 +231,25 @@ class MushafSvgService {
         .map((e) => AyahHitRegion.fromJson(e as Map<String, dynamic>))
         .toList();
 
-    final viewBoxMatch =
-        RegExp(r'viewBox="0 0 ([\d.]+) ([\d.]+)"').firstMatch(svgContent);
-    final vbWidth =
-        viewBoxMatch != null ? double.parse(viewBoxMatch.group(1)!) : 235.0;
-    final vbHeight =
-        viewBoxMatch != null ? double.parse(viewBoxMatch.group(2)!) : 235.0;
+    // The viewBox origin is NOT always 0 0 — Warsh and Qalon pages are
+    // "-6 0 345 550". Parse all four values: the origin is needed to map
+    // taps and mark painting into the page's own coordinate space, and
+    // matching only "0 0 ..." silently collapsed every page of those
+    // editions to the square fallback.
+    final vb = RegExp(
+            r'viewBox="\s*(-?[\d.]+)[,\s]+(-?[\d.]+)[,\s]+(-?[\d.]+)[,\s]+(-?[\d.]+)\s*"')
+        .firstMatch(svgContent);
+    double n(int g, double fallback) =>
+        vb == null ? fallback : (double.tryParse(vb.group(g)!) ?? fallback);
 
     final data = MushafPageData(
       pageNumber: page,
       svgContent: svgContent,
       ayahRegions: regions,
-      viewBoxWidth: vbWidth,
-      viewBoxHeight: vbHeight,
+      viewBoxMinX: n(1, 0),
+      viewBoxMinY: n(2, 0),
+      viewBoxWidth: n(3, 235),
+      viewBoxHeight: n(4, 235),
     );
 
     _memoryCache[page] = data;

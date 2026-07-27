@@ -18,11 +18,17 @@ class SurahBannerPainter extends CustomPainter {
   final double scaleY;
   final bool isDark;
 
+  /// viewBox origin — not every edition's pages start at 0 0.
+  final double minX;
+  final double minY;
+
   const SurahBannerPainter({
     required this.bands,
     required this.scaleX,
     required this.scaleY,
     required this.isDark,
+    this.minX = 0,
+    this.minY = 0,
   });
 
   @override
@@ -53,8 +59,8 @@ class SurahBannerPainter extends CustomPainter {
     final right = size.width - 6.0 * scaleX;
 
     for (final b in bands) {
-      final inkTop = b.top * scaleY;
-      final inkBottom = b.bottom * scaleY;
+      final inkTop = (b.top - minY) * scaleY;
+      final inkBottom = (b.bottom - minY) * scaleY;
       final inkH = inkBottom - inkTop;
       if (inkH <= 0) continue;
 
@@ -69,8 +75,8 @@ class SurahBannerPainter extends CustomPainter {
       goldPaint.strokeWidth = math.max(0.6, h * 0.030);
 
       // ── Outer band ────────────────────────────────────────────────
-      final outer = RRect.fromLTRBR(
-          left, top, right, bottom, Radius.circular(h * 0.16));
+      final outer =
+          RRect.fromLTRBR(left, top, right, bottom, Radius.circular(h * 0.16));
       canvas.drawRRect(outer, fillPaint);
       canvas.drawRRect(outer, rulePaint);
 
@@ -122,5 +128,10 @@ class SurahBannerPainter extends CustomPainter {
       old.scaleX != scaleX ||
       old.scaleY != scaleY ||
       old.isDark != isDark ||
-      old.bands.length != bands.length;
+      old.minX != minX ||
+      old.minY != minY ||
+      old.bands.length != bands.length ||
+      (bands.isNotEmpty &&
+          old.bands.isNotEmpty &&
+          old.bands.first.top != bands.first.top);
 }
