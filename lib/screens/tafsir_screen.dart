@@ -172,7 +172,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
             color: bodyText,
             fontWeight: FontWeight.bold,
             fontSize: 18,
-            fontFamily: 'ScheherazadeNew',
+            fontFamily: 'Almarai',
           ),
         ),
         centerTitle: true,
@@ -211,7 +211,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
                     fontSize: 22,
                     height: 1.8,
                     color: Colors.white,
-                    fontFamily: 'ScheherazadeNew',
+                    fontFamily: 'QuranHafs',
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -253,7 +253,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
                 style: TextStyle(
                   color: bodyText,
                   fontSize: 15,
-                  fontFamily: 'ScheherazadeNew',
+                  fontFamily: 'Almarai',
                 ),
                 items: _tafsirOptions.map((tafsir) {
                   return DropdownMenuItem<int>(
@@ -321,7 +321,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
                                 lineHeight: const LineHeight(2.0),
                                 textAlign: TextAlign.right,
                                 direction: TextDirection.rtl,
-                                fontFamily: 'ScheherazadeNew',
+                                fontFamily: 'Almarai',
                                 color: bodyText,
                               ),
                               "p": Style(

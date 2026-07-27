@@ -16,6 +16,7 @@ import '../services/library_events.dart';
 import '../services/quran_audio_service.dart';
 import '../services/settings_service.dart';
 import '../services/surah_header_service.dart';
+import '../services/tajweed_service.dart';
 import '../l10n/app_strings.dart';
 import '../theme.dart';
 import '../widgets/reciter_picker.dart';
@@ -118,6 +119,13 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     _audioService!.addListener(_followRecitation);
     // Ornamental surah-name frames (measured band positions, per edition).
     _loadHeaderBands();
+    // Tajweed colouring for the reflowing text edition. Loaded up front
+    // so flipping the setting is instant.
+    if (!TajweedService.isLoaded) {
+      TajweedService.load().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Auto-advance simply moves to the next global ayah — the Mushaf
       // view isn't scoped to one surah, so recitation flows across
@@ -205,7 +213,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         content: Text(
             'اضغط مطولاً على أي آية لعرض خياراتها، واضغط ضغطة سريعة لإظهار أو إخفاء الأشرطة',
             textDirection: TextDirection.rtl,
-            style: TextStyle(fontFamily: 'ScheherazadeNew', height: 1.6))));
+            style: TextStyle(fontFamily: 'Almarai', height: 1.6))));
   }
 
   /// One-time offer (per install) to download the whole Mushaf for
@@ -237,7 +245,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             textAlign: TextAlign.center,
             textDirection: TextDirection.rtl,
             style: TextStyle(
-                fontFamily: 'ScheherazadeNew',
+                fontFamily: 'Almarai',
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
                 color: isDark ? AppColors.darkText : AppColors.textPrimary)),
@@ -246,7 +254,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             textAlign: TextAlign.center,
             textDirection: TextDirection.rtl,
             style: TextStyle(
-                fontFamily: 'ScheherazadeNew',
+                fontFamily: 'Almarai',
                 height: 1.8,
                 fontSize: 14,
                 color:
@@ -265,7 +273,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               onPressed: () => Navigator.pop(context, true),
               child: const Text('تنزيل الآن',
                   style: TextStyle(
-                      color: Colors.white, fontFamily: 'ScheherazadeNew'))),
+                      color: Colors.white, fontFamily: 'Almarai'))),
         ],
       ),
     );
@@ -435,7 +443,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             textAlign: TextAlign.center,
             textDirection: TextDirection.rtl,
             style: TextStyle(
-                fontFamily: 'ScheherazadeNew',
+                fontFamily: 'Almarai',
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
                 color: isDark ? AppColors.darkText : AppColors.textPrimary)),
@@ -451,12 +459,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             ],
             style: TextStyle(
                 fontSize: 20,
-                fontFamily: 'ScheherazadeNew',
+                fontFamily: 'Almarai',
                 color: isDark ? AppColors.darkText : AppColors.textPrimary),
             decoration: InputDecoration(
                 hintText: '١ — ٦٠٤',
                 hintStyle: TextStyle(
-                    color: Colors.grey[400], fontFamily: 'ScheherazadeNew'),
+                    color: Colors.grey[400], fontFamily: 'Almarai'),
                 filled: true,
                 fillColor: isDark ? AppColors.darkSurfaceAlt : Colors.white,
                 border: OutlineInputBorder(
@@ -481,7 +489,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               },
               child: const Text('انتقال',
                   style: TextStyle(
-                      color: Colors.white, fontFamily: 'ScheherazadeNew'))),
+                      color: Colors.white, fontFamily: 'Almarai'))),
         ],
       ),
     );
@@ -515,7 +523,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   title: Text('الانتقال إلى سورة',
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
-                          fontFamily: 'ScheherazadeNew', color: textColor)),
+                          fontFamily: 'Almarai', color: textColor)),
                   onTap: () {
                     Navigator.pop(context);
                     _showSurahPicker();
@@ -526,7 +534,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   title: Text('الانتقال إلى جزء',
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
-                          fontFamily: 'ScheherazadeNew', color: textColor)),
+                          fontFamily: 'Almarai', color: textColor)),
                   onTap: () {
                     Navigator.pop(context);
                     _showJuzPicker();
@@ -536,12 +544,35 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   title: Text('الانتقال إلى صفحة',
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
-                          fontFamily: 'ScheherazadeNew', color: textColor)),
+                          fontFamily: 'Almarai', color: textColor)),
                   onTap: () {
                     Navigator.pop(context);
                     _jumpDialog();
                   }),
-              if (MushafSvgService.supportsFullOfflineDownload)
+              // Only the reflowing text edition can be coloured — the
+            // other editions are page artwork.
+            if (MushafSvgService.edition.isText)
+              Builder(builder: (_) {
+                final s = context.watch<SettingsService>();
+                return SwitchListTile(
+                  value: s.tajweed,
+                  activeColor: AppColors.gold,
+                  secondary: Icon(Icons.palette_rounded, color: iconColor),
+                  title: Text(L10n.of(context)('tajweedLbl'),
+                      style: TextStyle(
+                          fontFamily: 'Almarai', color: textColor)),
+                  subtitle: Text(
+                      L10n.of(context)(s.tajweed ? 'tajweedOn' : 'tajweedOff'),
+                      style: TextStyle(
+                          fontFamily: 'Almarai',
+                          fontSize: 12,
+                          color: isDark
+                              ? AppColors.darkTextSec
+                              : AppColors.textSecondary)),
+                  onChanged: (v) => s.setTajweed(v),
+                );
+              }),
+            if (MushafSvgService.supportsFullOfflineDownload)
                 Builder(builder: (_) {
                   final prog = MushafSvgService.bulkProgress.value;
                   return ListTile(
@@ -560,7 +591,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                                   : 'تنزيل المصحف كاملاً دون اتصال'),
                           textDirection: TextDirection.rtl,
                           style: TextStyle(
-                              fontFamily: 'ScheherazadeNew', color: textColor)),
+                              fontFamily: 'Almarai', color: textColor)),
                       onTap: () {
                         Navigator.pop(context);
                         if (_fullyDownloaded) return;
@@ -623,7 +654,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               Expanded(
                 child: Text(l.isArabic ? e.nameAr : e.nameEn,
                     style: TextStyle(
-                        fontFamily: 'ScheherazadeNew',
+                        fontFamily: 'Almarai',
                         fontSize: 16,
                         fontWeight: e.id == current.id
                             ? FontWeight.bold
@@ -699,7 +730,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             },
             trailing: Text('${_ar(i + 1)}.',
                 style: TextStyle(
-                    fontFamily: 'ScheherazadeNew',
+                    fontFamily: 'Almarai',
                     fontSize: 14,
                     color: isDark
                         ? AppColors.darkTextSec
@@ -708,12 +739,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 textAlign: TextAlign.right,
                 textDirection: TextDirection.rtl,
                 style: TextStyle(
-                    fontFamily: 'ScheherazadeNew',
+                    fontFamily: 'Almarai',
                     fontSize: 16,
                     color: textColor)),
             leading: Text('ص ${_ar(QuranPageMeta.surahStartPages[i])}',
                 style: TextStyle(
-                    fontFamily: 'ScheherazadeNew',
+                    fontFamily: 'Almarai',
                     fontSize: 12,
                     color: isDark
                         ? AppColors.darkTextSec
@@ -752,7 +783,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 child: Center(
                     child: Text(_ar(i + 1),
                         style: TextStyle(
-                            fontFamily: 'ScheherazadeNew',
+                            fontFamily: 'Almarai',
                             fontWeight: FontWeight.bold,
                             color: gold))),
               ),
@@ -800,7 +831,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'ScheherazadeNew',
+                      fontFamily: 'Almarai',
                       color:
                           isDark ? AppColors.darkText : AppColors.textPrimary)),
               const Divider(height: 24),
@@ -816,7 +847,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       playingThis ? l('pauseRecitation') : l('playRecitation'),
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
-                          fontFamily: 'ScheherazadeNew',
+                          fontFamily: 'Almarai',
                           color: isDark
                               ? AppColors.darkText
                               : AppColors.textPrimary)),
@@ -843,7 +874,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   title: Text(l('tafsir'),
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
-                          fontFamily: 'ScheherazadeNew',
+                          fontFamily: 'Almarai',
                           color: isDark
                               ? AppColors.darkText
                               : AppColors.textPrimary)),
@@ -872,7 +903,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   title: Text(l('bookmark'),
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
-                          fontFamily: 'ScheherazadeNew',
+                          fontFamily: 'Almarai',
                           color: isDark
                               ? AppColors.darkText
                               : AppColors.textPrimary)),
@@ -887,7 +918,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   title: Text(l('highlightAyah'),
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
-                          fontFamily: 'ScheherazadeNew',
+                          fontFamily: 'Almarai',
                           color: isDark
                               ? AppColors.darkText
                               : AppColors.textPrimary)),
@@ -919,7 +950,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text('اختر لون الفاصل',
                 style: TextStyle(
-                    fontFamily: 'ScheherazadeNew',
+                    fontFamily: 'Almarai',
                     fontWeight: FontWeight.bold,
                     color:
                         isDark ? AppColors.darkText : AppColors.textPrimary)),
@@ -1220,7 +1251,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   Text('تعذّر تحميل صفحة ${_ar(base)}\nتحقق من اتصالك',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontFamily: 'ScheherazadeNew',
+                          fontFamily: 'Almarai',
                           color: isDark
                               ? AppColors.darkTextSec
                               : AppColors.textSecondary,
@@ -1238,7 +1269,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       label: const Text('إعادة المحاولة',
                           style: TextStyle(
                               color: Colors.white,
-                              fontFamily: 'ScheherazadeNew'))),
+                              fontFamily: 'Almarai'))),
                 ]));
           }
           if (!snap.hasData) {
@@ -1320,7 +1351,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           ? 'صفحة ${_ar(_pageNum)} — ${_ar(_pageNum + 1)}'
                           : 'صفحة ${_ar(_pageNum)}',
                       style: TextStyle(
-                          fontFamily: 'ScheherazadeNew',
+                          fontFamily: 'Almarai',
                           fontWeight: FontWeight.bold,
                           fontSize: 20,
                           color: textColor)),
@@ -1358,7 +1389,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              fontFamily: 'ScheherazadeNew',
+                              fontFamily: 'Almarai',
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
                               color: headerText,
@@ -1372,7 +1403,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     const SizedBox(width: 14),
                     Text('الجزء ${_ar(juz)} • الحزب ${_ar(hizb)}',
                         style: TextStyle(
-                            fontFamily: 'ScheherazadeNew',
+                            fontFamily: 'Almarai',
                             fontSize: 12,
                             color: subText)),
                   ],
@@ -1444,7 +1475,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontFamily: 'ScheherazadeNew',
+                        fontFamily: 'Almarai',
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: gold)),
@@ -1533,7 +1564,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                             textAlign: TextAlign.center,
                             textDirection: TextDirection.rtl,
                             style: TextStyle(
-                                fontFamily: 'ScheherazadeNew',
+                                fontFamily: 'QuranHafs',
                                 fontSize: fontSize * 0.92,
                                 height: 1.9,
                                 color: isDark
@@ -1545,10 +1576,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     TextSpan(children: [
                       for (final a in block) ..._ayahSpans(a, isDark, fontSize),
                     ]),
-                    textAlign: TextAlign.justify,
+                    // Right-aligned, not justified: justification pulls
+                    // Arabic words apart and breaks the line's flow.
+                    textAlign: TextAlign.right,
                     textDirection: TextDirection.rtl,
                     style: TextStyle(
-                        fontFamily: 'ScheherazadeNew',
+                        fontFamily: 'QuranHafs',
                         fontSize: fontSize,
                         height: 2.0,
                         color: ink),
@@ -1609,23 +1642,48 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         _regionGlobal(region), () => LongPressGestureRecognizer())
       ..onLongPress = () => _showAyahOptions(region);
 
+    // Colour by tajweed rule when the setting is on, exactly as the
+    // reader does; a plain single span otherwise.
+    final tajweed = context.read<SettingsService>().tajweed;
+    final segs = tajweed
+        ? TajweedService.segments(a.surahNumber, a.numberInSurah)
+        : null;
+
     return [
-      TextSpan(
-          text: '${a.text} ',
-          recognizer: recognizer,
-          style: TextStyle(backgroundColor: bg)),
+      if (segs == null)
+        TextSpan(
+            text: a.text,
+            recognizer: recognizer,
+            style: TextStyle(backgroundColor: bg))
+      else
+        for (final seg in segs)
+          TextSpan(
+              text: seg.text,
+              recognizer: recognizer,
+              style: TextStyle(
+                  backgroundColor: bg,
+                  color: seg.isPlain
+                      ? null
+                      : TajweedService.colorFor(seg.rule))),
       // The end-of-ayah mark is drawn, not typed: U+06DD leaves the
       // number sitting BESIDE the ornament in most fonts instead of
       // enclosed by it, which is not how a Mushaf prints it.
+      //
+      // A WidgetSpan is directionally NEUTRAL, so in an RTL paragraph
+      // the marks drift out of reading order and end up beside the wrong
+      // ayah. The RLM on either side pins each one to the RTL run it
+      // belongs to, and the spaces keep it off the neighbouring words.
+      const TextSpan(text: '‏ '),
       WidgetSpan(
         alignment: PlaceholderAlignment.middle,
         child: _AyahNumberMark(
           number: _ar(a.numberInSurah),
-          size: fontSize * 1.5,
+          size: fontSize * 1.35,
           color: isDark ? AppColors.darkPrimary : AppColors.primary,
           textColor: isDark ? AppColors.darkText : AppColors.textPrimary,
         ),
       ),
+      const TextSpan(text: ' ‏'),
     ];
   }
 
@@ -1884,7 +1942,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               textDirection: TextDirection.rtl,
               style: TextStyle(
                   fontSize: 12,
-                  fontFamily: 'ScheherazadeNew',
+                  fontFamily: 'Almarai',
                   color:
                       isDark ? AppColors.darkTextSec : AppColors.textSecondary),
             ),
@@ -1937,7 +1995,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                                 fontSize: compact ? 11 : 12,
                                 fontWeight: FontWeight.bold,
                                 color: gold,
-                                fontFamily: 'ScheherazadeNew'))))),
+                                fontFamily: 'Almarai'))))),
             IconButton(
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
@@ -2036,7 +2094,7 @@ class _AyahNumberMark extends StatelessWidget {
               number,
               textDirection: TextDirection.rtl,
               style: TextStyle(
-                fontFamily: 'ScheherazadeNew',
+                fontFamily: 'Almarai',
                 // Long numbers (٢٨٦) have to shrink to stay inside.
                 fontSize: size * (number.length > 2 ? 0.38 : 0.46),
                 fontWeight: FontWeight.bold,

@@ -92,7 +92,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                 onPressed: _confirmClear,
                 child: Text(l('clearAll'),
                     style: const TextStyle(
-                        color: Colors.red, fontFamily: 'ScheherazadeNew', fontSize: 13))),
+                        color: Colors.red, fontFamily: 'Almarai', fontSize: 13))),
         ],
       ),
       body: _loading
@@ -146,7 +146,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                               style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  fontFamily: 'ScheherazadeNew',
+                                  fontFamily: 'Almarai',
                                   color: isDark
                                       ? AppColors.darkText
                                       : AppColors.textPrimary)),
@@ -159,7 +159,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                                   color: isDark
                                       ? AppColors.darkTextSec
                                       : AppColors.textSecondary,
-                                  fontFamily: 'ScheherazadeNew',
+                                  fontFamily: 'Almarai',
                                   fontSize: 13)),
                           trailing: Icon(Icons.chevron_left_rounded,
                               color: isDark
@@ -208,7 +208,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
         Text(l('noBookmarks'),
             style: TextStyle(
                 fontSize: 18,
-                fontFamily: 'ScheherazadeNew',
+                fontFamily: 'Almarai',
                 color:
                     isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
         const SizedBox(height: 8),
@@ -216,7 +216,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
                 color: isDark ? AppColors.darkTextSec : AppColors.textLight,
-                fontFamily: 'ScheherazadeNew',
+                fontFamily: 'Almarai',
                 fontSize: 13)),
       ]));
   }

@@ -98,7 +98,7 @@ class AppColors {
 }
 
 class AppTypography {
-  static const String arabicFont = 'ScheherazadeNew';
+  static const String arabicFont = 'Almarai';
   static const String uiFont = 'PlusJakartaSans';
   static const String serifFont = 'SourceSerif4';
 

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:ui' show Color;
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart' show rootBundle;
 
 /// One run of ayah text that shares a single tajweed rule (or none).
@@ -138,6 +139,30 @@ class TajweedService {
     }
   }
 
+  /// Whether [cp] is an Arabic combining mark — a vowel sign, a Quranic
+  /// annotation, or the superscript alef. These have no width of their
+  /// own and must stay attached to the letter they sit on.
+  static bool _isCombiningMark(int cp) =>
+      (cp >= 0x064B && cp <= 0x065F) || // tashkeel
+      cp == 0x0670 || //                   superscript alef
+      (cp >= 0x06D6 && cp <= 0x06DC) || // small high signs
+      (cp >= 0x06DF && cp <= 0x06E8) ||
+      (cp >= 0x06EA && cp <= 0x06ED);
+
+  /// Cleans a raw segment from the source data.
+  ///
+  /// That data is scraped markup and is not quite the Uthmani text the
+  /// rest of the app uses: 67 ayahs still carry unclosed `<tajweed>`
+  /// tags, and it spells the superscript alef and the alef maqsura with
+  /// codepoints the Mushaf font shapes differently. Left alone, the tags
+  /// print literally and the odd letters break the joining of the word
+  /// they sit in.
+  static String _normalize(String s) => s
+      .replaceAll(RegExp(r'</?tajweed[^>]*>'), '')
+      .replaceAll('‌', '') //          ZWNJ — blocks Arabic joining
+      .replaceAll('ٲ', 'ٰ') //    alef w/ wavy hamza -> superscript alef
+      .replaceAll('ٮ', 'ى'); //   dotless beh -> alef maqsura
+
   /// Tajweed-coloured segments for an ayah, or null when unavailable
   /// (asset missing, or the ayah isn't in the data).
   static List<TajweedSegment>? segments(int surah, int ayah) {
@@ -146,12 +171,30 @@ class TajweedService {
     final out = <TajweedSegment>[];
     for (var i = 0; i + 1 < flat.length; i += 2) {
       final rule = flat[i] as String;
-      final text = flat[i + 1] as String;
+      var text = _normalize(flat[i + 1] as String);
       if (text.isEmpty) continue;
+
+      // A rule can start between a letter and the mark sitting on it.
+      // Split across spans, that mark has no base to attach to and the
+      // shaper draws it on a dotted circle. Pull the letter it belongs
+      // to forward into this span instead of pushing the mark back —
+      // the carrying letter is what a printed tajweed Mushaf colours.
+      if (out.isNotEmpty && _isCombiningMark(text.codeUnitAt(0))) {
+        final prev = out.removeLast();
+        var cut = prev.text.length - 1;
+        while (cut > 0 && _isCombiningMark(prev.text.codeUnitAt(cut))) {
+          cut--;
+        }
+        text = prev.text.substring(cut) + text;
+        if (cut > 0) out.add(TajweedSegment(prev.rule, prev.text.substring(0, cut)));
+      }
       out.add(TajweedSegment(rule, text));
     }
     return out.isEmpty ? null : out;
   }
 
   static Color? colorFor(String rule) => ruleColors[rule];
+
+  @visibleForTesting
+  static bool isCombiningMark(int cp) => _isCombiningMark(cp);
 }

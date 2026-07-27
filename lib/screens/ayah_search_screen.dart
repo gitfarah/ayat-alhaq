@@ -125,14 +125,14 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
             style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                fontFamily: 'ScheherazadeNew',
+                fontFamily: 'Almarai',
                 color: isDark ? AppColors.darkText : AppColors.textPrimary)),
         subtitle: Text(
             '${s.revelationType == 'Meccan' ? 'مكية' : 'مدنية'} • ${_ar(s.numberOfAyahs)} آية',
             textAlign: TextAlign.right,
             textDirection: TextDirection.rtl,
             style: TextStyle(
-                fontFamily: 'ScheherazadeNew',
+                fontFamily: 'Almarai',
                 fontSize: 13,
                 color:
                     isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
@@ -181,7 +181,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                     style: TextStyle(
                         color:
                             isDark ? AppColors.darkText : AppColors.textPrimary,
-                        fontFamily: 'ScheherazadeNew'),
+                        fontFamily: 'Almarai'),
                     decoration: InputDecoration(
                         hintText: 'اكتب كلمة أو جزءاً من آية...',
                         hintTextDirection: TextDirection.rtl,
@@ -189,7 +189,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                             color: isDark
                                 ? AppColors.darkTextSec
                                 : AppColors.textLight,
-                            fontFamily: 'ScheherazadeNew',
+                            fontFamily: 'Almarai',
                             fontSize: 14),
                         border: InputBorder.none,
                         contentPadding:
@@ -208,12 +208,12 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                       style: TextStyle(
                           color: subColor,
                           fontSize: 13,
-                          fontFamily: 'ScheherazadeNew')))),
+                          fontFamily: 'Almarai')))),
         Expanded(
           child: _error != null
               ? Center(
                   child: Text(_error!,
-                      style: TextStyle(color: subColor, fontFamily: 'ScheherazadeNew')))
+                      style: TextStyle(color: subColor, fontFamily: 'Almarai')))
               : (_searchedOnce &&
                       _results.isEmpty &&
                       _surahResults.isEmpty &&
@@ -223,7 +223,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                           style: TextStyle(
                               color: subColor,
                               fontSize: 16,
-                              fontFamily: 'ScheherazadeNew')))
+                              fontFamily: 'Almarai')))
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: _surahResults.length + _results.length,
@@ -254,7 +254,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                                 style: TextStyle(
                                     fontSize: 16,
                                     height: 1.8,
-                                    fontFamily: 'ScheherazadeNew',
+                                    fontFamily: 'QuranHafs',
                                     color: isDark
                                         ? AppColors.darkText
                                         : AppColors.textPrimary)),
@@ -267,7 +267,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                                       color: isDark
                                           ? AppColors.darkPrimary
                                           : AppColors.primary,
-                                      fontFamily: 'ScheherazadeNew',
+                                      fontFamily: 'Almarai',
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold)),
                             ),

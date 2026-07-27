@@ -242,14 +242,14 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'ScheherazadeNew',
+                  fontFamily: 'Almarai',
                   color: isDark ? AppColors.darkText : AppColors.textPrimary)),
           Text(
               '${surah.revelationType == 'Meccan' ? 'مكية' : 'مدنية'} • ${_ar(surah.numberOfAyahs)} آية',
               style: TextStyle(
                   color:
                       isDark ? AppColors.darkTextSec : AppColors.textSecondary,
-                  fontFamily: 'ScheherazadeNew')),
+                  fontFamily: 'Almarai')),
           const SizedBox(height: 24),
           // Fixed order in every language: Mushaf on the LEFT, the
           // responsive reader on the RIGHT (pinned LTR so the app
@@ -375,7 +375,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ? AppColors.darkTextSec
                           : AppColors.textSecondary,
                       fontSize: 13,
-                      fontFamily: 'ScheherazadeNew')))),
+                      fontFamily: 'Almarai')))),
     ];
     // Inline result layout: headers, then matching surahs, then — when
     // the query also hits ayah text — a section label + ayah results,
@@ -410,7 +410,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 : AppColors.primary,
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            fontFamily: 'ScheherazadeNew'))));
+                            fontFamily: 'Almarai'))));
           }
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -448,14 +448,14 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(
                   fontSize: 16,
                   height: 1.8,
-                  fontFamily: 'ScheherazadeNew',
+                  fontFamily: 'Almarai',
                   color: isDark ? AppColors.darkText : AppColors.textPrimary)),
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Text('${r.surahName} • الآية ${_ar(r.numberInSurah)}',
                 style: TextStyle(
                     color: isDark ? AppColors.darkPrimary : AppColors.primary,
-                    fontFamily: 'ScheherazadeNew',
+                    fontFamily: 'Almarai',
                     fontSize: 12,
                     fontWeight: FontWeight.bold)),
           ),
@@ -506,7 +506,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           isDark ? AppColors.darkText : AppColors.textPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      fontFamily: 'ScheherazadeNew')),
+                      fontFamily: 'Almarai')),
               Text(
                   '${_ar(g.day)} ${gregorianMonths[g.month - 1]} ${_ar(g.year)} م',
                   maxLines: 1,
@@ -516,7 +516,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ? AppColors.darkTextSec
                           : AppColors.textSecondary,
                       fontSize: 13,
-                      fontFamily: 'ScheherazadeNew')),
+                      fontFamily: 'Almarai')),
             ])),
       ]),
     );
@@ -571,7 +571,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               : AppColors.primary,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
-                          fontFamily: 'ScheherazadeNew')),
+                          fontFamily: 'Almarai')),
                   if (s.lastSurah != null)
                     Text(
                         'سورة رقم ${s.lastSurah}${s.lastAyah != null ? ' · الآية ${s.lastAyah}' : ''}',
@@ -582,7 +582,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ? AppColors.darkTextSec
                                 : AppColors.textSecondary,
                             fontSize: 13,
-                            fontFamily: 'ScheherazadeNew')),
+                            fontFamily: 'Almarai')),
                 ])),
           ]),
         ),
@@ -606,14 +606,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(
                       color:
                           isDark ? AppColors.darkText : AppColors.textPrimary,
-                      fontFamily: 'ScheherazadeNew'),
+                      fontFamily: 'Almarai'),
                   decoration: InputDecoration(
                       hintText: L10n.of(context)('searchHint'),
                       hintStyle: TextStyle(
                           color: isDark
                               ? AppColors.darkTextSec
                               : AppColors.textLight,
-                          fontFamily: 'ScheherazadeNew',
+                          fontFamily: 'Almarai',
                           fontSize: 14),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 14)),
@@ -668,7 +668,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: isDark
                                   ? AppColors.gold
                                   : const Color(0xFF8A6D00),
-                              fontFamily: 'ScheherazadeNew')))),
+                              fontFamily: 'Almarai')))),
               const SizedBox(width: 14),
               Expanded(
                   child: Column(
@@ -679,7 +679,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            fontFamily: 'ScheherazadeNew',
+                            fontFamily: 'Almarai',
                             color: isDark
                                 ? AppColors.darkText
                                 : AppColors.textPrimary)),
@@ -737,7 +737,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Text(_error!,
             textAlign: TextAlign.center,
             style: TextStyle(
-                fontFamily: 'ScheherazadeNew',
+                fontFamily: 'Almarai',
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.6)),
         const SizedBox(height: 24),
@@ -751,7 +751,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: _load,
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             label: const Text('إعادة المحاولة',
-                style: TextStyle(fontFamily: 'ScheherazadeNew', color: Colors.white))),
+                style: TextStyle(fontFamily: 'Almarai', color: Colors.white))),
       ]));
 }
 
@@ -876,7 +876,7 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
               child: Text(L10n.of(context)('chooseCity'),
                   textAlign: TextAlign.start,
                   style: TextStyle(
-                      fontFamily: 'ScheherazadeNew',
+                      fontFamily: 'Almarai',
                       fontSize: 13,
                       color:
                           isDark ? AppColors.darkPrimary : AppColors.primary)),
@@ -907,7 +907,7 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
             child: Text('${L10n.of(context)('prayerTimes')} — $_label',
                 textAlign: TextAlign.start,
                 style: TextStyle(
-                    fontFamily: 'ScheherazadeNew',
+                    fontFamily: 'Almarai',
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color:
@@ -946,7 +946,7 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            fontFamily: 'ScheherazadeNew',
+                            fontFamily: 'Almarai',
                             fontSize: 12.5,
                             fontWeight: i == next
                                 ? FontWeight.bold
@@ -1015,7 +1015,7 @@ class _ModeBtn extends StatelessWidget {
               style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'ScheherazadeNew',
+                  fontFamily: 'Almarai',
                   color: isDark
                       ? (color == AppColors.primary
                           ? AppColors.darkPrimary
@@ -1026,7 +1026,7 @@ class _ModeBtn extends StatelessWidget {
                   fontSize: 12,
                   color:
                       isDark ? AppColors.darkTextSec : AppColors.textSecondary,
-                  fontFamily: 'ScheherazadeNew')),
+                  fontFamily: 'Almarai')),
         ]),
       ));
 }
