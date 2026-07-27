@@ -212,6 +212,33 @@ class QuranService {
     return 1;
   }
 
+  /// Every ayah printed on Mushaf page [page], in order, from the
+  /// bundled text. Powers the reflowing text edition of the Mushaf.
+  ///
+  /// The Basmala is stripped from each surah's first ayah for the same
+  /// reason as in [getSurahAyahs] — it is printed on its own line, and
+  /// the reflowing page draws it as a header.
+  static Future<List<PageAyah>> ayahsOnPage(int page) async {
+    await _ensureLoaded();
+    final out = <PageAyah>[];
+    for (var s = 0; s < _rawAyahs!.length; s++) {
+      final tuples = _rawAyahs![s];
+      // Pages run in order, so a surah ending before this page or
+      // starting after it cannot contribute any ayah.
+      if ((tuples.last[3] as int) < page) continue;
+      if ((tuples.first[3] as int) > page) break;
+      for (final t in tuples) {
+        if (t[3] as int != page) continue;
+        final n = t[1] as int;
+        var text = t[5] as String;
+        final surah = s + 1;
+        if (n == 1 && surah != 1 && surah != 9) text = _stripBasmala(text);
+        out.add(PageAyah(surah, n, text));
+      }
+    }
+    return out;
+  }
+
   /// Normalizes Arabic to bare letters word-by-word (public form of
   /// [_bareLetters] for multi-word strings).
   static String normalizeArabic(String s) =>
@@ -277,6 +304,15 @@ class QuranService {
 
   // Tafsir fetching lives in TafsirService (lib/services/tafsir_service
   // .dart), which also handles offline downloads and the CDN source.
+}
+
+/// One ayah as it appears on a Mushaf page — see [QuranService.ayahsOnPage].
+class PageAyah {
+  final int surahNumber;
+  final int numberInSurah;
+  final String text;
+
+  const PageAyah(this.surahNumber, this.numberInSurah, this.text);
 }
 
 class AyahSearchResult {

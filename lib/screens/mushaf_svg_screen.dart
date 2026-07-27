@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -40,6 +41,13 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// Per-index page-load futures so rebuilds don't refetch; pruned to
   /// the neighbourhood of the current page to keep memory flat.
   final Map<int, Future<List<MushafPageData>>> _pageFutures = {};
+
+  /// Same idea for the reflowing text edition, keyed by page number,
+  /// plus its per-ayah long-press recognizers keyed by global ayah —
+  /// held across rebuilds (a TextSpan recognizer must outlive the span)
+  /// and disposed with the screen.
+  final Map<int, Future<List<PageAyah>>> _textFutures = {};
+  final Map<int, LongPressGestureRecognizer> _textRecognizers = {};
 
   bool _isCachedOffline = false;
   bool _barsVisible = true;
@@ -138,6 +146,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     context.read<SettingsService>().saveLastRead(page: basePage);
     KhatmaService.markPageRead(basePage);
     if (_wide && basePage + 1 <= 604) KhatmaService.markPageRead(basePage + 1);
+
+    // The text edition is bundled — nothing to prefetch, and it is
+    // offline by definition.
+    if (MushafSvgService.edition.isText) {
+      _textFutures.removeWhere((k, _) => (k - basePage).abs() > 4);
+      if (!_isCachedOffline) setState(() => _isCachedOffline = true);
+      return;
+    }
 
     final step = _wide ? 2 : 1;
     MushafSvgService.preload(basePage + step);
@@ -266,6 +282,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _pageCtrl?.dispose();
     _flashCtrl.dispose();
+    for (final r in _textRecognizers.values) {
+      r.dispose();
+    }
     LibraryEvents.bookmarks.removeListener(_loadMarks);
     LibraryEvents.highlights.removeListener(_loadMarks);
     _audioService?.removeListener(_followRecitation);
@@ -612,6 +631,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     ? const Icon(Icons.check_circle_rounded,
                         color: AppColors.gold)
                     : null,
+                subtitle: Text(l.isArabic ? e.hintAr : e.hintEn,
+                    textAlign: TextAlign.start,
+                    style: TextStyle(
+                        fontFamily: 'ScheherazadeNew',
+                        fontSize: 13,
+                        color: isDark
+                            ? AppColors.darkTextSec
+                            : AppColors.textSecondary)),
                 title: Text(l.isArabic ? e.nameAr : e.nameEn,
                     textAlign: TextAlign.start,
                     style: TextStyle(
@@ -629,6 +656,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   // Drop cached page futures so the new edition loads.
                   setState(() {
                     _pageFutures.clear();
+                    _textFutures.clear();
                     _zoom = 1.0;
                   });
                   _onPageSettled(_pageNum);
@@ -1136,6 +1164,26 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// screens. Loads through a cached future so rebuilds don't refetch.
   Widget _buildPageItem(int index, bool isDark) {
     final base = _pageForIndex(index);
+
+    // The reflowing text edition is typeset from the bundled text —
+    // no artwork to fetch, and no illuminated-frame special case.
+    if (MushafSvgService.edition.isText) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _setBars(!_barsVisible),
+        onScaleStart: _onScaleStart,
+        onScaleUpdate: _onScaleUpdate,
+        child: SafeArea(
+          child: !_wide || base + 1 > 604
+              ? _buildTextPage(base, isDark)
+              : Row(children: [
+                  Expanded(child: _buildTextPage(base + 1, isDark)),
+                  Expanded(child: _buildTextPage(base, isDark)),
+                ]),
+        ),
+      );
+    }
+
     final future = _pageFutures[index] ??= () async {
       final first = await MushafSvgService.getPage(base);
       if (!_wide || base + 1 > 604) return [first];
@@ -1286,7 +1334,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             padding: const EdgeInsets.only(bottom: 8),
             child: Directionality(
               textDirection: TextDirection.rtl,
-              child: Row(
+              // A long surah label next to the juz/hizb text can be
+              // wider than a narrow phone — shrink the strip to fit
+              // rather than clipping it.
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -1315,6 +1368,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           fontSize: 12,
                           color: subText)),
                 ],
+              ),
               ),
             ),
           ),
@@ -1398,6 +1452,169 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         ),
       ),
     );
+  }
+
+  /// The reflowing text edition of page [page].
+  ///
+  /// The printed editions are page IMAGES: zooming can only make the
+  /// sheet bigger, so past a point the reader is panning around a page
+  /// wider than the screen. Here the same ayahs are typeset live, so
+  /// zoom changes the TYPE size and the lines re-wrap to whatever the
+  /// screen is — the text is always fully within the screen width, at
+  /// any zoom and in any orientation.
+  Widget _buildTextPage(int page, bool isDark) {
+    final future = _textFutures[page] ??= QuranService.ayahsOnPage(page);
+    final cream = isDark ? AppColors.darkSurfaceAlt : AppColors.mushafParchment;
+    final ink = isDark ? AppColors.darkText : AppColors.textPrimary;
+
+    return FutureBuilder<List<PageAyah>>(
+      future: future,
+      builder: (ctx, snap) {
+        if (!snap.hasData) {
+          return Center(
+              child: CircularProgressIndicator(
+                  color: isDark ? AppColors.darkPrimary : AppColors.primary));
+        }
+        final ayahs = snap.data!;
+        // The type size IS the zoom — 1.0 fits the page comfortably.
+        final fontSize = 21.0 * _zoom;
+
+        // Split the page into runs of consecutive ayahs from the same
+        // surah; a page can start mid-surah and finish inside the next.
+        final blocks = <List<PageAyah>>[];
+        for (final a in ayahs) {
+          if (blocks.isEmpty || blocks.last.first.surahNumber != a.surahNumber) {
+            blocks.add([a]);
+          } else {
+            blocks.last.add(a);
+          }
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+          physics: const ClampingScrollPhysics(),
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: cream,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: AppColors.mushafBorderGold.withValues(alpha: 0.55),
+                  width: 1.2),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final block in blocks) ...[
+                  // A surah that BEGINS on this page gets its name band
+                  // and the Basmala, as the printed page does.
+                  if (block.first.numberInSurah == 1) ...[
+                    _textSurahHeader(block.first.surahNumber, isDark, fontSize),
+                    if (block.first.surahNumber != 1 &&
+                        block.first.surahNumber != 9)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Text(QuranService.basmala,
+                            textAlign: TextAlign.center,
+                            textDirection: TextDirection.rtl,
+                            style: TextStyle(
+                                fontFamily: 'ScheherazadeNew',
+                                fontSize: fontSize * 0.92,
+                                height: 1.9,
+                                color: isDark
+                                    ? AppColors.darkPrimary
+                                    : AppColors.primary)),
+                      ),
+                  ],
+                  Text.rich(
+                    TextSpan(children: [
+                      for (final a in block) ..._ayahSpans(a, isDark, fontSize),
+                    ]),
+                    textAlign: TextAlign.justify,
+                    textDirection: TextDirection.rtl,
+                    style: TextStyle(
+                        fontFamily: 'ScheherazadeNew',
+                        fontSize: fontSize,
+                        height: 2.0,
+                        color: ink),
+                  ),
+                  const SizedBox(height: 6),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Name band for a surah starting on a reflowing text page.
+  Widget _textSurahHeader(int surah, bool isDark, double fontSize) {
+    final emerald = isDark ? AppColors.primaryContainer : AppColors.primary;
+    return Container(
+      margin: const EdgeInsets.only(top: 4, bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+      decoration: BoxDecoration(
+        color: emerald,
+        borderRadius: BorderRadius.circular(10),
+        border: const Border.fromBorderSide(
+            BorderSide(color: AppColors.mushafBorderGold, width: 1.2)),
+      ),
+      child: Text('سورة ${_surahName(surah)}',
+          textAlign: TextAlign.center,
+          textDirection: TextDirection.rtl,
+          style: TextStyle(
+              fontFamily: 'ScheherazadeNew',
+              fontSize: fontSize * 0.85,
+              fontWeight: FontWeight.bold,
+              color: AppColors.mushafBorderGold)),
+    );
+  }
+
+  /// One ayah's text plus its end-of-ayah marker, tinted for the mark
+  /// it carries (bookmark/highlight) or for being recited right now,
+  /// and long-pressable for the same options sheet as the page view.
+  List<InlineSpan> _ayahSpans(PageAyah a, bool isDark, double fontSize) {
+    final region = AyahHitRegion(
+        surahNumber: a.surahNumber,
+        ayahNumber: a.numberInSurah,
+        x: 0,
+        y: 0,
+        rings: const []);
+    final bookmark = _bookmarkFor(region);
+    final highlight = _highlightFor(region);
+    final playing = _playingGlobalAyah != null &&
+        _regionGlobal(region) == _playingGlobalAyah;
+
+    Color? bg;
+    if (playing) {
+      bg = (isDark ? AppColors.darkSecondary : AppColors.secondary)
+          .withValues(alpha: isDark ? 0.30 : 0.16);
+    } else if (bookmark != null) {
+      bg = AppColors.highlight(bookmark.color)
+          .withValues(alpha: isDark ? 0.32 : 0.22);
+    } else if (highlight != null) {
+      bg = AppColors.highlight(highlight.color)
+          .withValues(alpha: isDark ? 0.35 : 0.25);
+    }
+
+    final recognizer = _textRecognizers.putIfAbsent(
+        _regionGlobal(region), () => LongPressGestureRecognizer())
+      ..onLongPress = () => _showAyahOptions(region);
+
+    return [
+      TextSpan(
+          text: '${a.text} ',
+          recognizer: recognizer,
+          style: TextStyle(backgroundColor: bg)),
+      TextSpan(
+          text: '۝${_ar(a.numberInSurah)} ',
+          recognizer: recognizer,
+          style: TextStyle(
+              fontSize: fontSize * 0.95,
+              color: isDark ? AppColors.darkPrimary : AppColors.primary)),
+    ];
   }
 
   Widget _buildPageArtwork(MushafPageData data, bool isDark) {

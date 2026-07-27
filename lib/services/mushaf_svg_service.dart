@@ -106,15 +106,36 @@ class MushafEdition {
   final String nameAr;
   final String nameEn;
 
-  const MushafEdition(this.id, this.nameAr, this.nameEn);
+  /// One-line note shown under the name in the picker.
+  final String hintAr;
+  final String hintEn;
+
+  /// True for the reflowing text edition, which is typeset live from
+  /// the bundled Quran text instead of being fetched as page artwork.
+  /// Nothing about it is downloadable or page-image based.
+  final bool isText;
+
+  const MushafEdition(this.id, this.nameAr, this.nameEn,
+      {this.hintAr = '', this.hintEn = '', this.isText = false});
 }
 
 class MushafSvgService {
-  /// The editions offered in the app. All share the `kfqc` layout.
+  /// The editions offered in the app. The three riwayat share the
+  /// `kfqc` page layout; `text` is not artwork at all (see [isText]).
   static const List<MushafEdition> editions = [
-    MushafEdition('hafs', 'مصحف حفص', 'Hafs'),
-    MushafEdition('warsh', 'مصحف ورش', 'Warsh'),
-    MushafEdition('qalon', 'مصحف قالون', 'Qalon'),
+    MushafEdition('hafs', 'مصحف حفص', 'Hafs',
+        hintAr: 'الرسم العثماني — التخطيط الأصلي',
+        hintEn: 'Uthmani script — original page layout'),
+    MushafEdition('warsh', 'مصحف ورش', 'Warsh',
+        hintAr: 'رواية ورش عن نافع',
+        hintEn: 'Riwayat Warsh ʿan Nāfiʿ'),
+    MushafEdition('qalon', 'مصحف قالون', 'Qalon',
+        hintAr: 'رواية قالون عن نافع',
+        hintEn: 'Riwayat Qālūn ʿan Nāfiʿ'),
+    MushafEdition('text', 'نص متجاوب', 'Reflowing text',
+        hintAr: 'يتكيّف مع التكبير وحجم الشاشة',
+        hintEn: 'Reflows to the zoom level and screen size',
+        isText: true),
   ];
 
   static const String _repo =
@@ -141,8 +162,10 @@ class MushafSvgService {
 
   /// Whether this platform can realistically store the entire Mushaf
   /// offline (true on mobile/desktop, false on web).
+  /// The reflowing text edition ships inside the app, so there is
+  /// nothing to download for it.
   static bool get supportsFullOfflineDownload =>
-      MushafFileStorage.supportsFullOfflineDownload;
+      !_edition.isText && MushafFileStorage.supportsFullOfflineDownload;
 
   static final Map<int, MushafPageData> _memoryCache = {};
 
