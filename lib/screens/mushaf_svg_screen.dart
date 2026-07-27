@@ -537,25 +537,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   Navigator.pop(context);
                   _jumpDialog();
                 }),
-            ListTile(
-                leading: Icon(Icons.auto_stories_rounded, color: iconColor),
-                title: Text(L10n.of(context)('mushafEdition'),
-                    style: TextStyle(
-                        fontFamily: 'ScheherazadeNew', color: textColor)),
-                subtitle: Text(
-                    L10n.of(context).isArabic
-                        ? MushafSvgService.edition.nameAr
-                        : MushafSvgService.edition.nameEn,
-                    style: TextStyle(
-                        fontFamily: 'ScheherazadeNew',
-                        fontSize: 13,
-                        color: isDark
-                            ? AppColors.darkTextSec
-                            : AppColors.textSecondary)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showEditionPicker();
-                }),
             if (MushafSvgService.supportsFullOfflineDownload)
               Builder(builder: (_) {
                 final prog = MushafSvgService.bulkProgress.value;
@@ -594,79 +575,92 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     );
   }
 
-  /// Picker for the Mushaf edition (riwayah). Switching clears the
-  /// loaded pages so the new edition's artwork is fetched.
-  void _showEditionPicker() {
-    final isDark = context.read<SettingsService>().isDarkIn(context);
+  /// A small book icon standing for each edition, so the dropdown reads
+  /// at a glance instead of by name alone.
+  IconData _editionIcon(String id) => switch (id) {
+        'warsh' => Icons.import_contacts_rounded,
+        'qalon' => Icons.collections_bookmark_rounded,
+        'text' => Icons.format_size_rounded,
+        _ => Icons.menu_book_rounded,
+      };
+
+  /// Header control for the Mushaf edition (riwayah): the current
+  /// edition's icon with a caret, opening a dropdown anchored under it.
+  Widget _buildEditionButton(bool isDark, Color textColor) {
     final l = L10n.of(context);
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const SizedBox(height: 14),
-          Text(l('mushafEdition'),
-              style: TextStyle(
-                  fontFamily: 'ScheherazadeNew',
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? AppColors.darkText : AppColors.textPrimary)),
-          const SizedBox(height: 8),
-          for (final e in MushafSvgService.editions)
-            Builder(builder: (_) {
-              final sel = e.id == MushafSvgService.edition.id;
-              return ListTile(
-                dense: true,
-                selected: sel,
-                selectedTileColor: AppColors.gold.withValues(alpha: 0.16),
-                shape: sel
-                    ? RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: const BorderSide(
-                            color: AppColors.gold, width: 1.3))
-                    : null,
-                trailing: sel
-                    ? const Icon(Icons.check_circle_rounded,
-                        color: AppColors.gold)
-                    : null,
-                subtitle: Text(l.isArabic ? e.hintAr : e.hintEn,
-                    textAlign: TextAlign.start,
+    final current = MushafSvgService.edition;
+    final accent = isDark ? AppColors.darkPrimary : AppColors.primary;
+
+    return PopupMenuButton<String>(
+      tooltip: l('mushafEdition'),
+      position: PopupMenuPosition.under,
+      color: isDark ? AppColors.darkSurface : Colors.white,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+              color: AppColors.mushafBorderGold.withValues(alpha: 0.45))),
+      onSelected: _applyEdition,
+      itemBuilder: (_) => [
+        for (final e in MushafSvgService.editions)
+          PopupMenuItem<String>(
+            value: e.id,
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                    color: (e.id == current.id ? AppColors.gold : accent)
+                        .withValues(alpha: e.id == current.id ? 0.22 : 0.10),
+                    borderRadius: BorderRadius.circular(9)),
+                child: Icon(_editionIcon(e.id),
+                    size: 19,
+                    color: e.id == current.id ? AppColors.gold : accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(l.isArabic ? e.nameAr : e.nameEn,
                     style: TextStyle(
                         fontFamily: 'ScheherazadeNew',
-                        fontSize: 13,
-                        color: isDark
-                            ? AppColors.darkTextSec
-                            : AppColors.textSecondary)),
-                title: Text(l.isArabic ? e.nameAr : e.nameEn,
-                    textAlign: TextAlign.start,
-                    style: TextStyle(
-                        fontFamily: 'ScheherazadeNew',
-                        fontSize: 17,
-                        fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 16,
+                        fontWeight: e.id == current.id
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                         color: isDark
                             ? AppColors.darkText
                             : AppColors.textPrimary)),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  if (sel) return;
-                  await context.read<SettingsService>().setMushafEdition(e.id);
-                  if (!mounted) return;
-                  // Drop cached page futures so the new edition loads.
-                  setState(() {
-                    _pageFutures.clear();
-                    _textFutures.clear();
-                    _zoom = 1.0;
-                  });
-                  _onPageSettled(_pageNum);
-                },
-              );
-            }),
-          const SizedBox(height: 10),
+              ),
+              if (e.id == current.id)
+                const Icon(Icons.check_rounded,
+                    size: 18, color: AppColors.gold),
+            ]),
+          ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+            color: AppColors.gold.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color: AppColors.mushafBorderGold.withValues(alpha: 0.5))),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(_editionIcon(current.id), size: 18, color: textColor),
+          Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: textColor),
         ]),
       ),
     );
+  }
+
+  /// Switches the Mushaf edition: persists the choice, drops the loaded
+  /// pages so the new edition builds its own, and refits the page.
+  Future<void> _applyEdition(String id) async {
+    if (id == MushafSvgService.edition.id) return;
+    await context.read<SettingsService>().setMushafEdition(id);
+    if (!mounted) return;
+    setState(() {
+      _pageFutures.clear();
+      _textFutures.clear();
+      _zoom = 1.0;
+    });
+    _onPageSettled(_pageNum);
   }
 
   void _showSurahPicker() {
@@ -1326,6 +1320,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 ],
               ),
             ),
+            _buildEditionButton(isDark, textColor),
             IconButton(
                 icon: Icon(Icons.menu_rounded, color: textColor),
                 onPressed: _showMenuSheet),
@@ -1791,15 +1786,24 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             physics: scrollable
                 ? const ClampingScrollPhysics()
                 : const NeverScrollableScrollPhysics(),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: _isZoomed
-                  ? const ClampingScrollPhysics()
-                  : const NeverScrollableScrollPhysics(),
-              child: SizedBox(
-                width: renderWidth,
-                height: renderHeight,
-                child: page,
+            // A Mushaf page is proportionally WIDER than a phone screen,
+            // so fitting its width always leaves vertical slack. Claim
+            // the full viewport height and centre the page in it, or the
+            // slack all piles up as dead space under the last line.
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: _isZoomed
+                      ? const ClampingScrollPhysics()
+                      : const NeverScrollableScrollPhysics(),
+                  child: SizedBox(
+                    width: renderWidth,
+                    height: renderHeight,
+                    child: page,
+                  ),
+                ),
               ),
             ),
           ),
