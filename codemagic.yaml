@@ -1,0 +1,89 @@
+# Codemagic build configuration.
+#
+# IMPORTANT: builds must be RELEASE. iOS 14+ refuses to launch a
+# debug-mode Flutter app from the home screen or TestFlight — it shows
+# "debug mode Flutter apps can only be launched from Flutter tooling".
+# Keeping the config here (rather than in the Codemagic UI) means the
+# build mode is version-controlled and reviewable.
+#
+# Before the first run, in the Codemagic UI:
+#   1. Open the app → Settings → select "codemagic.yaml" as the config source.
+#   2. Teams/Integrations → App Store Connect: add your API key and note
+#      the integration NAME, then put that name below in
+#      `integrations.app_store_connect`.
+
+workflows:
+  ios-release:
+    name: iOS release (App Store / TestFlight)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    integrations:
+      # ⬇︎ Replace with the App Store Connect API key name from
+      #    Codemagic → Teams → Integrations → App Store Connect.
+      app_store_connect: AyatAlHaq ASC Key
+
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.omar.ayatalhaq
+      vars:
+        # App Store Connect "Apple ID" of the app record.
+        APP_STORE_APPLE_ID: 6794894864
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+
+    scripts:
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Install CocoaPods dependencies
+        script: find . -name "Podfile" -execdir pod install \;
+
+      - name: Apply signing profiles to the Xcode project
+        script: xcode-project use-profiles
+
+      - name: Build signed IPA (RELEASE)
+        script: |
+          # Build number must be higher than anything already uploaded,
+          # so take the latest from TestFlight and add one.
+          BUILD_NUMBER=$(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID") + 1))
+          echo "Building release IPA as build $BUILD_NUMBER"
+          flutter build ipa --release \
+            --build-number=$BUILD_NUMBER \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        # Upload to TestFlight. Internal testers get it immediately;
+        # external testers still require Apple's beta review.
+        submit_to_testflight: true
+        submit_to_app_store: false
+
+  android-release:
+    name: Android release (Play Store)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    environment:
+      flutter: stable
+      android_signing:
+        # Upload the keystore in Codemagic → Teams → Code signing
+        # identities, then reference its reference name here.
+        - ayatalhaq_keystore
+
+    scripts:
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Build release AAB
+        script: flutter build appbundle --release
+
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
