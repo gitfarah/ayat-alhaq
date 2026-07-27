@@ -125,7 +125,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
             style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                fontFamily: 'Almarai',
+                fontFamily: 'QuranHafs',
                 color: isDark ? AppColors.darkText : AppColors.textPrimary)),
         subtitle: Text(
             '${s.revelationType == 'Meccan' ? 'مكية' : 'مدنية'} • ${_ar(s.numberOfAyahs)} آية',
@@ -267,7 +267,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                                       color: isDark
                                           ? AppColors.darkPrimary
                                           : AppColors.primary,
-                                      fontFamily: 'Almarai',
+                                      fontFamily: 'QuranHafs',
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold)),
                             ),

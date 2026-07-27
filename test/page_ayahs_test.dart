@@ -4,6 +4,7 @@ import 'package:quran_app_v1/services/quran_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  checkFontSafe();
 
   group('QuranService.ayahsOnPage', () {
     test('page 1 is Al-Fatiha in full', () async {
@@ -57,6 +58,33 @@ void main() {
     test('an unknown edition id falls back to Hafs', () {
       MushafSvgService.setEdition('nope');
       expect(MushafSvgService.edition.id, 'hafs');
+    });
+  });
+}
+
+// Regression: the KFGQPC HAFS font has no mark support for U+06DF,
+// U+06E3 and U+06EB — each renders as a bold ring on a dotted circle.
+// The service re-encodes them at load (U+06DF becomes the sukun this
+// font draws as the silent-letter circle; the other two are dropped).
+void checkFontSafe() {
+  group('Quran font re-encoding', () {
+    test('no displayed ayah carries a mark the font cannot shape', () async {
+      for (var p = 1; p <= 604; p++) {
+        for (final a in await QuranService.ayahsOnPage(p)) {
+          for (final bad in ['۟', 'ۣ', '۫']) {
+            expect(a.text, isNot(contains(bad)),
+                reason: 'page $p ${a.surahNumber}:${a.numberInSurah}');
+          }
+        }
+      }
+    });
+
+    test('the silent-letter circle became a sukun, not a deletion', () async {
+      // كفروا in 3:4 must still carry a mark on its silent alef.
+      final page = await QuranService.ayahsOnPage(50);
+      final a4 =
+          page.firstWhere((a) => a.surahNumber == 3 && a.numberInSurah == 4);
+      expect(a4.text, contains('كَفَرُواْ'));
     });
   });
 }

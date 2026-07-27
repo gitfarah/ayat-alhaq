@@ -38,7 +38,7 @@ class SurahFrame extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontFamily: 'Almarai',
+              fontFamily: 'QuranHafs',
               fontSize: fontSize,
               fontWeight: FontWeight.bold,
               color: text,

@@ -1006,7 +1006,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            fontFamily: 'Almarai',
+                            fontFamily: 'QuranHafs',
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
                             color: textColor)),

@@ -242,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'Almarai',
+                  fontFamily: 'QuranHafs',
                   color: isDark ? AppColors.darkText : AppColors.textPrimary)),
           Text(
               '${surah.revelationType == 'Meccan' ? 'مكية' : 'مدنية'} • ${_ar(surah.numberOfAyahs)} آية',
@@ -455,7 +455,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Text('${r.surahName} • الآية ${_ar(r.numberInSurah)}',
                 style: TextStyle(
                     color: isDark ? AppColors.darkPrimary : AppColors.primary,
-                    fontFamily: 'Almarai',
+                    fontFamily: 'QuranHafs',
                     fontSize: 12,
                     fontWeight: FontWeight.bold)),
           ),
@@ -679,7 +679,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            fontFamily: 'Almarai',
+                            fontFamily: 'QuranHafs',
                             color: isDark
                                 ? AppColors.darkText
                                 : AppColors.textPrimary)),

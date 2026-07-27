@@ -3,6 +3,7 @@ import 'dart:ui' show Color;
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart' show rootBundle;
+import 'quran_service.dart';
 
 /// One run of ayah text that shares a single tajweed rule (or none).
 class TajweedSegment {
@@ -157,11 +158,11 @@ class TajweedService {
   /// codepoints the Mushaf font shapes differently. Left alone, the tags
   /// print literally and the odd letters break the joining of the word
   /// they sit in.
-  static String _normalize(String s) => s
+  static String _normalize(String s) => QuranService.fixForQuranFont(s
       .replaceAll(RegExp(r'</?tajweed[^>]*>'), '')
       .replaceAll('‌', '') //          ZWNJ — blocks Arabic joining
       .replaceAll('ٲ', 'ٰ') //    alef w/ wavy hamza -> superscript alef
-      .replaceAll('ٮ', 'ى'); //   dotless beh -> alef maqsura
+      .replaceAll('ٮ', 'ى')); //  dotless beh -> alef maqsura
 
   /// Tajweed-coloured segments for an ayah, or null when unavailable
   /// (asset missing, or the ayah isn't in the data).

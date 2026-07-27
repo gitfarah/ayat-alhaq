@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -739,7 +737,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 textAlign: TextAlign.right,
                 textDirection: TextDirection.rtl,
                 style: TextStyle(
-                    fontFamily: 'Almarai',
+                    fontFamily: 'QuranHafs',
                     fontSize: 16,
                     color: textColor)),
             leading: Text('ص ${_ar(QuranPageMeta.surahStartPages[i])}',
@@ -831,7 +829,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'Almarai',
+                      fontFamily: 'QuranHafs',
                       color:
                           isDark ? AppColors.darkText : AppColors.textPrimary)),
               const Divider(height: 24),
@@ -1213,14 +1211,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         onTap: () => _setBars(!_barsVisible),
         onScaleStart: _onScaleStart,
         onScaleUpdate: _onScaleUpdate,
-        // No SafeArea here: the page pads itself around the floating
-        // bars, which already sit inside the safe area.
-        child: !_wide || base + 1 > 604
-            ? _buildTextPage(base, isDark)
-            : Row(children: [
-                Expanded(child: _buildTextPage(base + 1, isDark)),
-                Expanded(child: _buildTextPage(base, isDark)),
-              ]),
+        child: SafeArea(
+          child: !_wide || base + 1 > 604
+              ? _buildTextPage(base, isDark)
+              : Row(children: [
+                  Expanded(child: _buildTextPage(base + 1, isDark)),
+                  Expanded(child: _buildTextPage(base, isDark)),
+                ]),
+        ),
       );
     }
 
@@ -1389,7 +1387,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              fontFamily: 'Almarai',
+                              fontFamily: 'QuranHafs',
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
                               color: headerText,
@@ -1530,13 +1528,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           }
         }
 
-        // The bars FLOAT over the page, so the text has to start below
-        // the top bar and end above the nav bar — otherwise the first
-        // surah frame slides under the header and is cut off.
-        final inset = MediaQuery.paddingOf(context);
         return SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-              14, inset.top + _topBarHeight + 10, 14, inset.bottom + 88),
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
           physics: const ClampingScrollPhysics(),
           child: Container(
             width: double.infinity,
@@ -1576,9 +1569,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     TextSpan(children: [
                       for (final a in block) ..._ayahSpans(a, isDark, fontSize),
                     ]),
-                    // Right-aligned, not justified: justification pulls
-                    // Arabic words apart and breaks the line's flow.
-                    textAlign: TextAlign.right,
+                    // Justified edge to edge, like the printed page.
+                    textAlign: TextAlign.justify,
                     textDirection: TextDirection.rtl,
                     style: TextStyle(
                         fontFamily: 'QuranHafs',
@@ -1595,10 +1587,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       },
     );
   }
-
-  /// Height of the floating top bar (back/page row plus the juz-hizb
-  /// strip), excluding the status-bar inset.
-  static const double _topBarHeight = 96;
 
   /// Name band for a surah starting on a reflowing text page — the same
   /// ornamental cartouche the reader uses, not a plain box.
@@ -1665,25 +1653,16 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   color: seg.isPlain
                       ? null
                       : TajweedService.colorFor(seg.rule))),
-      // The end-of-ayah mark is drawn, not typed: U+06DD leaves the
-      // number sitting BESIDE the ornament in most fonts instead of
-      // enclosed by it, which is not how a Mushaf prints it.
-      //
-      // A WidgetSpan is directionally NEUTRAL, so in an RTL paragraph
-      // the marks drift out of reading order and end up beside the wrong
-      // ayah. The RLM on either side pins each one to the RTL run it
-      // belongs to, and the spaces keep it off the neighbouring words.
-      const TextSpan(text: '‏ '),
-      WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: _AyahNumberMark(
-          number: _ar(a.numberInSurah),
-          size: fontSize * 1.35,
-          color: isDark ? AppColors.darkPrimary : AppColors.primary,
-          textColor: isDark ? AppColors.darkText : AppColors.textPrimary,
-        ),
-      ),
-      const TextSpan(text: ' ‏'),
+      // End-of-ayah mark: bare Arabic-Indic digits. The KFGQPC HAFS
+      // font itself sets them inside the ornate medallion — that is its
+      // own convention — and unlike a drawn WidgetSpan (directionally
+      // neutral, so it drifts out of reading order in an RTL paragraph)
+      // real digits take part in the bidi algorithm and always land
+      // beside their own ayah.
+      TextSpan(
+          text: ' ${_ar(a.numberInSurah)} ',
+          recognizer: recognizer,
+          style: TextStyle(backgroundColor: bg)),
     ];
   }
 
@@ -2065,81 +2044,3 @@ class _AyahMarkPainter extends CustomPainter {
   }
 }
 
-/// The printed end-of-ayah medallion: a gold rosette with the ayah
-/// number sitting INSIDE it.
-class _AyahNumberMark extends StatelessWidget {
-  final String number;
-  final double size;
-  final Color color;
-  final Color textColor;
-
-  const _AyahNumberMark({
-    required this.number,
-    required this.size,
-    required this.color,
-    required this.textColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: size * 0.1),
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: CustomPaint(
-          painter: _RosettePainter(color),
-          child: Center(
-            child: Text(
-              number,
-              textDirection: TextDirection.rtl,
-              style: TextStyle(
-                fontFamily: 'Almarai',
-                // Long numbers (٢٨٦) have to shrink to stay inside.
-                fontSize: size * (number.length > 2 ? 0.38 : 0.46),
-                fontWeight: FontWeight.bold,
-                color: textColor,
-                height: 1,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Eight-lobed rosette, the shape Mushaf printers use for the ayah mark.
-class _RosettePainter extends CustomPainter {
-  final Color color;
-
-  const _RosettePainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = size.center(Offset.zero);
-    final r = size.width / 2;
-    final petal = r * 0.30;
-    final ring = r - petal * 0.75;
-
-    final fill = Paint()..color = color.withValues(alpha: 0.13);
-    final stroke = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(0.8, r * 0.07)
-      ..color = color;
-
-    // Eight lobes around the rim, then the rim itself on top of them.
-    for (var i = 0; i < 8; i++) {
-      final a = i * math.pi / 4;
-      final o = Offset(c.dx + ring * math.cos(a), c.dy + ring * math.sin(a));
-      canvas.drawCircle(o, petal, fill);
-      canvas.drawCircle(o, petal, stroke);
-    }
-    canvas.drawCircle(
-        c, ring * 0.86, Paint()..color = color.withValues(alpha: 0.10));
-    canvas.drawCircle(c, ring * 0.86, stroke);
-  }
-
-  @override
-  bool shouldRepaint(_RosettePainter old) => old.color != color;
-}

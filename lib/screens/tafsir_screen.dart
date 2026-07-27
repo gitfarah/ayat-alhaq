@@ -172,7 +172,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
             color: bodyText,
             fontWeight: FontWeight.bold,
             fontSize: 18,
-            fontFamily: 'Almarai',
+            fontFamily: 'QuranHafs',
           ),
         ),
         centerTitle: true,
@@ -226,6 +226,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
                     'سورة ${widget.surahName} - آية ${_toArabicNumber(widget.ayahNumber)}',
                     style: const TextStyle(
                       color: Colors.white70,
+                      fontFamily: 'QuranHafs',
                       fontSize: 12,
                     ),
                   ),

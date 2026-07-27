@@ -40,7 +40,27 @@ class QuranService {
     _rawAyahs = [
       for (final s in list) (s['ayahs'] as List).cast<List<dynamic>>(),
     ];
+    // Adapt the text to the KFGQPC HAFS font's own encoding — see
+    // [fixForQuranFont].
+    for (final surah in _rawAyahs!) {
+      for (final t in surah) {
+        t[5] = fixForQuranFont(t[5] as String);
+      }
+    }
   }
+
+  /// Re-encodes marks the KFGQPC HAFS font cannot shape.
+  ///
+  /// Verified against the font (v0.18): it has no mark support for
+  /// U+06DF, U+06E3 and U+06EB — each renders as a bold ring on a
+  /// dotted circle instead of combining. The KFGQPC's own text writes
+  /// the silent-letter circle (U+06DF, as in كَفَرُوا۟) as a plain
+  /// sukun, which this font draws AS the small circle; the other two
+  /// appear in three words in the whole Quran and are dropped.
+  static String fixForQuranFont(String s) => s
+      .replaceAll('۟', 'ْ')
+      .replaceAll('ۣ', '')
+      .replaceAll('۫', '');
 
   static Future<List<Surah>> getAllSurahs({bool forceRefresh = false}) async {
     await _ensureLoaded();

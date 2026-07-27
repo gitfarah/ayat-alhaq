@@ -154,7 +154,7 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
                                       style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
-                                          fontFamily: 'Almarai',
+                                          fontFamily: 'QuranHafs',
                                           color: isDark
                                               ? AppColors.darkText
                                               : AppColors.textPrimary)),
