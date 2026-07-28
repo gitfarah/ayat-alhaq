@@ -69,17 +69,28 @@ class _HomeScreenState extends State<HomeScreen> {
     // Diacritic- and prefix-insensitive surah filter: the data's names
     // are fully vocalized (سُورَةُ ٱلْفَاتِحَةِ) while users type plain
     // letters — raw contains() almost never matched.
-    final norm = QuranService.normalizeArabic(query)
-        .replaceFirst(RegExp(r'^سورة\s*'), '');
+    final norm = QuranService.searchKey(query);
+    // A surah can be reached by its number typed on either keyboard.
+    final digits = query.replaceAllMapped(
+        RegExp('[٠-٩]'),
+        (m) => String.fromCharCode(m[0]!.codeUnitAt(0) - 0x0660 + 0x30));
+    final asNumber = int.tryParse(digits);
+    final latin = QuranService.latinKey(query);
+
     setState(() {
       _filtered = query.isEmpty
           ? _all
           : _all.where((s) {
-              final name = QuranService.normalizeArabic(s.name)
-                  .replaceFirst(RegExp(r'^سورة\s*'), '');
-              return (norm.isNotEmpty && name.contains(norm)) ||
-                  s.englishName.toLowerCase().contains(query.toLowerCase()) ||
-                  s.number.toString() == query;
+              final name = QuranService.searchKey(s.name);
+              final noAl = name.replaceFirst(RegExp(r'^ل'), '');
+              return (norm.isNotEmpty &&
+                      (name.contains(norm) ||
+                          noAl.contains(norm.replaceFirst(RegExp(r'^ل'), '')))) ||
+                  (latin.isNotEmpty &&
+                      (QuranService.latinKey(s.englishName).contains(latin) ||
+                          QuranService.latinKey(s.englishNameTranslation)
+                              .contains(latin))) ||
+                  s.number == asNumber;
             }).toList();
     });
 

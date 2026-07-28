@@ -51,16 +51,28 @@ class QuranService {
 
   /// Re-encodes marks the KFGQPC HAFS font cannot shape.
   ///
-  /// Verified against the font (v0.18): it has no mark support for
-  /// U+06DF, U+06E3 and U+06EB — each renders as a bold ring on a
-  /// dotted circle instead of combining. The KFGQPC's own text writes
-  /// the silent-letter circle (U+06DF, as in كَفَرُوا۟) as a plain
-  /// sukun, which this font draws AS the small circle; the other two
-  /// appear in three words in the whole Quran and are dropped.
+  /// Verified against the font (v0.18) by rendering each mark used in
+  /// the whole text:
+  ///
+  ///  * U+06DF, U+06E3, U+06EB have no mark support at all — each draws
+  ///    as a bold ring on a dotted circle instead of combining. The
+  ///    KFGQPC's own text writes the silent-letter circle (U+06DF, as
+  ///    in كَفَرُوا۟) as a plain sukun, which this font draws AS that
+  ///    circle; the other two appear in three words in the whole Quran.
+  ///
+  ///  * U+06ED (small low meem, ikhfa) and U+06E2 (small high meem,
+  ///    iqlab) carry no positioning against a tanween, so they land on
+  ///    top of it and the pair renders as one smudged blob — the "م
+  ///    mixed into the letter" in هُدًۭى and عَذَابٌۭ شَدِيدٌۭ. The
+  ///    font has none of the stacked-tanween codepoints (U+08F0-08F2)
+  ///    that would carry the same rule, so the marks are dropped; the
+  ///    tajweed colouring conveys ikhfa and iqlab instead.
   static String fixForQuranFont(String s) => s
       .replaceAll('۟', 'ْ')
       .replaceAll('ۣ', '')
-      .replaceAll('۫', '');
+      .replaceAll('۫', '')
+      .replaceAll('ۭ', '')
+      .replaceAll('ۢ', '');
 
   static Future<List<Surah>> getAllSurahs({bool forceRefresh = false}) async {
     await _ensureLoaded();
@@ -175,14 +187,17 @@ class QuranService {
     if (words.length <= 4) return text;
     const target = ['بسم', 'الله', 'الرحمن', 'الرحيم'];
     for (var i = 0; i < 4; i++) {
-      if (_bareLetters(words[i]) != target[i]) return text;
+      if (_bareLetters(words[i]) != _bareLetters(target[i])) return text;
     }
     return words.sublist(4).join(' ');
   }
 
-  /// Reduces an Arabic word to its bare letters: strips tashkeel and
-  /// other combining marks, drops tatweel, and folds alef variants
-  /// (wasla, madda, hamza forms) into a plain alef.
+  /// Folds a word to the bare letter skeleton used for searching.
+  ///
+  /// Beyond dropping the vowel marks, letters that a reader types one
+  /// way and the Mushaf spells another are folded together — otherwise
+  /// searching ٱلَّذِى for "الذي", or البقرة for "البقره", finds
+  /// nothing at all, which is what made the search feel broken.
   static String _bareLetters(String word) {
     final b = StringBuffer();
     for (final r in word.runes) {
@@ -192,10 +207,28 @@ class QuranService {
           (r >= 0x06D6 && r <= 0x06ED) ||
           r == 0x0640; // tatweel
       if (isMark) continue;
-      if (r == 0x0671 || r == 0x0622 || r == 0x0623 || r == 0x0625) {
-        b.write('ا');
-      } else {
-        b.writeCharCode(r);
+      switch (r) {
+        // Every alef is dropped, not folded to one letter. The Mushaf
+        // writes the long a as a superscript alef where a reader types
+        // a full one (ٱلْعَٰلَمِينَ against العالمين) and omits one
+        // where a reader types none (ٱلرَّحْمَٰنِ against الرحمن), so
+        // no single spelling of it can match both — removing it does.
+        case 0x0627: // ا
+        case 0x0671: // ٱ wasla
+        case 0x0622: // آ
+        case 0x0623: // أ
+        case 0x0625: // إ
+        case 0x0670: // superscript (dagger) alef
+          break;
+        case 0x0649: // ى alef maqsura -> ya
+        case 0x0626: // ئ
+          b.write('ي');
+        case 0x0624: // ؤ
+          b.write('و');
+        case 0x0629: // ة ta marbuta -> ha
+          b.write('ه');
+        default:
+          b.writeCharCode(r);
       }
     }
     return b.toString();
@@ -269,22 +302,44 @@ class QuranService {
   /// "فاتحة" all find سُورَةُ ٱلْفَاتِحَةِ.
   static Future<List<Surah>> searchSurahs(String query) async {
     await _ensureLoaded();
-    var q = normalizeArabic(query);
-    q = q.replaceFirst(RegExp(r'^سورة\s*'), '');
+    final q = searchKey(query);
     if (q.isEmpty) return [];
-    final qNoAl = q.replaceFirst(RegExp(r'^ال'), '');
+    // The definite article is optional: "بقرة" should find البقرة.
+    // After normalization the alef is gone, so it reads as a bare lam.
+    final qNoAl = q.replaceFirst(RegExp(r'^ل'), '');
+    final latin = latinKey(query);
     final results = <Surah>[];
     for (final s in _surahCache!) {
-      final name =
-          normalizeArabic(s.name).replaceFirst(RegExp(r'^سورة\s*'), '');
-      final nameNoAl = name.replaceFirst(RegExp(r'^ال'), '');
+      final name = searchKey(s.name);
+      final nameNoAl = name.replaceFirst(RegExp(r'^ل'), '');
       if (name.contains(q) ||
           (qNoAl.isNotEmpty && nameNoAl.contains(qNoAl)) ||
-          s.englishName.toLowerCase().contains(query.trim().toLowerCase())) {
+          (latin.isNotEmpty &&
+              (latinKey(s.englishName).contains(latin) ||
+                  latinKey(s.englishNameTranslation).contains(latin)))) {
         results.add(s);
       }
     }
     return results;
+  }
+
+  /// A surah name reduced for matching: bare letters, with the "سورة"
+  /// prefix the data carries removed so a reader can type either form.
+  static String searchKey(String s) => normalizeArabic(s)
+      .replaceFirst(RegExp('^${_bareLetters('سورة')}\\s*'), '')
+      .trim();
+
+  /// A transliterated name reduced for matching. Transliteration is not
+  /// standardised — the data says "Al-Faatiha" and "Al-Baqara" where a
+  /// reader types "Fatihah" and "Baqarah" — so doubled vowels, the
+  /// hyphen and a trailing h are all folded away.
+  static String latinKey(String s) {
+    final letters = s.toLowerCase().replaceAll(RegExp('[^a-z]'), '');
+    final b = StringBuffer();
+    for (var i = 0; i < letters.length; i++) {
+      if (i == 0 || letters[i] != letters[i - 1]) b.write(letters[i]);
+    }
+    return b.toString().replaceFirst(RegExp('h\$'), '');
   }
 
   /// Full-text ayah search over the BUNDLED text — works offline.
@@ -304,20 +359,35 @@ class QuranService {
         ],
     ];
 
+    // Phrase first, then — if that finds little — ayahs carrying every
+    // word anywhere in them. Typing three words a reader half-remembers
+    // rarely reproduces their exact order and spacing, and a phrase-only
+    // search answers that with nothing at all.
     final results = <AyahSearchResult>[];
-    for (var s = 0; s < _searchIndex!.length; s++) {
-      final texts = _searchIndex![s];
-      for (var i = 0; i < texts.length; i++) {
-        if (texts[i].contains(normQuery)) {
+    final seen = <int>{};
+
+    void collect(bool Function(String) matches) {
+      for (var s = 0; s < _searchIndex!.length; s++) {
+        final texts = _searchIndex![s];
+        for (var i = 0; i < texts.length; i++) {
+          final key = s * 1000 + i;
+          if (seen.contains(key) || !matches(texts[i])) continue;
+          seen.add(key);
           results.add(AyahSearchResult(
             surahNumber: s + 1,
             surahName: _surahCache![s].name,
             numberInSurah: _rawAyahs![s][i][1] as int,
             text: _rawAyahs![s][i][5] as String,
           ));
-          if (results.length >= 300) return results;
+          if (results.length >= 300) return;
         }
       }
+    }
+
+    collect((t) => t.contains(normQuery));
+    final words = normQuery.split(' ').where((w) => w.length > 1).toList();
+    if (results.length < 300 && words.length > 1) {
+      collect((t) => words.every(t.contains));
     }
     return results;
   }

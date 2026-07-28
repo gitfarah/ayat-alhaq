@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -53,6 +51,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   final Map<int, Future<List<PageAyah>>> _textFutures = {};
   final Map<int, LongPressGestureRecognizer> _textRecognizers = {};
 
+  /// Measured fit sizes for the reflowing pages, keyed by page and box.
+  final Map<String, double> _fitCache = {};
+
+  /// Page artwork with its medallions tinted, keyed by page number.
+  final Map<int, String> _tintedCache = {};
+
   bool _isCachedOffline = false;
   bool _barsVisible = true;
   List<Bookmark> _bookmarks = [];
@@ -81,11 +85,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     if (d.pointerCount < 2) return; // one finger = swipe/tap, not zoom
     final next = (_zoomStart * d.scale).clamp(_minZoom, _maxZoom);
     if ((next - _zoom).abs() > 0.005) setState(() => _zoom = next);
-  }
-
-  /// Returns to the fitted page (used when turning a page).
-  void _resetZoom() {
-    if (_isZoomed) setState(() => _zoom = 1.0);
   }
 
   /// Tap feedback: the just-tapped ayah flashes briefly so the user
@@ -1154,15 +1153,19 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             child: PageView.builder(
               controller: _pageCtrl,
               reverse: true,
-              // While the page is zoomed in, a drag should pan the page
-              // rather than flip to the next one.
-              physics: _isZoomed
+              // A zoomed page IMAGE has to be panned, so a drag there
+              // must not flip the page. The reflowing text reflows to
+              // the width instead of overflowing it, so it keeps its
+              // page turns at every zoom level.
+              physics: _isZoomed && !MushafSvgService.edition.isText
                   ? const NeverScrollableScrollPhysics()
                   : const PageScrollPhysics(),
               itemCount: _pageCount,
               onPageChanged: (i) {
                 _setBars(false);
-                _resetZoom();
+                // The zoom level deliberately CARRIES to the next page:
+                // a reader who enlarged the type wants it enlarged for
+                // the rest of the reading, not reset every turn.
                 _onPageSettled(_pageForIndex(i));
               },
               itemBuilder: (ctx, i) => _buildPageItem(i, isDark),
@@ -1515,31 +1518,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     color: isDark ? AppColors.darkPrimary : AppColors.primary));
           }
           final ayahs = snap.data!;
-          // The type size IS the zoom. Its baseline is chosen so this
-          // page's own text roughly FILLS the box it is typeset into:
-          // a paragraph's ink area is (character count x glyph box) and
-          // the glyph box grows with the square of the type size, so
-          // the size that fills width x height is the square root of
-          // the area available per character. Width alone was not
-          // enough — on a large tablet it left a short block of text
-          // floating above an empty screen.
-          // Only BASE characters occupy width — with full tashkeel
-          // nearly half the code units are combining marks, and counting
-          // those had the estimate land at half the intended size.
-          var chars = 60; // headers and margins
-          for (final a in ayahs) {
-            chars += 4; // ayah marker and surrounding spaces
-            for (final cp in a.text.runes) {
-              final mark = (cp >= 0x064B && cp <= 0x065F) ||
-                  cp == 0x0670 ||
-                  (cp >= 0x06D6 && cp <= 0x06ED);
-              if (!mark) chars++;
-            }
-          }
-          final base = math
-              .sqrt(constraints.maxWidth * constraints.maxHeight / chars)
-              .clamp(19.0, 46.0);
-          final fontSize = base * _zoom;
 
           // Split the page into runs of consecutive ayahs from the same
           // surah; a page can start mid-surah and finish inside the next.
@@ -1552,6 +1530,15 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               blocks.last.add(a);
             }
           }
+
+          // The type size IS the zoom, and its baseline is the size at
+          // which THIS page's text fills the box it is typeset into.
+          // That is measured, not estimated: the text is laid out at
+          // trial sizes until the largest one that still fits is found.
+          // Guessing from a character count was never going to be right
+          // for every page — pages hold anywhere from 7 to 25 lines.
+          final base = _fitFontSize(page, blocks, constraints);
+          final fontSize = base * _zoom;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
@@ -1619,6 +1606,107 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         },
       );
     });
+  }
+
+  /// The page artwork with its ayah medallions tinted.
+  ///
+  /// The artwork draws every ayah-end medallion in one group, so giving
+  /// that group a fill colours them all and leaves the script black —
+  /// the same distinction a printed Mushaf makes. Memoised: the source
+  /// is around 600 KB and the PageView rebuilds constantly.
+  String _tintedSvg(MushafPageData data) {
+    final key = data.pageNumber;
+    final hit = _tintedCache[key];
+    if (hit != null) return hit;
+
+    const gold = '#B8892B';
+    const ink = 'fill="#231f20"';
+    final svg = data.svgContent;
+    var out = svg;
+
+    // Each medallion path sets its own fill, so a fill on the group
+    // would be overridden — the colour has to be swapped path by path,
+    // and only inside the marker group. The page's script is one more
+    // path with the same fill just outside it.
+    const open = '<g id="ayah_markers"';
+    final start = svg.indexOf(open);
+    if (start >= 0) {
+      var depth = 0, end = -1;
+      for (var i = start; i < svg.length; i++) {
+        if (svg.startsWith('<g', i)) {
+          depth++;
+        } else if (svg.startsWith('</g>', i)) {
+          depth--;
+          if (depth == 0) {
+            end = i + 4;
+            break;
+          }
+        }
+      }
+      if (end > start) {
+        out = svg.substring(0, start) +
+            svg.substring(start, end).replaceAll(ink, 'fill="$gold"') +
+            svg.substring(end);
+      }
+    }
+
+    _tintedCache[key] = out;
+    if (_tintedCache.length > 6) _tintedCache.remove(_tintedCache.keys.first);
+    return out;
+  }
+
+  /// Largest type size at which [blocks] still fit [constraints], found
+  /// by binary search over an actual text layout.
+  ///
+  /// Cached per page and box: the search costs a dozen layouts, and a
+  /// PageView rebuilds its children constantly while swiping.
+  double _fitFontSize(
+      int page, List<List<PageAyah>> blocks, BoxConstraints constraints) {
+    final key = '$page:${constraints.maxWidth.round()}'
+        'x${constraints.maxHeight.round()}';
+    final cached = _fitCache[key];
+    if (cached != null) return cached;
+
+    // The page's own furniture: card padding, and per surah opening a
+    // name frame and a Basmala line.
+    const cardPadding = 32.0 + 16.0;
+    final openings =
+        blocks.where((b) => b.first.numberInSurah == 1).length;
+    final width = constraints.maxWidth - 28 - 28;
+    final height = constraints.maxHeight - cardPadding - 32;
+
+    double textHeight(double size) {
+      var total = openings * size * 3.4; // frame + Basmala line
+      for (final block in blocks) {
+        final painter = TextPainter(
+          textDirection: TextDirection.rtl,
+          textAlign: TextAlign.justify,
+          text: TextSpan(
+            style: TextStyle(
+                fontFamily: 'QuranHafs', fontSize: size, height: 2.0),
+            children: [
+              for (final a in block)
+                TextSpan(text: '${a.text} ${_ar(a.numberInSurah)} '),
+            ],
+          ),
+        )..layout(maxWidth: width);
+        total += painter.height + 6;
+      }
+      return total;
+    }
+
+    var lo = 16.0, hi = 64.0;
+    for (var i = 0; i < 12; i++) {
+      final mid = (lo + hi) / 2;
+      if (textHeight(mid) <= height) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+    _fitCache[key] = lo;
+    if (_fitCache.length > 24) _fitCache.remove(_fitCache.keys.first);
+    return lo;
   }
 
   /// Name band for a surah starting on a reflowing text page — the same
@@ -1691,10 +1779,16 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       // neutral, so it drifts out of reading order in an RTL paragraph)
       // real digits take part in the bidi algorithm and always land
       // beside their own ayah.
+      // Tinted, so the medallions read as marks between ayahs rather
+      // than as part of the script — as a printed Mushaf prints them.
       TextSpan(
           text: ' ${_ar(a.numberInSurah)} ',
           recognizer: recognizer,
-          style: TextStyle(backgroundColor: bg)),
+          style: TextStyle(
+              backgroundColor: bg,
+              color: isDark
+                  ? AppColors.darkSecondary
+                  : const Color(0xFFB8892B))),
     ];
   }
 
@@ -1767,9 +1861,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           1,
                           0,
                         ]),
-                        child: SvgPicture.string(data.svgContent,
+                        child: SvgPicture.string(_tintedSvg(data),
                             fit: BoxFit.contain))
-                    : SvgPicture.string(data.svgContent, fit: BoxFit.contain),
+                    : SvgPicture.string(_tintedSvg(data), fit: BoxFit.contain),
               ),
               // Tint marked ayahs using their exact polygon outlines (a
               // bounding-box tint would bleed onto neighbouring ayahs
