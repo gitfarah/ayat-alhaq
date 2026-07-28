@@ -81,8 +81,18 @@ class SurahBannerPainter extends CustomPainter {
       canvas.drawRRect(outer, rulePaint);
 
       // ── Inner cartouche (hexagonal, pointed ends) ─────────────────
-      final cw = (right - left) * 0.56; // cartouche width
-      final cx = (left + right) / 2;
+      //
+      // Sized to the NAME, not to a fixed share of the band. Surah names
+      // differ hugely in length (ٱلْأَعْرَاف against ٱلنَّاس) and each
+      // riwayah sets them at its own size, so a fixed width either
+      // crowded the long ones or left the short ones adrift. The
+      // measured ink is centred inside the cartouche by construction.
+      final inkLeft = (b.left - minX) * scaleX;
+      final inkRight = (b.right - minX) * scaleX;
+      final cx = (inkLeft + inkRight) / 2;
+      final maxW = (right - left) * 0.78;
+      final cw = math.min(
+          maxW, math.max((inkRight - inkLeft) + inkH * 2.6, inkH * 5));
       final cLeft = cx - cw / 2;
       final cRight = cx + cw / 2;
       final inset = h * 0.13;

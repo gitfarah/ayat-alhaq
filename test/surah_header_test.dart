@@ -8,7 +8,7 @@ void main() {
 
   // Every riwayah breaks its lines differently, so each ships its own
   // measured set and each must be complete.
-  for (final edition in ['hafs', 'warsh', 'qalon']) {
+  for (final edition in ['hafs', 'warsh', 'qalon', 'shubah', 'douri']) {
     group('Surah header bands ($edition)', () {
       setUpAll(() async => SurahHeaderService.load(edition));
 

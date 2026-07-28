@@ -211,10 +211,13 @@ class QuranAudioService extends ChangeNotifier {
     try {
       _docsDir ??= await getApplicationDocumentsDirectory();
       final f = File('${_docsDir!.path}${Platform.pathSeparator}media_art.png');
-      if (!await f.exists()) {
-        final bytes = await rootBundle.load('assets/icon/media_art.png');
-        await f.writeAsBytes(bytes.buffer.asUint8List(), flush: true);
-      }
+      // Rewritten on every launch rather than only when missing. The
+      // old code kept whatever it had copied out the first time, so a
+      // device that had run an earlier build went on showing the icon
+      // from that build on the lock screen no matter how often the
+      // asset changed. This costs one small write per app start.
+      final bytes = await rootBundle.load('assets/icon/media_art.png');
+      await f.writeAsBytes(bytes.buffer.asUint8List(), flush: true);
       _artUri = Uri.file(f.path);
     } catch (_) {
       _artUri = null;

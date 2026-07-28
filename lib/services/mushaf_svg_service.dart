@@ -140,6 +140,12 @@ class MushafSvgService {
     MushafEdition('qalon', 'مصحف قالون', 'Qalon',
         hintAr: 'رواية قالون عن نافع',
         hintEn: 'Riwayat Qālūn ʿan Nāfiʿ'),
+    MushafEdition('shubah', 'مصحف شعبة', 'Shubah',
+        hintAr: 'رواية شعبة عن عاصم',
+        hintEn: 'Riwayat Shuʿbah ʿan ʿĀṣim'),
+    MushafEdition('douri', 'مصحف الدوري', 'Ad-Duri',
+        hintAr: 'رواية الدوري عن أبي عمرو',
+        hintEn: 'Riwayat ad-Dūrī ʿan Abī ʿAmr'),
     MushafEdition('text', 'نص متجاوب', 'Reflowing text',
         hintAr: 'يتكيّف مع التكبير وحجم الشاشة',
         hintEn: 'Reflows to the zoom level and screen size',
@@ -152,14 +158,16 @@ class MushafSvgService {
   static MushafEdition _edition = editions.first;
   static MushafEdition get edition => _edition;
 
-  /// Switches edition: clears the in-memory pages and re-points storage
-  /// so cached pages of different riwayat never mix.
+  /// Switches edition and re-points storage so cached pages of
+  /// different riwayat never mix. The in-memory pages are NOT cleared —
+  /// they are keyed by edition, so the previous riwayah's entries are
+  /// simply unreachable, and an in-flight preload landing after the
+  /// switch cannot be mistaken for the new edition's page.
   static void setEdition(String id) {
     final next = editions.firstWhere((e) => e.id == id,
         orElse: () => editions.first);
     if (next.id == _edition.id) return;
     _edition = next;
-    _memoryCache.clear();
     MushafFileStorage.edition = next.id;
   }
 
@@ -175,19 +183,28 @@ class MushafSvgService {
   static bool get supportsFullOfflineDownload =>
       !_edition.isText && MushafFileStorage.supportsFullOfflineDownload;
 
-  static final Map<int, MushafPageData> _memoryCache = {};
+  /// Decoded pages, keyed by "edition:page".
+  ///
+  /// Keyed by edition, not cleared on switch: preloads for the previous
+  /// edition are still in flight when the reader switches, and a plain
+  /// page-number key let one of them land AFTER the clear and hand the
+  /// old riwayah's artwork straight back to the new edition's request.
+  /// That is why a switch only seemed to take effect a page later.
+  static final Map<String, MushafPageData> _memoryCache = {};
+
+  static String _cacheKey(int page) => '${_edition.id}:$page';
 
   static String _padded(int page) => page.toString().padLeft(3, '0');
 
   static Future<bool> isCached(int page) async {
-    if (_memoryCache.containsKey(page)) return true;
+    if (_memoryCache.containsKey(_cacheKey(page))) return true;
     return MushafFileStorage.hasPage(page);
   }
 
   /// Loads a page: memory cache -> disk/web cache -> network, in order.
   static Future<MushafPageData> getPage(int page) async {
-    if (_memoryCache.containsKey(page)) {
-      return _memoryCache[page]!;
+    if (_memoryCache.containsKey(_cacheKey(page))) {
+      return _memoryCache[_cacheKey(page)]!;
     }
 
     final cachedSvg = await MushafFileStorage.readSvg(page);
@@ -252,7 +269,7 @@ class MushafSvgService {
       viewBoxHeight: n(4, 235),
     );
 
-    _memoryCache[page] = data;
+    _memoryCache[_cacheKey(page)] = data;
     // Cap the in-memory cache: each page's SVG string is ~0.6 MB, and a
     // swipe through the whole Mushaf must not accumulate 350 MB of RAM.
     // Insertion order ≈ recency here (pages are re-fetched from disk
@@ -267,7 +284,7 @@ class MushafSvgService {
   static Future<void> preload(int page) async {
     if (page < 1 || page > totalPages) return;
     try {
-      if (_memoryCache.containsKey(page)) return;
+      if (_memoryCache.containsKey(_cacheKey(page))) return;
       if (await isCached(page)) return;
       await getPage(page);
     } catch (_) {

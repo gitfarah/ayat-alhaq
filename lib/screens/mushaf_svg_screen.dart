@@ -42,7 +42,13 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
   /// Per-index page-load futures so rebuilds don't refetch; pruned to
   /// the neighbourhood of the current page to keep memory flat.
-  final Map<int, Future<List<MushafPageData>>> _pageFutures = {};
+  /// Page loads in flight or done, by PageView index, each remembering
+  /// the edition it was started for. Comparing that on every build is
+  /// what makes an edition switch take effect immediately: relying on
+  /// the switch handler to clear the map meant any other route to a
+  /// change — or a rebuild that beat the clear — kept showing the old
+  /// riwayah until the reader turned a page.
+  final Map<int, (String, Future<List<MushafPageData>>)> _pageFutures = {};
 
   /// Same idea for the reflowing text edition, keyed by page number,
   /// plus its per-ayah long-press recognizers keyed by global ayah —
@@ -54,8 +60,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// Measured fit sizes for the reflowing pages, keyed by page and box.
   final Map<String, double> _fitCache = {};
 
-  /// Page artwork with its medallions tinted, keyed by page number.
-  final Map<String, String> _tintedCache = {};
+  /// Page artwork with its medallions tinted, held against the page
+  /// object itself. A key built from the page number and the CURRENT
+  /// edition looked right but was not: while a switch is loading, the
+  /// FutureBuilder still holds the previous edition's page, so the old
+  /// artwork got cached under the new edition's key and was served from
+  /// then on. An Expando cannot mix them up, and needs no eviction —
+  /// the entry dies with the page it belongs to.
+  final Expando<String> _tintedCache = Expando<String>('tinted mushaf page');
 
   bool _isCachedOffline = false;
   bool _barsVisible = true;
@@ -686,6 +698,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   }
 
   /// Loads the current edition's surah-name bands if they aren't in yet.
+  /// Called from build as well as from the switch, so the frames appear
+  /// however the edition came to change.
   void _loadHeaderBands() {
     final id = MushafSvgService.edition.id;
     if (SurahHeaderService.isLoaded(id)) return;
@@ -704,7 +718,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     setState(() {
       _pageFutures.clear();
       _textFutures.clear();
-      _tintedCache.clear();
       _fitCache.clear();
       _zoom = 1.0;
     });
@@ -1125,6 +1138,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     final s = context.watch<SettingsService>();
     final audio = context.watch<QuranAudioService>();
     final isDark = s.isDarkIn(context);
+    // The edition can change from anywhere; make sure its frames are on
+    // their way whenever this screen rebuilds.
+    _loadHeaderBands();
     final bgColor = isDark ? AppColors.darkBg : AppColors.background;
     final textColor = isDark ? AppColors.darkText : AppColors.textPrimary;
 
@@ -1229,15 +1245,21 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       );
     }
 
-    final future = _pageFutures[index] ??= () async {
-      final first = await MushafSvgService.getPage(base);
-      if (!_wide || base + 1 > 604) return [first];
-      try {
-        return [first, await MushafSvgService.getPage(base + 1)];
-      } catch (_) {
-        return [first];
-      }
-    }();
+    final edition = MushafSvgService.edition.id;
+    var entry = _pageFutures[index];
+    if (entry == null || entry.$1 != edition) {
+      entry = (edition, () async {
+        final first = await MushafSvgService.getPage(base);
+        if (!_wide || base + 1 > 604) return [first];
+        try {
+          return [first, await MushafSvgService.getPage(base + 1)];
+        } catch (_) {
+          return [first];
+        }
+      }());
+      _pageFutures[index] = entry;
+    }
+    final future = entry.$2;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -1617,12 +1639,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// the same distinction a printed Mushaf makes. Memoised: the source
   /// is around 600 KB and the PageView rebuilds constantly.
   String _tintedSvg(MushafPageData data) {
-    // Keyed by EDITION as well as page. The riwayat share page numbers,
-    // so keying on the number alone kept serving the PREVIOUS edition's
-    // artwork until the entry happened to be evicted — which is why
-    // switching only seemed to take effect a page or two later.
-    final key = '${MushafSvgService.edition.id}:${data.pageNumber}';
-    final hit = _tintedCache[key];
+    final hit = _tintedCache[data];
     if (hit != null) return hit;
 
     const gold = '#B8892B';
@@ -1656,8 +1673,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       }
     }
 
-    _tintedCache[key] = out;
-    if (_tintedCache.length > 6) _tintedCache.remove(_tintedCache.keys.first);
+    _tintedCache[data] = out;
     return out;
   }
 

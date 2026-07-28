@@ -17,14 +17,25 @@ class SurahHeaderBand {
   final double top;
   final double bottom;
 
+  /// Horizontal ink extent of the NAME itself. The frame is drawn from
+  /// this rather than at a fixed width, so it hugs the name it holds —
+  /// a long one like ٱلْأَعْرَاف is far wider than ٱلنَّاس, and every
+  /// riwayah sets them at its own size.
+  final double left;
+  final double right;
+
   const SurahHeaderBand({
     required this.surah,
     required this.page,
     required this.top,
     required this.bottom,
+    required this.left,
+    required this.right,
   });
 
   double get height => bottom - top;
+  double get width => right - left;
+  double get centreX => (left + right) / 2;
 }
 
 /// Loads the measured surah-header bands and serves them per page.
@@ -39,6 +50,8 @@ class SurahHeaderService {
     'hafs': 'assets/quran/surah_headers.json',
     'warsh': 'assets/quran/surah_headers_warsh.json',
     'qalon': 'assets/quran/surah_headers_qalon.json',
+    'shubah': 'assets/quran/surah_headers_shubah.json',
+    'douri': 'assets/quran/surah_headers_douri.json',
   };
 
   /// Editions that have measured bands (the reflowing text edition draws
@@ -70,6 +83,8 @@ class SurahHeaderService {
           page: e['p'] as int,
           top: (e['t'] as num).toDouble(),
           bottom: (e['b'] as num).toDouble(),
+          left: (e['l'] as num).toDouble(),
+          right: (e['r'] as num).toDouble(),
         );
         map.putIfAbsent(band.page, () => <SurahHeaderBand>[]).add(band);
       }
