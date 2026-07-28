@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/quran_page_meta.dart';
+import '../services/mushaf_glyph_service.dart';
 import '../services/mushaf_svg_service.dart';
 import '../services/quran_service.dart';
 import '../services/bookmark_service.dart';
@@ -130,6 +131,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     _audioService!.addListener(_followRecitation);
     // Ornamental surah-name frames (measured band positions, per edition).
     _loadHeaderBands();
+    // Page layout for the glyph-rendered edition.
+    if (!MushafGlyphService.isLayoutLoaded) {
+      MushafGlyphService.loadLayout().then((_) {
+        if (mounted) setState(() {});
+      });
+    }
     // Tajweed colouring for the reflowing text edition. Loaded up front
     // so flipping the setting is instant.
     if (!TajweedService.isLoaded) {
@@ -164,6 +171,13 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     context.read<SettingsService>().saveLastRead(page: basePage);
     KhatmaService.markPageRead(basePage);
     if (_wide && basePage + 1 <= 604) KhatmaService.markPageRead(basePage + 1);
+
+    if (MushafSvgService.edition.isGlyph) {
+      MushafGlyphService.preload(basePage);
+      final cached = MushafGlyphService.hasFont(basePage);
+      if (cached != _isCachedOffline) setState(() => _isCachedOffline = cached);
+      return;
+    }
 
     // The text edition is bundled — nothing to prefetch, and it is
     // offline by definition.
@@ -1245,6 +1259,21 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       );
     }
 
+    if (MushafSvgService.edition.isGlyph) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _setBars(!_barsVisible),
+        child: SafeArea(
+          child: !_wide || base + 1 > 604
+              ? _buildGlyphPage(base, isDark)
+              : Row(children: [
+                  Expanded(child: _buildGlyphPage(base + 1, isDark)),
+                  Expanded(child: _buildGlyphPage(base, isDark)),
+                ]),
+        ),
+      );
+    }
+
     final edition = MushafSvgService.edition.id;
     var entry = _pageFutures[index];
     if (entry == null || entry.$1 != edition) {
@@ -1527,6 +1556,168 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// zoom changes the TYPE size and the lines re-wrap to whatever the
   /// screen is — the text is always fully within the screen width, at
   /// any zoom and in any orientation.
+  /// A page of the KFGQPC V1 Mushaf, typeset from that page's own font.
+  ///
+  /// Unlike the artwork editions this is real text: the printed line
+  /// breaks are preserved exactly (they are baked into the font), but
+  /// it stays sharp at any zoom, and each ayah's position comes from
+  /// the text layout instead of from a polygon — so tapping, tinting
+  /// and the recitation highlight all work off the same spans.
+  Widget _buildGlyphPage(int page, bool isDark) {
+    final lines = MushafGlyphService.linesOf(page);
+    final ready = MushafGlyphService.hasFont(page);
+    if (!ready) {
+      // Kick the download off and repaint when the family lands.
+      MushafGlyphService.ensureFont(page).then((ok) {
+        if (mounted && ok) setState(() {});
+      });
+    }
+    final ink = isDark ? AppColors.darkText : AppColors.textPrimary;
+    final cream = isDark ? AppColors.darkSurfaceAlt : AppColors.mushafParchment;
+
+    if (lines.isEmpty || !ready) {
+      return Center(
+          child: CircularProgressIndicator(
+              color: isDark ? AppColors.darkPrimary : AppColors.primary));
+    }
+
+    return LayoutBuilder(builder: (context, constraints) {
+      // Same zoom model as the artwork editions: the page is drawn
+      // WIDER and read by scrolling, never dragged around in two
+      // dimensions. Here that costs nothing in sharpness.
+      final width = constraints.maxWidth * _zoom;
+      final height = width / (345 / 550);
+
+      final page0 = Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: cream,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+              color: AppColors.mushafBorderGold.withValues(alpha: 0.45)),
+        ),
+        padding: EdgeInsets.symmetric(
+            horizontal: width * 0.045, vertical: height * 0.02),
+        child: Column(
+          children: [
+            for (final line in lines)
+              Expanded(child: _buildGlyphLine(line, page, ink, isDark)),
+          ],
+        ),
+      );
+
+      final scrollable = _isZoomed || _isLandscapeCompact(context);
+      return GestureDetector(
+        onScaleStart: _onScaleStart,
+        onScaleUpdate: _onScaleUpdate,
+        child: SingleChildScrollView(
+          physics: scrollable
+              ? const ClampingScrollPhysics()
+              : const NeverScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: _isZoomed
+                    ? const ClampingScrollPhysics()
+                    : const NeverScrollableScrollPhysics(),
+                child: page0,
+              ),
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
+  /// One printed line. Ayah lines are stretched to the full measure —
+  /// that is how the page is set, and the font's glyphs are drawn for
+  /// exactly that width. Surah headers and the Basmalah are centred at
+  /// their natural size instead.
+  Widget _buildGlyphLine(
+      GlyphLine line, int page, Color ink, bool isDark) {
+    final family = line.usesSharedFont
+        ? MushafGlyphService.sharedFamily
+        : MushafGlyphService.familyFor(page);
+    final gold = isDark ? AppColors.darkSecondary : AppColors.mushafBorderGold;
+
+    if (line.spans.isEmpty) {
+      return FittedBox(
+        fit: BoxFit.contain,
+        child: Text(line.text,
+            textDirection: TextDirection.rtl,
+            style: TextStyle(
+                fontFamily: family,
+                fontSize: 40,
+                color: line.isHeader ? gold : ink)),
+      );
+    }
+
+    // Split the line at ayah boundaries so each ayah is its own span:
+    // that is what carries the tint and the long-press.
+    final spans = <InlineSpan>[];
+    var cursor = 0;
+    for (final s in line.spans) {
+      final start = s[2], len = s[3];
+      if (start > cursor) {
+        spans.add(TextSpan(
+            text: line.text.substring(cursor, start),
+            style: TextStyle(color: ink)));
+      }
+      spans.add(_glyphAyahSpan(
+          line.text.substring(start, start + len), s[0], s[1], ink, isDark));
+      cursor = start + len;
+    }
+    if (cursor < line.text.length) {
+      spans.add(TextSpan(
+          text: line.text.substring(cursor), style: TextStyle(color: ink)));
+    }
+
+    return FittedBox(
+      fit: BoxFit.fitWidth,
+      child: Text.rich(
+        TextSpan(children: spans),
+        textDirection: TextDirection.rtl,
+        style: TextStyle(fontFamily: family, fontSize: 40, color: ink),
+      ),
+    );
+  }
+
+  /// One ayah's stretch of a glyph line, tinted for the mark it carries
+  /// and long-pressable for the same options sheet as everywhere else.
+  InlineSpan _glyphAyahSpan(
+      String text, int surah, int ayah, Color ink, bool isDark) {
+    final region = AyahHitRegion(
+        surahNumber: surah, ayahNumber: ayah, x: 0, y: 0, rings: const []);
+    final bookmark = _bookmarkFor(region);
+    final highlight = _highlightFor(region);
+    final playing = _playingGlobalAyah != null &&
+        _regionGlobal(region) == _playingGlobalAyah;
+
+    Color? bg;
+    if (playing) {
+      bg = (isDark ? AppColors.darkSecondary : AppColors.secondary)
+          .withValues(alpha: isDark ? 0.30 : 0.16);
+    } else if (bookmark != null) {
+      bg = AppColors.highlight(bookmark.color)
+          .withValues(alpha: isDark ? 0.32 : 0.22);
+    } else if (highlight != null) {
+      bg = AppColors.highlight(highlight.color)
+          .withValues(alpha: isDark ? 0.35 : 0.25);
+    }
+
+    final recognizer = _textRecognizers.putIfAbsent(
+        _regionGlobal(region), () => LongPressGestureRecognizer())
+      ..onLongPress = () => _showAyahOptions(region);
+
+    return TextSpan(
+        text: text,
+        recognizer: recognizer,
+        style: TextStyle(color: ink, backgroundColor: bg));
+  }
+
   Widget _buildTextPage(int page, bool isDark) {
     final future = _textFutures[page] ??= QuranService.ayahsOnPage(page);
     final cream = isDark ? AppColors.darkSurfaceAlt : AppColors.mushafParchment;
