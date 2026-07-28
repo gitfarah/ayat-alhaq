@@ -67,12 +67,56 @@ class QuranService {
   ///    font has none of the stacked-tanween codepoints (U+08F0-08F2)
   ///    that would carry the same rule, so the marks are dropped; the
   ///    tajweed colouring conveys ikhfa and iqlab instead.
-  static String fixForQuranFont(String s) => s
+  static String fixForQuranFont(String s) => _joinMedialHamza(s
       .replaceAll('۟', 'ْ')
       .replaceAll('ۣ', '')
       .replaceAll('۫', '')
       .replaceAll('ۭ', '')
-      .replaceAll('ۢ', '');
+      .replaceAll('ۢ', ''));
+
+  /// A combining mark: it sits ON a letter and never breaks a join.
+  static bool _isDiacritic(int cp) =>
+      (cp >= 0x0610 && cp <= 0x061A) ||
+      (cp >= 0x064B && cp <= 0x065F) ||
+      cp == 0x0670 ||
+      (cp >= 0x06D6 && cp <= 0x06ED);
+
+  /// Arabic letters that do not join to the letter after them.
+  static const String _nonJoining = 'اأإآٱدذرزوةى';
+
+  /// Reconnects a hamza sitting INSIDE a word.
+  ///
+  /// The source spells ٱلْءَاخِرَةُ and لِءَادَمَ with a standalone
+  /// hamza (U+0621), which cannot join, so the Mushaf font breaks the
+  /// word open around it — لام, gap, floating ء. The KFGQPC pages join
+  /// it: the hamza rides a connecting stroke. Writing it the same way
+  /// (tatweel + U+0654) reproduces the printed page exactly and keeps
+  /// both the hamza and the alef of madd.
+  ///
+  /// Only hamzas after a letter that joins forward are touched — 280
+  /// places. At the start of a word, or after a non-joining letter like
+  /// و in سَوَآءٌ, a standalone hamza is what the page shows anyway.
+  static String _joinMedialHamza(String s) {
+    if (!s.contains('ء')) return s;
+    final b = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      final c = s[i];
+      if (c != 'ء') {
+        b.write(c);
+        continue;
+      }
+      var j = i - 1;
+      while (j >= 0 && _isDiacritic(s.codeUnitAt(j))) {
+        j--;
+      }
+      final prev = j >= 0 ? s.codeUnitAt(j) : 0;
+      final joins = prev >= 0x0620 &&
+          prev <= 0x064A &&
+          !_nonJoining.contains(s[j]);
+      b.write(joins ? 'ـٔ' : 'ء');
+    }
+    return b.toString();
+  }
 
   static Future<List<Surah>> getAllSurahs({bool forceRefresh = false}) async {
     await _ensureLoaded();

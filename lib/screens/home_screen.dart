@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:provider/provider.dart';
@@ -71,8 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // letters — raw contains() almost never matched.
     final norm = QuranService.searchKey(query);
     // A surah can be reached by its number typed on either keyboard.
-    final digits = query.replaceAllMapped(
-        RegExp('[٠-٩]'),
+    final digits = query.replaceAllMapped(RegExp('[٠-٩]'),
         (m) => String.fromCharCode(m[0]!.codeUnitAt(0) - 0x0660 + 0x30));
     final asNumber = int.tryParse(digits);
     final latin = QuranService.latinKey(query);
@@ -85,7 +84,8 @@ class _HomeScreenState extends State<HomeScreen> {
               final noAl = name.replaceFirst(RegExp(r'^ل'), '');
               return (norm.isNotEmpty &&
                       (name.contains(norm) ||
-                          noAl.contains(norm.replaceFirst(RegExp(r'^ل'), '')))) ||
+                          noAl.contains(
+                              norm.replaceFirst(RegExp(r'^ل'), '')))) ||
                   (latin.isNotEmpty &&
                       (QuranService.latinKey(s.englishName).contains(latin) ||
                           QuranService.latinKey(s.englishNameTranslation)
@@ -105,11 +105,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted || _search.text.trim() != query) return;
       setState(() => _ayahResults = res.take(30).toList());
     });
-  }
-
-  String _ar(int n) {
-    const d = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-    return n.toString().split('').map((c) => d[int.parse(c)]).join();
   }
 
   static const Map<int, int> _surahPage = {
@@ -230,6 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
   };
 
   void _openOptions(Surah surah) {
+    final l = L10n(context.read<SettingsService>().effectiveLanguage);
     final isDark = context.read<SettingsService>().isDarkIn(context);
     showModalBottomSheet(
       context: context,
@@ -240,68 +236,70 @@ class _HomeScreenState extends State<HomeScreen> {
       // screens.
       builder: (_) => SingleChildScrollView(
         child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2))),
-          Text(surah.name,
-              style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'QuranHafs',
-                  color: isDark ? AppColors.darkText : AppColors.textPrimary)),
-          Text(
-              '${surah.revelationType == 'Meccan' ? 'مكية' : 'مدنية'} • ${_ar(surah.numberOfAyahs)} آية',
-              style: TextStyle(
-                  color:
-                      isDark ? AppColors.darkTextSec : AppColors.textSecondary,
-                  fontFamily: 'Almarai')),
-          const SizedBox(height: 24),
-          // Fixed order in every language: Mushaf on the LEFT, the
-          // responsive reader on the RIGHT (pinned LTR so the app
-          // language can't reverse them).
-          Directionality(
-            textDirection: TextDirection.ltr,
-            child: Row(children: [
-              Expanded(
-                  child: _ModeBtn(
-                      icon: Icons.menu_book_rounded,
-                      label: 'المصحف',
-                      sub: 'قراءة بالصفحات',
-                      color: AppColors.primary,
-                      isDark: isDark,
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => MushafSvgScreen(
-                                    startPage:
-                                        _surahPage[surah.number] ?? 1)));
-                      })),
-              const SizedBox(width: 14),
-              Expanded(
-                  child: _ModeBtn(
-                      icon: Icons.format_align_right_rounded,
-                      label: 'الآيات',
-                      sub: 'قراءة متجاوبة',
-                      color: AppColors.accent,
-                      isDark: isDark,
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => ReaderScreen(surah: surah)));
-                      })),
-            ]),
-          ),
-        ]),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2))),
+            Text(surah.name,
+                style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'QuranHafs',
+                    color:
+                        isDark ? AppColors.darkText : AppColors.textPrimary)),
+            Text(
+                '${l(surah.revelationType == 'Meccan' ? 'meccan' : 'medinan')} • ${l.number(surah.numberOfAyahs)} ${l('ayahWord')}',
+                style: TextStyle(
+                    color: isDark
+                        ? AppColors.darkTextSec
+                        : AppColors.textSecondary,
+                    fontFamily: 'Almarai')),
+            const SizedBox(height: 24),
+            // Fixed order in every language: Mushaf on the LEFT, the
+            // responsive reader on the RIGHT (pinned LTR so the app
+            // language can't reverse them).
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: Row(children: [
+                Expanded(
+                    child: _ModeBtn(
+                        icon: Icons.menu_book_rounded,
+                        label: 'المصحف',
+                        sub: 'قراءة بالصفحات',
+                        color: AppColors.primary,
+                        isDark: isDark,
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => MushafSvgScreen(
+                                      startPage:
+                                          _surahPage[surah.number] ?? 1)));
+                        })),
+                const SizedBox(width: 14),
+                Expanded(
+                    child: _ModeBtn(
+                        icon: Icons.format_align_right_rounded,
+                        label: 'الآيات',
+                        sub: 'قراءة متجاوبة',
+                        color: AppColors.accent,
+                        isDark: isDark,
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => ReaderScreen(surah: surah)));
+                        })),
+              ]),
+            ),
+          ]),
         ),
       ),
     );
@@ -463,7 +461,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: isDark ? AppColors.darkText : AppColors.textPrimary)),
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Text('${r.surahName} • الآية ${_ar(r.numberInSurah)}',
+            child: Text(
+                '${r.surahName} • ${L10n.of(context)('ayahWord')} ${L10n.of(context).number(r.numberInSurah)}',
                 style: TextStyle(
                     color: isDark ? AppColors.darkPrimary : AppColors.primary,
                     fontFamily: 'QuranHafs',
@@ -476,17 +475,16 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Today's date in the Hijri (Umm al-Qura) calendar, with the
   /// Gregorian date as a secondary line.
   Widget _buildHijriDate(bool isDark) {
-    HijriCalendar.setLocal('ar');
+    // Both calendars follow the app language — month and weekday names
+    // as well as the digits.
+    final l = L10n.of(context);
     final h = HijriCalendar.now();
     final g = DateTime.now();
-    const gregorianMonths = [
-      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
-    ];
-    const weekdays = [
-      'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس',
-      'الجمعة', 'السبت', 'الأحد',
-    ];
+    final hijriLine = '${l.weekday(g.weekday)} ${l.number(h.hDay)} '
+        '${l.hijriMonth(h.hMonth)} ${l.number(h.hYear)} ${l.hijriEra}';
+    final gregorianLine = '${l.number(g.day)} '
+            '${l.gregorianMonth(g.month)} ${l.number(g.year)} ${l.gregorianEra}'
+        .trimRight();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -508,8 +506,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-              Text(
-                  '${weekdays[g.weekday - 1]} ${_ar(h.hDay)} ${h.longMonthName} ${_ar(h.hYear)} هـ',
+              Text(hijriLine,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -518,8 +515,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                       fontFamily: 'Almarai')),
-              Text(
-                  '${_ar(g.day)} ${gregorianMonths[g.month - 1]} ${_ar(g.year)} م',
+              Text(gregorianLine,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -585,7 +581,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontFamily: 'Almarai')),
                   if (s.lastSurah != null)
                     Text(
-                        'سورة رقم ${s.lastSurah}${s.lastAyah != null ? ' · الآية ${s.lastAyah}' : ''}',
+                        '${L10n.of(context)('surahNo')} ${L10n.of(context).number(s.lastSurah!)}${s.lastAyah != null ? ' · ${L10n.of(context)('ayahWord')} ${L10n.of(context).number(s.lastAyah!)}' : ''}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -672,7 +668,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               .withValues(alpha: isDark ? 0.55 : 0.5),
                           width: 1.2)),
                   child: Center(
-                      child: Text(_ar(surah.number),
+                      child: Text(L10n.of(context).number(surah.number),
                           style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
@@ -696,14 +692,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                 : AppColors.textPrimary)),
                     const SizedBox(height: 3),
                     Row(mainAxisAlignment: MainAxisAlignment.start, children: [
-                      Text('ص ${_ar(_surahPage[surah.number] ?? 1)}',
+                      Text(
+                          '${L10n.of(context)('pageWord')} ${L10n.of(context).number(_surahPage[surah.number] ?? 1)}',
                           style: TextStyle(
                               fontSize: 12.5,
                               color: isDark
                                   ? AppColors.darkTextSec
                                   : AppColors.textLight)),
                       const SizedBox(width: 8),
-                      Text('${_ar(surah.numberOfAyahs)} آية',
+                      Text(
+                          '${L10n.of(context).number(surah.numberOfAyahs)} ${L10n.of(context)('ayahWord')}',
                           style: TextStyle(
                               fontSize: 12.5,
                               color: isDark
@@ -718,7 +716,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ? const Color(0xFFE8F5E9)
                                   : const Color(0xFFF3E5F5),
                               borderRadius: BorderRadius.circular(8)),
-                          child: Text(meccan ? 'مكية' : 'مدنية',
+                          child: Text(
+                              L10n.of(context)(meccan ? 'meccan' : 'medinan'),
                               style: TextStyle(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.bold,
@@ -866,8 +865,8 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
     // Not configured yet — a one-tap prompt.
     if (_label == null) {
       return GestureDetector(
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const SettingsScreen())),
+        onTap: () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
         child: Container(
           margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -959,9 +958,8 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
                         style: TextStyle(
                             fontFamily: 'Almarai',
                             fontSize: 12.5,
-                            fontWeight: i == next
-                                ? FontWeight.bold
-                                : FontWeight.normal,
+                            fontWeight:
+                                i == next ? FontWeight.bold : FontWeight.normal,
                             color: i == next
                                 ? accent
                                 : (isDark
@@ -971,9 +969,8 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
                     Text(_digits(times.all[i]),
                         style: TextStyle(
                             fontSize: 13,
-                            fontWeight: i == next
-                                ? FontWeight.bold
-                                : FontWeight.normal,
+                            fontWeight:
+                                i == next ? FontWeight.bold : FontWeight.normal,
                             color: i == next
                                 ? accent
                                 : (isDark

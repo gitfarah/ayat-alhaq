@@ -42,6 +42,68 @@ class L10n {
     return n.toString().split('').map((c) => d[int.parse(c)]).join();
   }
 
+  /// Weekday name, Monday first (matching DateTime.weekday).
+  String weekday(int weekday) => _weekdays[code]![weekday - 1];
+
+  /// Gregorian month name, 1-based.
+  String gregorianMonth(int month) => _gregorianMonths[code]![month - 1];
+
+  /// Hijri month name, 1-based. Kept here rather than taken from the
+  /// hijri package, which has no German.
+  String hijriMonth(int month) => _hijriMonths[code]![month - 1];
+
+  /// Era suffix written after the year.
+  String get hijriEra => const {'ar': 'هـ', 'en': 'AH', 'de': 'AH'}[code]!;
+  String get gregorianEra => const {'ar': 'م', 'en': '', 'de': ''}[code]!;
+
+  static const Map<String, List<String>> _weekdays = {
+    'ar': [
+      'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس',
+      'الجمعة', 'السبت', 'الأحد',
+    ],
+    'en': [
+      'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+      'Friday', 'Saturday', 'Sunday',
+    ],
+    'de': [
+      'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag',
+      'Freitag', 'Samstag', 'Sonntag',
+    ],
+  };
+
+  static const Map<String, List<String>> _gregorianMonths = {
+    'ar': [
+      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+    ],
+    'en': [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ],
+    'de': [
+      'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+      'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+    ],
+  };
+
+  static const Map<String, List<String>> _hijriMonths = {
+    'ar': [
+      'محرم', 'صفر', 'ربيع الأول', 'ربيع الآخر',
+      'جمادى الأولى', 'جمادى الآخرة', 'رجب', 'شعبان',
+      'رمضان', 'شوال', 'ذو القعدة', 'ذو الحجة',
+    ],
+    'en': [
+      'Muharram', 'Safar', 'Rabi al-Awwal', 'Rabi al-Thani',
+      'Jumada al-Ula', 'Jumada al-Akhira', 'Rajab', 'Shaban',
+      'Ramadan', 'Shawwal', 'Dhul-Qadah', 'Dhul-Hijjah',
+    ],
+    'de': [
+      'Muharram', 'Safar', 'Rabi al-Auwal', 'Rabi al-Thani',
+      'Dschumada al-Ula', 'Dschumada al-Achira', 'Radschab', 'Schaban',
+      'Ramadan', 'Schauwal', 'Dhul-Qada', 'Dhul-Hiddscha',
+    ],
+  };
+
   static const Map<String, Map<String, String>> _data = {
     'ar': {
       'tabHighlights': 'التمييزات',
@@ -50,6 +112,7 @@ class L10n {
       'tabIndex': 'الفهرس',
       'searchHint': 'ابحث عن سورة أو رقم...',
       'surahUnit': 'سورة',
+      'surahNo': 'سورة رقم',
       'ayahUnit': 'آية',
       'ayahResults': 'نتائج في الآيات',
       'lastRead': 'آخر ما قرأت',
@@ -183,6 +246,7 @@ class L10n {
       'tabIndex': 'Index',
       'searchHint': 'Search surah, number, or text…',
       'surahUnit': 'surahs',
+      'surahNo': 'Surah',
       'ayahUnit': 'ayahs',
       'ayahResults': 'Matches in ayah text',
       'lastRead': 'Continue reading',
@@ -316,6 +380,7 @@ class L10n {
       'tabIndex': 'Index',
       'searchHint': 'Sure, Nummer oder Text suchen…',
       'surahUnit': 'Suren',
+      'surahNo': 'Sure',
       'ayahUnit': 'Verse',
       'ayahResults': 'Treffer im Verstext',
       'lastRead': 'Weiterlesen',

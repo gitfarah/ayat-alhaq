@@ -55,7 +55,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   final Map<String, double> _fitCache = {};
 
   /// Page artwork with its medallions tinted, keyed by page number.
-  final Map<int, String> _tintedCache = {};
+  final Map<String, String> _tintedCache = {};
 
   bool _isCachedOffline = false;
   bool _barsVisible = true;
@@ -704,6 +704,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     setState(() {
       _pageFutures.clear();
       _textFutures.clear();
+      _tintedCache.clear();
+      _fitCache.clear();
       _zoom = 1.0;
     });
     _onPageSettled(_pageNum);
@@ -1615,7 +1617,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// the same distinction a printed Mushaf makes. Memoised: the source
   /// is around 600 KB and the PageView rebuilds constantly.
   String _tintedSvg(MushafPageData data) {
-    final key = data.pageNumber;
+    // Keyed by EDITION as well as page. The riwayat share page numbers,
+    // so keying on the number alone kept serving the PREVIOUS edition's
+    // artwork until the entry happened to be evicted — which is why
+    // switching only seemed to take effect a page or two later.
+    final key = '${MushafSvgService.edition.id}:${data.pageNumber}';
     final hit = _tintedCache[key];
     if (hit != null) return hit;
 
