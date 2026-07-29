@@ -12,6 +12,18 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
   String _appLanguage = 'ar';
   bool _tajweed = false;
   String _mushafEdition = 'hafs';
+  String _mushafBackground = 'parchment';
+
+  /// Page-background colour for every Mushaf view, one choice for all
+  /// editions. See AppColors.mushafBackgrounds.
+  String get mushafBackground => _mushafBackground;
+
+  Future<void> setMushafBackground(String id) async {
+    if (id == _mushafBackground) return;
+    _mushafBackground = id;
+    (await SharedPreferences.getInstance()).setString('mushafBackground', id);
+    notifyListeners();
+  }
 
   /// Chosen Mushaf edition (riwayah) for the page view.
   String get mushafEdition => _mushafEdition;
@@ -146,6 +158,7 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
     _appLanguage = p.getString('appLanguage') ?? 'ar';
     _tajweed = p.getBool('tajweed') ?? false;
     _mushafEdition = p.getString('mushafEdition') ?? 'hafs';
+    _mushafBackground = p.getString('mushafBackground') ?? 'parchment';
     MushafSvgService.setEdition(_mushafEdition);
     notifyListeners();
   }

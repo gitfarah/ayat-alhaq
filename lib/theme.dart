@@ -82,6 +82,24 @@ class AppColors {
 
   // Mushaf parchment, distinct from app's main surface
   static const Color mushafParchment = Color(0xFFFAF3E0);
+
+  /// Page-background choices for the Mushaf, light and night value for
+  /// each. Night is not a filter over the light colour: a tinted paper
+  /// looks muddy when merely darkened, so each has a companion picked
+  /// to keep the same hue while reading comfortably in the dark.
+  static const Map<String, (Color, Color)> mushafBackgrounds = {
+    'parchment': (Color(0xFFFAF3E0), Color(0xFF1B2420)),
+    'yellow': (Color(0xFFFFF8D9), Color(0xFF262212)),
+    'blue': (Color(0xFFEAF3FB), Color(0xFF141E28)),
+    'pink': (Color(0xFFFCEDF2), Color(0xFF241820)),
+    'green': (Color(0xFFEAF5EC), Color(0xFF13221A)),
+  };
+
+  /// The page background for [id], resolved for the current mode.
+  static Color mushafBackground(String id, bool isDark) {
+    final pair = mushafBackgrounds[id] ?? mushafBackgrounds['parchment']!;
+    return isDark ? pair.$2 : pair.$1;
+  }
   static const Color mushafParchmentDark = Color(0xFF12100A);
   static const Color mushafBorderGold = Color(0xFFD4B483);
 

@@ -8,6 +8,7 @@ import '../services/quran_audio_service.dart';
 import '../services/tafsir_service.dart';
 import '../services/tajweed_service.dart';
 import '../theme.dart';
+import 'about_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -536,6 +537,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           _Tile(
             isDark: isDark,
+            icon: Icons.format_color_fill_rounded,
+            title: t('mushafBg'),
+            subtitle: t('bg${s.mushafBackground[0].toUpperCase()}'
+                '${s.mushafBackground.substring(1)}'),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (final id in AppColors.mushafBackgrounds.keys)
+                    GestureDetector(
+                      onTap: () => s.setMushafBackground(id),
+                      child: Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          // The swatch shows the colour as it will look
+                          // in the mode the reader is actually in.
+                          color: AppColors.mushafBackground(id, isDark),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: s.mushafBackground == id
+                                ? AppColors.gold
+                                : (isDark
+                                    ? AppColors.darkTextSec
+                                    : AppColors.border),
+                            width: s.mushafBackground == id ? 3 : 1,
+                          ),
+                        ),
+                        child: s.mushafBackground == id
+                            ? const Icon(Icons.check_rounded,
+                                size: 20, color: AppColors.gold)
+                            : null,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          _Tile(
+            isDark: isDark,
             icon: Icons.palette_rounded,
             title: t('tajweedLbl'),
             subtitle: s.tajweed ? t('tajweedOn') : t('tajweedOff'),
@@ -748,21 +791,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 16),
           _SectionLabel(t('about'), isDark),
-          _Tile(
-              isDark: isDark,
-              icon: Icons.info_outline_rounded,
-              title: t('versionLbl'),
-              subtitle: '1.6.1'),
-          _Tile(
-              isDark: isDark,
-              icon: Icons.api_rounded,
-              title: t('textSource'),
-              subtitle: 'api.qurancdn.com'),
-          _Tile(
-              isDark: isDark,
-              icon: Icons.menu_book_rounded,
-              title: t('pagesSource'),
-              subtitle: 'quranpedia.net (مجمع الملك فهد)'),
+          // Everything that used to be listed here — version, text
+          // source, page source — now lives on its own page, together
+          // with the typefaces and their licences.
+          GestureDetector(
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const AboutScreen())),
+            child: _Tile(
+                isDark: isDark,
+                icon: Icons.info_outline_rounded,
+                title: t('aboutApp'),
+                subtitle: t('aboutOpen'),
+                child: Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: Icon(Icons.chevron_right_rounded,
+                      color: isDark
+                          ? AppColors.darkTextSec
+                          : AppColors.textSecondary),
+                )),
+          ),
         ],
       ),
     );

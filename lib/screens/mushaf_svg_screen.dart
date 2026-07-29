@@ -1162,8 +1162,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     // the pages sit straight on it with no card, no border and no
     // rounded corners, so a future setting can repaint every edition at
     // once by changing this single value.
-    final bgColor =
-        isDark ? AppColors.darkSurfaceAlt : AppColors.mushafParchment;
+    final bgColor = AppColors.mushafBackground(s.mushafBackground, isDark);
     final textColor = isDark ? AppColors.darkText : AppColors.textPrimary;
 
     // (Re)create the controller when wide-mode flips — index math
@@ -1600,9 +1599,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
       // The opening spread is set in a narrower column than a full
       // page, the way the printed Mushaf frames it.
-      final inset = page <= 2 ? 0.19 : 0.045;
+      // The opening spread is set in a narrower column, the way the
+      // printed Mushaf frames it; a full page uses the whole measure.
+      final opening = page <= 2;
+      final inset = opening ? 0.16 : 0.045;
       final measure = width * (1 - inset * 2);
-      final size = _glyphFontSize(page, lines, measure, height * 0.96);
+      final size = _glyphFontSize(page, lines, measure, height * 0.9, opening);
 
       final page0 = SizedBox(
         width: width,
@@ -1610,11 +1612,26 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         child: Padding(
           padding: EdgeInsets.symmetric(
               horizontal: width * inset, vertical: height * 0.02),
+          // A full page divides its height into fifteen equal lines, as
+          // printed. The opening pages hold only eight, so spreading
+          // them the same way tore them apart — they sit at their
+          // natural spacing, as a block, instead.
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: opening ? MainAxisSize.min : MainAxisSize.max,
             children: [
               for (final line in lines)
-                Expanded(child: _buildGlyphLine(line, page, size, ink, isDark)),
+                if (opening)
+                  // The band is painted around the name, so the header
+                  // line needs room of its own here; inside a full page
+                  // the fifteen equal slots already provide it.
+                  SizedBox(
+                    height: line.isHeader ? size * 2.1 : null,
+                    child: _buildGlyphLine(line, page, size, ink, isDark),
+                  )
+                else
+                  Expanded(
+                      child: _buildGlyphLine(line, page, size, ink, isDark)),
             ],
           ),
         ),
@@ -1658,8 +1675,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// came out with verses at half a dozen different sizes. The page
   /// font's glyphs are drawn so a full line fills the measure at one
   /// size; short lines are simply short, and centre.
-  double _glyphFontSize(
-      int page, List<GlyphLine> lines, double measure, double maxHeight) {
+  double _glyphFontSize(int page, List<GlyphLine> lines, double measure,
+      double maxHeight, bool opening) {
     final key = '$page:${measure.round()}';
     final hit = _glyphSizeCache[key];
     if (hit != null) return hit;
@@ -1681,11 +1698,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       if (painter.width > widest) widest = painter.width;
       if (painter.height > tallest) tallest = painter.height;
     }
-    // Fit the widest line to the measure, but never let the stack of
-    // lines run past the page.
+    // A full page is designed so its lines fill the measure — so the
+    // width decides, and capping by height only squeezed the page into
+    // a thin column with wide empty margins. The opening pages hold few
+    // short lines, where width alone would give an enormous size, so
+    // there the height decides too.
     final byWidth = ref * measure / widest;
     final byHeight = ref * maxHeight / (tallest * lines.length);
-    final size = byWidth < byHeight ? byWidth : byHeight;
+    final size = opening && byHeight < byWidth ? byHeight : byWidth;
     _glyphSizeCache[key] = size;
     if (_glyphSizeCache.length > 24) {
       _glyphSizeCache.remove(_glyphSizeCache.keys.first);
@@ -1707,14 +1727,41 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               fontFamily: family,
               fontSize: size,
               color: line.isHeader ? gold : ink));
-      // The surah name gets the same ornamental band the rest of the
-      // app draws. The V1 font supplies the NAME, not the frame around
-      // it — which is what I mistook it for.
-      return Center(
-          child: line.isHeader
-              ? SurahFrame(
-                  title: '', isDark: isDark, fontSize: size, child: label)
-              : label);
+      if (!line.isHeader) return Center(child: label);
+
+      // The surah name gets the SAME band the artwork editions draw —
+      // the green field with a gold cartouche hugging the name — not a
+      // pill stretched across the page with the name lost inside it.
+      // The name's width is measured here, exactly as it was measured
+      // off the artwork pages for the other editions.
+      final painter = TextPainter(
+        textDirection: TextDirection.rtl,
+        text: TextSpan(
+            text: line.text,
+            style: TextStyle(fontFamily: family, fontSize: size)),
+      )..layout();
+      return LayoutBuilder(builder: (context, c) {
+        final w = c.maxWidth;
+        final h = c.maxHeight.isFinite ? c.maxHeight : painter.height * 1.5;
+        final half = painter.width / 2;
+        final band = SurahHeaderBand(
+          surah: 0,
+          page: 0,
+          top: h * 0.22,
+          bottom: h * 0.78,
+          left: w / 2 - half,
+          right: w / 2 + half,
+        );
+        return CustomPaint(
+          painter: SurahBannerPainter(
+            bands: [band],
+            scaleX: 1,
+            scaleY: 1,
+            isDark: isDark,
+          ),
+          child: Center(child: label),
+        );
+      });
     }
 
     // Split the line at ayah boundaries so each ayah is its own span:
@@ -1728,8 +1775,22 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             text: line.text.substring(cursor, start),
             style: TextStyle(color: ink)));
       }
+      // The end-of-ayah medallion is the last glyph of the run — split
+      // it off so it can carry its own colour.
+      final run = line.text.substring(start, start + len);
+      final endsWithMark = _lineEndsAyah(line, s);
       spans.add(_glyphAyahSpan(
-          line.text.substring(start, start + len), s[0], s[1], ink, isDark));
+          endsWithMark ? run.substring(0, run.length - 1) : run,
+          s[0],
+          s[1],
+          ink,
+          isDark));
+      if (endsWithMark) {
+        spans.add(_glyphAyahSpan(
+            run.substring(run.length - 1), s[0], s[1], ink, isDark,
+            colour:
+                isDark ? AppColors.darkPrimary : AppColors.primary));
+      }
       cursor = start + len;
     }
     if (cursor < line.text.length) {
@@ -1749,8 +1810,23 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
   /// One ayah's stretch of a glyph line, tinted for the mark it carries
   /// and long-pressable for the same options sheet as everywhere else.
+  /// Whether this run of the ayah ends with its numbered medallion —
+  /// true only for the run that closes the ayah, which is the one the
+  /// next span (if any) belongs to a different ayah after.
+  bool _lineEndsAyah(GlyphLine line, List<int> span) {
+    final i = line.spans.indexOf(span);
+    final end = span[2] + span[3];
+    if (end > line.text.length) return false;
+    // The closing run either ends the line or is followed by a
+    // different ayah.
+    if (i == line.spans.length - 1) return true;
+    final next = line.spans[i + 1];
+    return next[0] != span[0] || next[1] != span[1];
+  }
+
   InlineSpan _glyphAyahSpan(
-      String text, int surah, int ayah, Color ink, bool isDark) {
+      String text, int surah, int ayah, Color ink, bool isDark,
+      {Color? colour}) {
     final region = AyahHitRegion(
         surahNumber: surah, ayahNumber: ayah, x: 0, y: 0, rings: const []);
     final bookmark = _bookmarkFor(region);
@@ -1777,7 +1853,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     return TextSpan(
         text: text,
         recognizer: recognizer,
-        style: TextStyle(color: ink, backgroundColor: bg));
+        style: TextStyle(color: colour ?? ink, backgroundColor: bg));
   }
 
   Widget _buildTextPage(int page, bool isDark) {
