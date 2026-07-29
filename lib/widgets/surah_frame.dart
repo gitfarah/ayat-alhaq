@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../theme.dart';
 
 /// Ornamental surah-name header modeled on the decorated cartouches of
@@ -9,19 +9,23 @@ class SurahFrame extends StatelessWidget {
   final bool isDark;
   final double fontSize;
 
+  /// Rendered content to frame instead of [title]. The V1 Mushaf sets
+  /// the surah name from its own font, so the band has to go around a
+  /// widget rather than around a string.
+  final Widget? child;
+
   const SurahFrame({
     super.key,
     required this.title,
     required this.isDark,
     this.fontSize = 20,
+    this.child,
   });
 
   @override
   Widget build(BuildContext context) {
     final gold = isDark ? AppColors.darkSecondary : AppColors.mushafBorderGold;
-    final fill = isDark
-        ? AppColors.darkSurface
-        : AppColors.mushafParchment;
+    final fill = isDark ? AppColors.darkSurface : AppColors.mushafParchment;
     final text = isDark ? AppColors.darkText : AppColors.textPrimary;
 
     return Padding(
@@ -30,21 +34,25 @@ class SurahFrame extends StatelessWidget {
         painter: _FramePainter(gold: gold, fill: fill),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 14),
-          child: Text(
-            title,
-            textAlign: TextAlign.center,
-            textDirection: TextDirection.rtl,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontFamily: 'QuranHafs',
-              fontSize: fontSize,
-              fontWeight: FontWeight.bold,
-              color: text,
-              height: 1.4,
-            ),
-          ),
+          padding: EdgeInsets.symmetric(
+              horizontal: child == null ? 56 : fontSize * 1.6,
+              vertical: child == null ? 14 : fontSize * 0.22),
+          child: child != null
+              ? Center(child: child)
+              : Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'QuranHafs',
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.bold,
+                    color: text,
+                    height: 1.4,
+                  ),
+                ),
         ),
       ),
     );
@@ -118,6 +126,5 @@ class _FramePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_FramePainter old) =>
-      old.gold != gold || old.fill != fill;
+  bool shouldRepaint(_FramePainter old) => old.gold != gold || old.fill != fill;
 }

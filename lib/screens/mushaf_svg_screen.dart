@@ -70,6 +70,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// the entry dies with the page it belongs to.
   final Expando<String> _tintedCache = Expando<String>('tinted mushaf page');
 
+  /// Measured type size for a glyph page, keyed by page and measure.
+  final Map<String, double> _glyphSizeCache = {};
+
   bool _isCachedOffline = false;
   bool _barsVisible = true;
   List<Bookmark> _bookmarks = [];
@@ -1155,7 +1158,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     // The edition can change from anywhere; make sure its frames are on
     // their way whenever this screen rebuilds.
     _loadHeaderBands();
-    final bgColor = isDark ? AppColors.darkBg : AppColors.background;
+    // ONE background colour for the whole Mushaf, whatever the edition:
+    // the pages sit straight on it with no card, no border and no
+    // rounded corners, so a future setting can repaint every edition at
+    // once by changing this single value.
+    final bgColor =
+        isDark ? AppColors.darkSurfaceAlt : AppColors.mushafParchment;
     final textColor = isDark ? AppColors.darkText : AppColors.textPrimary;
 
     // (Re)create the controller when wide-mode flips — index math
@@ -1277,15 +1285,18 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     final edition = MushafSvgService.edition.id;
     var entry = _pageFutures[index];
     if (entry == null || entry.$1 != edition) {
-      entry = (edition, () async {
-        final first = await MushafSvgService.getPage(base);
-        if (!_wide || base + 1 > 604) return [first];
-        try {
-          return [first, await MushafSvgService.getPage(base + 1)];
-        } catch (_) {
-          return [first];
-        }
-      }());
+      entry = (
+        edition,
+        () async {
+          final first = await MushafSvgService.getPage(base);
+          if (!_wide || base + 1 > 604) return [first];
+          try {
+            return [first, await MushafSvgService.getPage(base + 1)];
+          } catch (_) {
+            return [first];
+          }
+        }()
+      );
       _pageFutures[index] = entry;
     }
     final future = entry.$2;
@@ -1573,7 +1584,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       });
     }
     final ink = isDark ? AppColors.darkText : AppColors.textPrimary;
-    final cream = isDark ? AppColors.darkSurfaceAlt : AppColors.mushafParchment;
 
     if (lines.isEmpty || !ready) {
       return Center(
@@ -1588,22 +1598,25 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       final width = constraints.maxWidth * _zoom;
       final height = width / (345 / 550);
 
-      final page0 = Container(
+      // The opening spread is set in a narrower column than a full
+      // page, the way the printed Mushaf frames it.
+      final inset = page <= 2 ? 0.19 : 0.045;
+      final measure = width * (1 - inset * 2);
+      final size = _glyphFontSize(page, lines, measure, height * 0.96);
+
+      final page0 = SizedBox(
         width: width,
         height: height,
-        decoration: BoxDecoration(
-          color: cream,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-              color: AppColors.mushafBorderGold.withValues(alpha: 0.45)),
-        ),
-        padding: EdgeInsets.symmetric(
-            horizontal: width * 0.045, vertical: height * 0.02),
-        child: Column(
-          children: [
-            for (final line in lines)
-              Expanded(child: _buildGlyphLine(line, page, ink, isDark)),
-          ],
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+              horizontal: width * inset, vertical: height * 0.02),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (final line in lines)
+                Expanded(child: _buildGlyphLine(line, page, size, ink, isDark)),
+            ],
+          ),
         ),
       );
 
@@ -1636,23 +1649,72 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// that is how the page is set, and the font's glyphs are drawn for
   /// exactly that width. Surah headers and the Basmalah are centred at
   /// their natural size instead.
+  /// The single type size a page is set at.
+  ///
+  /// One size for the whole page, not one per line. Stretching each
+  /// line to the full measure looked right on a dense page — every line
+  /// there really does fill it — but wrecked the opening pages, where a
+  /// short line was blown up to the width of a long one and Al-Fatiha
+  /// came out with verses at half a dozen different sizes. The page
+  /// font's glyphs are drawn so a full line fills the measure at one
+  /// size; short lines are simply short, and centre.
+  double _glyphFontSize(
+      int page, List<GlyphLine> lines, double measure, double maxHeight) {
+    final key = '$page:${measure.round()}';
+    final hit = _glyphSizeCache[key];
+    if (hit != null) return hit;
+
+    const ref = 100.0;
+    var widest = 1.0;
+    var tallest = 1.0;
+    for (final line in lines) {
+      final painter = TextPainter(
+        textDirection: TextDirection.rtl,
+        text: TextSpan(
+            text: line.text,
+            style: TextStyle(
+                fontFamily: line.usesSharedFont
+                    ? MushafGlyphService.sharedFamily
+                    : MushafGlyphService.familyFor(page),
+                fontSize: ref)),
+      )..layout();
+      if (painter.width > widest) widest = painter.width;
+      if (painter.height > tallest) tallest = painter.height;
+    }
+    // Fit the widest line to the measure, but never let the stack of
+    // lines run past the page.
+    final byWidth = ref * measure / widest;
+    final byHeight = ref * maxHeight / (tallest * lines.length);
+    final size = byWidth < byHeight ? byWidth : byHeight;
+    _glyphSizeCache[key] = size;
+    if (_glyphSizeCache.length > 24) {
+      _glyphSizeCache.remove(_glyphSizeCache.keys.first);
+    }
+    return size;
+  }
+
   Widget _buildGlyphLine(
-      GlyphLine line, int page, Color ink, bool isDark) {
+      GlyphLine line, int page, double size, Color ink, bool isDark) {
     final family = line.usesSharedFont
         ? MushafGlyphService.sharedFamily
         : MushafGlyphService.familyFor(page);
     final gold = isDark ? AppColors.darkSecondary : AppColors.mushafBorderGold;
 
     if (line.spans.isEmpty) {
-      return FittedBox(
-        fit: BoxFit.contain,
-        child: Text(line.text,
-            textDirection: TextDirection.rtl,
-            style: TextStyle(
-                fontFamily: family,
-                fontSize: 40,
-                color: line.isHeader ? gold : ink)),
-      );
+      final label = Text(line.text,
+          textDirection: TextDirection.rtl,
+          style: TextStyle(
+              fontFamily: family,
+              fontSize: size,
+              color: line.isHeader ? gold : ink));
+      // The surah name gets the same ornamental band the rest of the
+      // app draws. The V1 font supplies the NAME, not the frame around
+      // it — which is what I mistook it for.
+      return Center(
+          child: line.isHeader
+              ? SurahFrame(
+                  title: '', isDark: isDark, fontSize: size, child: label)
+              : label);
     }
 
     // Split the line at ayah boundaries so each ayah is its own span:
@@ -1675,12 +1737,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           text: line.text.substring(cursor), style: TextStyle(color: ink)));
     }
 
-    return FittedBox(
-      fit: BoxFit.fitWidth,
+    return Center(
       child: Text.rich(
         TextSpan(children: spans),
         textDirection: TextDirection.rtl,
-        style: TextStyle(fontFamily: family, fontSize: 40, color: ink),
+        maxLines: 1,
+        style: TextStyle(fontFamily: family, fontSize: size, color: ink),
       ),
     );
   }
@@ -1883,8 +1945,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     // The page's own furniture: card padding, and per surah opening a
     // name frame and a Basmala line.
     const cardPadding = 32.0 + 16.0;
-    final openings =
-        blocks.where((b) => b.first.numberInSurah == 1).length;
+    final openings = blocks.where((b) => b.first.numberInSurah == 1).length;
     final width = constraints.maxWidth - 28 - 28;
     final height = constraints.maxHeight - cardPadding - 32;
 
@@ -1895,8 +1956,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           textDirection: TextDirection.rtl,
           textAlign: TextAlign.justify,
           text: TextSpan(
-            style: TextStyle(
-                fontFamily: 'QuranHafs', fontSize: size, height: 2.0),
+            style:
+                TextStyle(fontFamily: 'QuranHafs', fontSize: size, height: 2.0),
             children: [
               for (final a in block)
                 TextSpan(text: '${a.text} ${_ar(a.numberInSurah)} '),
@@ -1999,9 +2060,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           recognizer: recognizer,
           style: TextStyle(
               backgroundColor: bg,
-              color: isDark
-                  ? AppColors.darkSecondary
-                  : const Color(0xFFB8892B))),
+              color:
+                  isDark ? AppColors.darkSecondary : const Color(0xFFB8892B))),
     ];
   }
 
