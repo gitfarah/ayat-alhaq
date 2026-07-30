@@ -91,10 +91,23 @@ class SurahBannerPainter extends CustomPainter {
       goldPaint.strokeWidth = math.max(0.6, h * 0.030);
 
       // ── Outer band ────────────────────────────────────────────────
+      //
+      // Ruled twice, as the printed bands are: a green keyline on the
+      // outside and a finer gold one set in from it. A single rule reads
+      // as a UI chip; the pair reads as a printed frame.
       final outer =
           RRect.fromLTRBR(left, top, right, bottom, Radius.circular(h * 0.16));
       canvas.drawRRect(outer, fillPaint);
       canvas.drawRRect(outer, rulePaint);
+
+      final keyInset = h * 0.10;
+      canvas.drawRRect(
+          RRect.fromLTRBR(left + keyInset, top + keyInset, right - keyInset,
+              bottom - keyInset, Radius.circular(h * 0.11)),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = math.max(0.5, h * 0.018)
+            ..color = gold.withValues(alpha: 0.65));
 
       // ── Inner cartouche (hexagonal, pointed ends) ─────────────────
       //
@@ -131,20 +144,79 @@ class SurahBannerPainter extends CustomPainter {
       canvas.drawPath(cartouche, innerPaint);
       canvas.drawPath(cartouche, goldPaint);
 
-      // ── End ornaments: a small diamond between the band edge and
-      // the cartouche on each side.
-      final d = h * 0.16;
-      for (final ox in [
-        (left + cLeft) / 2,
-        (right + cRight) / 2,
+      // A hairline echoing the cartouche just inside it — the same
+      // doubling as the outer band, at the scale of the name.
+      canvas.save();
+      canvas.translate(cx, midY);
+      canvas.scale(0.965, 0.80);
+      canvas.translate(-cx, -midY);
+      canvas.drawPath(
+          cartouche,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = math.max(0.4, h * 0.014) / 0.80
+            ..color = gold.withValues(alpha: 0.5));
+      canvas.restore();
+
+      // ── End ornaments ─────────────────────────────────────────────
+      //
+      // A floret rather than a lone diamond: a four-petal rosette with a
+      // gold bead at its heart and a small lozenge either side of it,
+      // which is the filler the printed bands run between the cartouche
+      // and the frame.
+      final d = h * 0.21;
+      for (final (ox, inner) in [
+        ((left + cLeft) / 2, cLeft),
+        ((right + cRight) / 2, cRight),
       ]) {
-        final diamond = Path()
-          ..moveTo(ox, midY - d)
-          ..lineTo(ox + d, midY)
-          ..lineTo(ox, midY + d)
-          ..lineTo(ox - d, midY)
-          ..close();
-        canvas.drawPath(diamond, goldSolid);
+        // A hairline along the band's centre, from the frame to the
+        // cartouche, with the floret threaded onto it. Without it the
+        // end panels read as empty space with a mark dropped in.
+        final edge = ox < cx ? left + keyInset : right - keyInset;
+        canvas.drawLine(
+            Offset(edge + (ox < cx ? h * 0.16 : -h * 0.16), midY),
+            Offset(inner + (ox < cx ? -h * 0.10 : h * 0.10), midY),
+            Paint()
+              ..strokeWidth = math.max(0.4, h * 0.014)
+              ..color = gold.withValues(alpha: 0.45));
+
+        // Petals: four teardrops on the diagonals.
+        for (var i = 0; i < 4; i++) {
+          canvas.save();
+          canvas.translate(ox, midY);
+          canvas.rotate(math.pi / 4 + i * math.pi / 2);
+          canvas.drawPath(
+              Path()
+                ..moveTo(0, 0)
+                ..quadraticBezierTo(d * 0.50, -d * 0.44, d * 1.10, 0)
+                ..quadraticBezierTo(d * 0.50, d * 0.44, 0, 0)
+                ..close(),
+              goldSolid);
+          canvas.restore();
+        }
+        // Heart of the floret, left as the page colour so the petals
+        // read as separate leaves rather than a blob.
+        canvas.drawCircle(Offset(ox, midY), d * 0.30, innerPaint);
+        canvas.drawCircle(
+            Offset(ox, midY),
+            d * 0.30,
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = math.max(0.4, h * 0.016)
+              ..color = gold);
+
+        // Lozenge either side, sitting on the band's centre line.
+        for (final dx in [-d * 2.1, d * 2.1]) {
+          final lz = d * 0.42;
+          canvas.drawPath(
+              Path()
+                ..moveTo(ox + dx, midY - lz)
+                ..lineTo(ox + dx + lz * 0.60, midY)
+                ..lineTo(ox + dx, midY + lz)
+                ..lineTo(ox + dx - lz * 0.60, midY)
+                ..close(),
+              goldSolid);
+        }
       }
     }
   }

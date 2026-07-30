@@ -112,6 +112,7 @@ class MushafFileStorage {
 class MushafFontStorage {
   static Future<Uint8List?> read(int page) async => null;
   static Future<void> write(int page, Uint8List bytes) async {}
+  static Future<void> remove(int page) async {}
   static Future<int> cachedCount() async => 0;
   static Future<void> clear() async {}
 }

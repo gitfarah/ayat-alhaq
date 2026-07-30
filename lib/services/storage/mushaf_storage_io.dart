@@ -117,6 +117,15 @@ class MushafFontStorage {
     }
   }
 
+  /// Drops one page's cached font — used when the file turns out to be
+  /// truncated or otherwise unusable, so the next attempt refetches it.
+  static Future<void> remove(int page) async {
+    try {
+      final f = File('${(await _dir()).path}/p$page.ttf');
+      if (await f.exists()) await f.delete();
+    } catch (_) {}
+  }
+
   static Future<int> cachedCount() async {
     try {
       final dir = await _dir();

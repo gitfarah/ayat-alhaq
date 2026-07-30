@@ -99,14 +99,19 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
   bool get _isZoomed => _zoom > 1.01;
 
-  /// Whether this edition gets the new page treatment: a running head
-  /// and an ornamented page number printed on the leaf, and its lines
-  /// spread into the height that frees up.
+  /// Whether this edition prints its own furniture on the leaf — the
+  /// running head and the ornamented page number — instead of leaving
+  /// that to the floating bars. Those editions also lose the bottom
+  /// page-number bar and its arrows, which only duplicate it.
+  bool get _usesPageFurniture =>
+      const {'hafs', 'v1'}.contains(MushafSvgService.edition.id);
+
+  /// Whether the page artwork's printed lines are pulled apart to fill
+  /// the height the furniture leaves over.
   ///
-  /// Hafs only for now — it is the edition nearly everyone reads, and
-  /// the layout wants judging on a real reading before the other four
-  /// riwayat (and the two typeset editions, which set their own lines
-  /// anyway) are moved over to it.
+  /// Hafs only: it is the one edition drawn as a fixed page IMAGE whose
+  /// lines can be re-spaced by blitting. V1 sets its own lines from a
+  /// font and already fills the page exactly.
   bool get _spreadsLines => MushafSvgService.edition.id == 'hafs';
 
   void _onScaleStart(ScaleStartDetails d) => _zoomStart = _zoom;
@@ -1255,7 +1260,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 // the page, and turning pages is a swipe. Tapping the
                 // printed number opens the same go-to dialog the old
                 // circle did.
-                if (!_spreadsLines) _buildNavBar(isDark),
+                if (!_usesPageFurniture) _buildNavBar(isDark),
               ]),
             ),
           ),
@@ -1294,10 +1299,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         onTap: () => _setBars(!_barsVisible),
         child: SafeArea(
           child: !_wide || base + 1 > 604
-              ? _buildGlyphPage(base, isDark)
+              ? _withPageFurniture(base, isDark, _buildGlyphPage(base, isDark))
               : Row(children: [
-                  Expanded(child: _buildGlyphPage(base + 1, isDark)),
-                  Expanded(child: _buildGlyphPage(base, isDark)),
+                  Expanded(
+                      child: _withPageFurniture(
+                          base + 1, isDark, _buildGlyphPage(base + 1, isDark))),
+                  Expanded(
+                      child: _withPageFurniture(
+                          base, isDark, _buildGlyphPage(base, isDark))),
                 ]),
         ),
       );
@@ -1458,7 +1467,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           ]),
           // Where the reader is, for editions whose pages don't yet
           // carry their own running head.
-          if (!_spreadsLines)
+          if (!_usesPageFurniture)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Directionality(
@@ -1515,18 +1524,22 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       padding: const EdgeInsets.all(2),
       child: _buildPageArtwork(data, isDark),
     );
-    // Editions still on the old chrome: just the artwork, with the page
-    // number and the surah/juz strip living in the floating bars.
-    if (!_spreadsLines) return artwork;
+    return _withPageFurniture(data.pageNumber, isDark, artwork);
+  }
 
-    // The leaf carries its own furniture — running head above, page
-    // number below — and both stay put when the floating bars slide
-    // away, exactly as they are printed on paper.
+  /// Wraps a page in the furniture a printed Mushaf carries: the running
+  /// head above and the page number below.
+  ///
+  /// Both stay put when the floating bars slide away — they belong to
+  /// the leaf, not to the app. Editions still on the old chrome get the
+  /// page back untouched, with that information in the bars instead.
+  Widget _withPageFurniture(int page, bool isDark, Widget page0) {
+    if (!_usesPageFurniture) return page0;
     return Column(children: [
-      MushafPageHeader(page: data.pageNumber, isDark: isDark),
-      Expanded(child: artwork),
+      MushafPageHeader(page: page, isDark: isDark),
+      Expanded(child: page0),
       MushafPageFooter(
-        page: data.pageNumber,
+        page: page,
         isDark: isDark,
         pageColor: _pageColor(isDark),
         onTap: _jumpDialog,
@@ -1616,13 +1629,56 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   Widget _buildGlyphPage(int page, bool isDark) {
     final lines = MushafGlyphService.linesOf(page);
     final ready = MushafGlyphService.hasFont(page);
-    if (!ready) {
-      // Kick the download off and repaint when the family lands.
-      MushafGlyphService.ensureFont(page).then((ok) {
-        if (mounted && ok) setState(() {});
+    final failed = MushafGlyphService.hasFailed(page);
+    if (!ready && !failed) {
+      // Kick the download off and repaint when the family lands — or
+      // when it turns out it cannot be made to draw.
+      MushafGlyphService.ensureFont(page).then((_) {
+        if (mounted) setState(() {});
       });
     }
     final ink = isDark ? AppColors.darkText : AppColors.textPrimary;
+
+    // A page whose font will not draw must SAY so. Typesetting it anyway
+    // would not fail loudly: this edition's glyph codes are real Arabic
+    // Presentation Forms, so the engine would quietly substitute another
+    // font and present a page that reads like the Quran but is not the
+    // printed page — which is far worse than an error.
+    if (failed) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(Icons.font_download_off_rounded,
+                size: 44, color: Colors.grey),
+            const SizedBox(height: 12),
+            Text(
+                'تعذّر تحميل خط صفحة ${_ar(page)}\nتحقق من اتصالك ثم أعد المحاولة',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontFamily: 'Almarai',
+                    height: 1.6,
+                    color: isDark
+                        ? AppColors.darkTextSec
+                        : AppColors.textSecondary)),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12))),
+              onPressed: () {
+                MushafGlyphService.clearFailure(page);
+                setState(() {});
+              },
+              icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+              label: const Text('إعادة المحاولة',
+                  style: TextStyle(color: Colors.white, fontFamily: 'Almarai')),
+            ),
+          ]),
+        ),
+      );
+    }
 
     if (lines.isEmpty || !ready) {
       return Center(

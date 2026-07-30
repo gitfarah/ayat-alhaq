@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/painting.dart' show TextPainter, TextSpan, TextStyle;
 import 'package:flutter/services.dart' show FontLoader, rootBundle;
+import 'package:flutter/widgets.dart' show TextDirection;
 import 'package:http/http.dart' as http;
 
 import 'storage/mushaf_storage.dart';
@@ -76,6 +78,66 @@ class MushafGlyphService {
 
   static bool hasFont(int page) => _fontsReady.contains(page);
 
+  /// Pages whose font could not be made to draw. Tracked separately from
+  /// "not ready yet" so the reader is told the page cannot be typeset
+  /// instead of watching a spinner that will never finish — or, far
+  /// worse, being shown the page in the WRONG script (see [_familyDraws]).
+  static final Set<int> _fontsFailed = <int>{};
+
+  static bool hasFailed(int page) => _fontsFailed.contains(page);
+
+  /// Forgets a failure so the reader's retry actually retries.
+  static void clearFailure(int page) => _fontsFailed.remove(page);
+
+  /// A usable TrueType/OpenType file starts with one of these tags. A
+  /// truncated or half-written cache file is the likeliest reason a page
+  /// font stops working, and it must never reach [FontLoader].
+  static bool _looksLikeFont(Uint8List b) {
+    if (b.length < 4096) return false;
+    final tag = ByteData.view(b.buffer, b.offsetInBytes).getUint32(0);
+    return tag == 0x00010000 || // TrueType outlines
+        tag == 0x4F54544F || // 'OTTO' — CFF outlines
+        tag == 0x74727565 || // 'true'
+        tag == 0x74746366; // 'ttcf' — collection
+  }
+
+  /// Whether [family] is genuinely being used to draw [probe].
+  ///
+  /// This is the check the edition was missing, and the reason a page
+  /// could come out looking like readable Arabic in the wrong shapes.
+  /// The V1 layout is written in Arabic Presentation Forms-A
+  /// (U+FB50…), which are REAL assigned codepoints — so when the page
+  /// font is absent the engine does not draw empty boxes, it quietly
+  /// falls back to any font that covers that block and renders ordinary
+  /// Arabic letters. The result reads as text, so nothing looks broken,
+  /// but the lines are not the printed page's lines at all.
+  ///
+  /// Measuring the same string against a family that cannot exist gives
+  /// the width of that fallback. If the real family measures the same,
+  /// it is the fallback, and the font has NOT been applied.
+  static bool _familyDraws(String family, String probe) {
+    double widthOf(String f) {
+      final p = TextPainter(
+        textDirection: TextDirection.rtl,
+        text: TextSpan(
+            text: probe, style: TextStyle(fontFamily: f, fontSize: 100)),
+      )..layout();
+      return p.width;
+    }
+
+    final real = widthOf(family);
+    if (real <= 0) return false;
+    return (real - widthOf('__mushaf_absent_family__')).abs() > 0.5;
+  }
+
+  /// A stretch of this page's own glyph codes to test the font with.
+  static String _probeFor(int page) {
+    for (final line in linesOf(page)) {
+      if (!line.usesSharedFont && line.text.trim().isNotEmpty) return line.text;
+    }
+    return '';
+  }
+
   /// In-flight font loads, so two widgets asking for the same page
   /// during one frame don't both download it.
   static final Map<int, Future<bool>> _inFlight = {};
@@ -98,8 +160,7 @@ class MushafGlyphService {
                     (s as List).cast<int>(),
                 ],
                 {
-                  for (final i in (line['e'] as List? ?? const []) )
-                    i as int,
+                  for (final i in (line['e'] as List? ?? const [])) i as int,
                 },
                 line['f'] == 'b',
               ),
@@ -125,25 +186,59 @@ class MushafGlyphService {
     });
   }
 
+  /// Fetches, registers and then PROVES the page's font.
+  ///
+  /// Two passes: the first will use a cached file if there is one, the
+  /// second always refetches. A page font that registers but does not
+  /// draw is treated exactly like a missing one — the cached copy is
+  /// binned and the download retried — because a font that does not draw
+  /// is what puts the page on screen in the wrong script.
   static Future<bool> _loadFont(int page) async {
-    try {
-      Uint8List? bytes = await MushafFontStorage.read(page);
-      if (bytes == null) {
-        final res = await http
-            .get(Uri.parse('$fontBaseUrl/p$page.ttf'))
-            .timeout(const Duration(seconds: 30));
-        if (res.statusCode != 200) return false;
-        bytes = res.bodyBytes;
-        await MushafFontStorage.write(page, bytes);
+    // The probe is written in the page's own glyph codes, so the layout
+    // has to be in before the font can be verified.
+    await loadLayout();
+    final probe = _probeFor(page);
+    final family = familyFor(page);
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        Uint8List? bytes =
+            attempt == 0 ? await MushafFontStorage.read(page) : null;
+        if (bytes != null && !_looksLikeFont(bytes)) {
+          await MushafFontStorage.remove(page);
+          bytes = null;
+        }
+        if (bytes == null) {
+          final res = await http
+              .get(Uri.parse('$fontBaseUrl/p$page.ttf'))
+              .timeout(const Duration(seconds: 30));
+          if (res.statusCode != 200) continue;
+          bytes = res.bodyBytes;
+          if (!_looksLikeFont(bytes)) continue;
+          await MushafFontStorage.write(page, bytes);
+        }
+
+        await (FontLoader(family)
+              ..addFont(Future.value(ByteData.view(bytes.buffer))))
+            .load();
+
+        // No probe means no layout for this page, so there is nothing to
+        // typeset and nothing to verify against.
+        if (probe.isEmpty || _familyDraws(family, probe)) {
+          _fontsReady.add(page);
+          _fontsFailed.remove(page);
+          return true;
+        }
+        // Registered, but the engine is still drawing the fallback. The
+        // cached file is the usual culprit, so drop it and refetch once.
+        await MushafFontStorage.remove(page);
+      } catch (_) {
+        // Fall through to the next attempt.
       }
-      final loader = FontLoader(familyFor(page))
-        ..addFont(Future.value(ByteData.view(bytes.buffer)));
-      await loader.load();
-      _fontsReady.add(page);
-      return true;
-    } catch (_) {
-      return false;
     }
+
+    _fontsFailed.add(page);
+    return false;
   }
 
   /// Pulls the fonts for the pages around [page] so a page turn does
