@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../build_info.dart';
 import '../l10n/app_strings.dart';
 import '../services/settings_service.dart';
 import '../theme.dart';
@@ -67,6 +68,16 @@ class AboutScreen extends StatelessWidget {
                     fontWeight: FontWeight.bold),
               ),
             ),
+            const SizedBox(height: 6),
+            // The marketing version stays put until a real release; the
+            // build number is what tells two sideloaded builds apart, so
+            // it is the part worth quoting in a bug report.
+            Center(
+              child: Text('${t('versionLbl')} $kVersionLabel',
+                  textDirection: TextDirection.ltr,
+                  style: TextStyle(
+                      fontFamily: 'Almarai', fontSize: 12.5, color: sub)),
+            ),
             const SizedBox(height: 14),
             Text(t('aboutBlurb'),
                 textAlign: TextAlign.start,
@@ -79,11 +90,16 @@ class AboutScreen extends StatelessWidget {
           const SizedBox(height: 14),
           _Section(isDark: isDark, title: t('aboutSources'), rows: [
             (t('aboutQuranText'), 'alquran.cloud — Uthmani (ar.alafasy)'),
-            (t('aboutMushafPages'), 'quranpedia/quran-svg — Hafs, Warsh,\n'
-                'Qalon, Shubah, ad-Duri'),
-            (t('aboutV1'),
-                'KFGQPC V1 (1405H) — layout from quran.com-images,\n'
-                    'page fonts from QUL (qul.tarteel.ai)'),
+            (
+              t('aboutMushafPages'),
+              'quranpedia/quran-svg — Hafs, Warsh,\n'
+                  'Qalon, Shubah, ad-Duri'
+            ),
+            (
+              t('aboutV1'),
+              'KFGQPC V1 (1405H) — layout from quran.com-images,\n'
+                  'page fonts from QUL (qul.tarteel.ai)'
+            ),
             (t('aboutTajweed'), 'quran.com tajweed rule data'),
             (t('aboutTafsir'), 'spa5k/tafsir_api'),
             (t('aboutAudio'), 'islamic.network / everyayah.com'),
@@ -92,10 +108,14 @@ class AboutScreen extends StatelessWidget {
           const SizedBox(height: 14),
           _Section(isDark: isDark, title: t('aboutFonts'), rows: [
             ('Almarai', 'SIL Open Font License 1.1'),
-            ('KFGQPC HAFS Uthmanic Script',
-                'King Fahd Glorious Quran Printing Complex'),
-            ('KFGQPC V1 page fonts (QCF)',
-                'King Fahd Glorious Quran Printing Complex'),
+            (
+              'KFGQPC HAFS Uthmanic Script',
+              'King Fahd Glorious Quran Printing Complex'
+            ),
+            (
+              'KFGQPC V1 page fonts (QCF)',
+              'King Fahd Glorious Quran Printing Complex'
+            ),
           ]),
           const SizedBox(height: 14),
           _Card(isDark: isDark, children: [
@@ -156,7 +176,8 @@ class _Card extends StatelessWidget {
                   ? Colors.white.withValues(alpha: 0.06)
                   : AppColors.border),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+        child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start, children: children),
       );
 }
 

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -18,6 +20,8 @@ import '../services/surah_header_service.dart';
 import '../services/tajweed_service.dart';
 import '../l10n/app_strings.dart';
 import '../theme.dart';
+import '../widgets/mushaf_page_furniture.dart';
+import '../widgets/mushaf_spread_page.dart';
 import '../widgets/reciter_picker.dart';
 import '../widgets/surah_banner_painter.dart';
 import '../widgets/surah_frame.dart';
@@ -94,6 +98,16 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   static const double _maxZoom = 3.5;
 
   bool get _isZoomed => _zoom > 1.01;
+
+  /// Whether this edition gets the new page treatment: a running head
+  /// and an ornamented page number printed on the leaf, and its lines
+  /// spread into the height that frees up.
+  ///
+  /// Hafs only for now — it is the edition nearly everyone reads, and
+  /// the layout wants judging on a real reading before the other four
+  /// riwayat (and the two typeset editions, which set their own lines
+  /// anyway) are moved over to it.
+  bool get _spreadsLines => MushafSvgService.edition.id == 'hafs';
 
   void _onScaleStart(ScaleStartDetails d) => _zoomStart = _zoom;
 
@@ -732,6 +746,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     await context.read<SettingsService>().setMushafEdition(id);
     if (!mounted) return;
     _loadHeaderBands();
+    // Cached page rasters belong to the edition that was showing; none
+    // of them can appear again, and each one is several megabytes.
+    MushafSpreadArtwork.evictAll();
     setState(() {
       _pageFutures.clear();
       _textFutures.clear();
@@ -1233,7 +1250,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               curve: Curves.easeOut,
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 if (audio.hasActiveTrack) _buildAudioBar(audio, isDark),
-                _buildNavBar(isDark),
+                // The page-number bar and its two arrows are redundant
+                // once the leaf prints its own number: the number is on
+                // the page, and turning pages is a swipe. Tapping the
+                // printed number opens the same go-to dialog the old
+                // circle did.
+                if (!_spreadsLines) _buildNavBar(isDark),
               ]),
             ),
           ),
@@ -1434,48 +1456,51 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 icon: Icon(Icons.menu_rounded, color: textColor),
                 onPressed: _showMenuSheet),
           ]),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Directionality(
-              textDirection: TextDirection.rtl,
-              // A long surah label next to the juz/hizb text can be
-              // wider than a narrow phone — shrink the strip to fit
-              // rather than clipping it.
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 220),
-                      child: Text(surahLabel,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+          // Where the reader is, for editions whose pages don't yet
+          // carry their own running head.
+          if (!_spreadsLines)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Directionality(
+                textDirection: TextDirection.rtl,
+                // A long surah label next to the juz/hizb text can be
+                // wider than a narrow phone — shrink the strip to fit
+                // rather than clipping it.
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 220),
+                        child: Text(surahLabel,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontFamily: 'QuranHafs',
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: headerText,
+                                height: 1.25)),
+                      ),
+                      const SizedBox(width: 14),
+                      Container(
+                          width: 1,
+                          height: 18,
+                          color: gold.withValues(alpha: 0.45)),
+                      const SizedBox(width: 14),
+                      Text('الجزء ${_ar(juz)} • الحزب ${_ar(hizb)}',
                           style: TextStyle(
-                              fontFamily: 'QuranHafs',
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: headerText,
-                              height: 1.25)),
-                    ),
-                    const SizedBox(width: 14),
-                    Container(
-                        width: 1,
-                        height: 18,
-                        color: gold.withValues(alpha: 0.45)),
-                    const SizedBox(width: 14),
-                    Text('الجزء ${_ar(juz)} • الحزب ${_ar(hizb)}',
-                        style: TextStyle(
-                            fontFamily: 'Almarai',
-                            fontSize: 12,
-                            color: subText)),
-                  ],
+                              fontFamily: 'Almarai',
+                              fontSize: 12,
+                              color: subText)),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
         ]),
       ),
     );
@@ -1486,12 +1511,27 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     if (data.pageNumber <= 2) {
       return _buildIlluminatedPage(data, isDark);
     }
-    // Just the page artwork at its maximum size — the info header
-    // lives in the floating top bar now, so the page NEVER resizes.
-    return Padding(
+    final artwork = Padding(
       padding: const EdgeInsets.all(2),
       child: _buildPageArtwork(data, isDark),
     );
+    // Editions still on the old chrome: just the artwork, with the page
+    // number and the surah/juz strip living in the floating bars.
+    if (!_spreadsLines) return artwork;
+
+    // The leaf carries its own furniture — running head above, page
+    // number below — and both stay put when the floating bars slide
+    // away, exactly as they are printed on paper.
+    return Column(children: [
+      MushafPageHeader(page: data.pageNumber, isDark: isDark),
+      Expanded(child: artwork),
+      MushafPageFooter(
+        page: data.pageNumber,
+        isDark: isDark,
+        pageColor: _pageColor(isDark),
+        onTap: _jumpDialog,
+      ),
+    ]);
   }
 
   /// Illuminated frame for the opening spread (pages 1-2 only).
@@ -1642,8 +1682,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   // the fifteen equal slots already provide it.
                   SizedBox(
                     height: line.isHeader ? size * 2.1 : null,
-                    child: _buildGlyphLine(
-                        line, page, size, leading, ink, isDark),
+                    child:
+                        _buildGlyphLine(line, page, size, leading, ink, isDark),
                   )
                 else
                   Expanded(
@@ -1750,8 +1790,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   Color _pageColor(bool isDark) => AppColors.mushafBackground(
       context.read<SettingsService>().mushafBackground, isDark);
 
-  Widget _buildGlyphLine(GlyphLine line, int page, double size,
-      double? leading, Color ink, bool isDark) {
+  Widget _buildGlyphLine(GlyphLine line, int page, double size, double? leading,
+      Color ink, bool isDark) {
     final family = line.usesSharedFont
         ? MushafGlyphService.sharedFamily
         : MushafGlyphService.familyFor(page);
@@ -1848,10 +1888,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         textDirection: TextDirection.rtl,
         maxLines: 1,
         style: TextStyle(
-            fontFamily: family,
-            fontSize: size,
-            height: leading,
-            color: ink),
+            fontFamily: family, fontSize: size, height: leading, color: ink),
       ),
     );
   }
@@ -2169,6 +2206,21 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     ];
   }
 
+  /// Line boundaries per page, measured once — the page data itself is
+  /// cached, so keying off it keeps the measurement alive exactly as
+  /// long as the page it describes.
+  final Expando<Object> _bandCache = Expando<Object>('mushaf line bands');
+
+  MushafLineBands? _lineBandsFor(MushafPageData data) {
+    final hit = _bandCache[data];
+    if (hit != null) return hit is MushafLineBands ? hit : null;
+    final measured = MushafLineBands.measure(data);
+    // Expando can't hold null, so a page that has no usable bands is
+    // remembered as a plain marker object instead of re-measured.
+    _bandCache[data] = measured ?? const Object();
+    return measured;
+  }
+
   Widget _buildPageArtwork(MushafPageData data, bool isDark) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -2190,10 +2242,36 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         final scaleX = renderWidth / data.viewBoxWidth;
         final scaleY = renderHeight / data.viewBoxHeight;
 
+        // ── Spread the printed lines into the leftover height ────────
+        //
+        // Fitting a Mushaf leaf's width to a phone always leaves slack
+        // below the last line; handing that slack to the line spacing
+        // is what makes the type readable. Only at rest: a zoomed page
+        // is already taller than the screen, so there is no slack to
+        // give, and the raster it is blitted from would be upscaled.
+        MushafLineBands? spread;
+        if (_spreadsLines && _zoom == 1.0 && !scrollZoom) {
+          final measured = _lineBandsFor(data);
+          if (measured != null && measured.bandCount > 1) {
+            final slack = constraints.maxHeight - renderHeight;
+            // Never more than a fraction of a line: past that the page
+            // stops reading as a page and starts reading as a list.
+            final lineHeight = renderHeight / measured.bandCount;
+            final gapPx =
+                math.min(slack / (measured.bandCount - 1), lineHeight * 0.45);
+            if (gapPx > 1.0) spread = measured.withGap(gapPx / scaleY);
+          }
+        }
+        final spreadHeight = renderHeight + (spread?.extraHeight ?? 0) * scaleY;
+        // Painted overlays live in the SPREAD coordinate space, so each
+        // shape moves with the line it belongs to.
+        double shiftPx(double viewBoxY) =>
+            (spread?.offsetFor(viewBoxY) ?? 0) * scaleY;
+
         final page = Center(
           child: SizedBox(
             width: renderWidth,
-            height: renderHeight,
+            height: spreadHeight,
             child: Stack(children: [
               // Ornamental surah-name frames — painted BEHIND the page
               // artwork so the surah names the SVG already draws land
@@ -2210,38 +2288,16 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       minY: data.viewBoxMinY,
                       isDark: isDark,
                       pageColor: _pageColor(isDark),
+                      shiftY: shiftPx,
                     ),
                   ),
                 ),
               ),
               Positioned.fill(
-                child: isDark
-                    ? ColorFiltered(
-                        colorFilter: const ColorFilter.matrix([
-                          -1,
-                          0,
-                          0,
-                          0,
-                          255,
-                          0,
-                          -1,
-                          0,
-                          0,
-                          255,
-                          0,
-                          0,
-                          -1,
-                          0,
-                          255,
-                          0,
-                          0,
-                          0,
-                          1,
-                          0,
-                        ]),
-                        child: SvgPicture.string(_tintedSvg(data),
-                            fit: BoxFit.contain))
-                    : SvgPicture.string(_tintedSvg(data), fit: BoxFit.contain),
+                child: _artworkLayer(data, isDark, spread,
+                    width: renderWidth,
+                    naturalHeight: renderHeight,
+                    scaleY: scaleY),
               ),
               // Tint marked ayahs using their exact polygon outlines (a
               // bounding-box tint would bleed onto neighbouring ayahs
@@ -2251,44 +2307,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 child: IgnorePointer(
                   child: CustomPaint(
                     painter: _AyahMarkPainter(
-                      marks: [
-                        for (final r in data.ayahRegions)
-                          if (r.ayahNumber > 0 && r.surahNumber > 0)
-                            if (identical(r, _flashRegion))
-                              (
-                                r,
-                                (isDark
-                                        ? AppColors.darkSecondary
-                                        : AppColors.secondary)
-                                    .withValues(
-                                        alpha: (1 - _flashCtrl.value) * 0.40)
-                              )
-                            else if (_playingGlobalAyah != null &&
-                                _regionGlobal(r) == _playingGlobalAyah)
-                              (
-                                r,
-                                (isDark
-                                        ? AppColors.darkSecondary
-                                        : AppColors.secondary)
-                                    .withValues(alpha: isDark ? 0.30 : 0.16)
-                              )
-                            else if (_bookmarkFor(r) != null)
-                              (
-                                r,
-                                AppColors.highlight(_bookmarkFor(r)!.color)
-                                    .withValues(alpha: isDark ? 0.32 : 0.22)
-                              )
-                            else if (_highlightFor(r) != null)
-                              (
-                                r,
-                                AppColors.highlight(_highlightFor(r)!.color)
-                                    .withValues(alpha: isDark ? 0.35 : 0.25)
-                              ),
-                      ],
+                      marks: _ayahMarks(data, isDark),
                       scaleX: scaleX,
                       scaleY: scaleY,
                       minX: data.viewBoxMinX,
                       minY: data.viewBoxMinY,
+                      spread: spread,
                     ),
                   ),
                 ),
@@ -2305,8 +2329,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   onLongPressStart: (details) {
                     final vx =
                         details.localPosition.dx / scaleX + data.viewBoxMinX;
-                    final vy =
+                    // Undo the line spread before hit-testing: the ayah
+                    // polygons are written against the printed page, not
+                    // against the spread one.
+                    final rawY =
                         details.localPosition.dy / scaleY + data.viewBoxMinY;
+                    final vy = spread?.unmap(rawY) ?? rawY;
                     for (final region in data.ayahRegions) {
                       if (region.ayahNumber > 0 &&
                           region.surahNumber > 0 &&
@@ -2359,7 +2387,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       : const NeverScrollableScrollPhysics(),
                   child: SizedBox(
                     width: renderWidth,
-                    height: renderHeight,
+                    height: spreadHeight,
                     child: page,
                   ),
                 ),
@@ -2369,6 +2397,75 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         );
       },
     );
+  }
+
+  /// The page artwork itself — blitted line by line when the lines are
+  /// being spread, drawn straight from the SVG otherwise.
+  ///
+  /// Dark mode inverts the whole layer rather than recolouring the
+  /// artwork: the pages are black ink on white, and inverting is the one
+  /// transform that keeps the ayah medallions and the script in step.
+  Widget _artworkLayer(
+    MushafPageData data,
+    bool isDark,
+    MushafLineBands? spread, {
+    required double width,
+    required double naturalHeight,
+    required double scaleY,
+  }) {
+    final artwork = spread == null
+        ? SvgPicture.string(_tintedSvg(data), fit: BoxFit.contain)
+        : MushafSpreadArtwork(
+            svg: _tintedSvg(data),
+            cacheKey: '${MushafSvgService.edition.id}:${data.pageNumber}',
+            bands: spread,
+            width: width,
+            naturalHeight: naturalHeight,
+            scale: scaleY,
+            viewBoxWidth: data.viewBoxWidth,
+            minX: data.viewBoxMinX,
+            minY: data.viewBoxMinY,
+            background: _pageColor(isDark),
+          );
+    if (!isDark) return artwork;
+    return ColorFiltered(
+      colorFilter: const ColorFilter.matrix([
+        -1,
+        0, 0, 0, 255, //
+        0, -1, 0, 0, 255, //
+        0, 0, -1, 0, 255, //
+        0, 0, 0, 1, 0, //
+      ]),
+      child: artwork,
+    );
+  }
+
+  /// Which ayahs on [data] are tinted, and in what colour. Priority:
+  /// the just-tapped flash, then the ayah being recited, then a
+  /// bookmark, then a highlight — the same order the reader uses.
+  List<(AyahHitRegion, Color)> _ayahMarks(MushafPageData data, bool isDark) {
+    final lit = isDark ? AppColors.darkSecondary : AppColors.secondary;
+    return [
+      for (final r in data.ayahRegions)
+        if (r.ayahNumber > 0 && r.surahNumber > 0)
+          if (identical(r, _flashRegion))
+            (r, lit.withValues(alpha: (1 - _flashCtrl.value) * 0.40))
+          else if (_playingGlobalAyah != null &&
+              _regionGlobal(r) == _playingGlobalAyah)
+            (r, lit.withValues(alpha: isDark ? 0.30 : 0.16))
+          else if (_bookmarkFor(r) != null)
+            (
+              r,
+              AppColors.highlight(_bookmarkFor(r)!.color)
+                  .withValues(alpha: isDark ? 0.32 : 0.22)
+            )
+          else if (_highlightFor(r) != null)
+            (
+              r,
+              AppColors.highlight(_highlightFor(r)!.color)
+                  .withValues(alpha: isDark ? 0.35 : 0.25)
+            ),
+    ];
   }
 
   /// Compact recitation controls shown while audio is active — without
@@ -2505,12 +2602,19 @@ class _AyahMarkPainter extends CustomPainter {
   final double minX;
   final double minY;
 
+  /// The line spread in force, if any. Each ring is one text LINE, so a
+  /// ring moves down by however far its line moved — measured once from
+  /// the ring's middle, so the rectangle travels rigidly instead of
+  /// being stretched across a line boundary.
+  final MushafLineBands? spread;
+
   _AyahMarkPainter({
     required this.marks,
     required this.scaleX,
     required this.scaleY,
     this.minX = 0,
     this.minY = 0,
+    this.spread,
   });
 
   @override
@@ -2519,9 +2623,20 @@ class _AyahMarkPainter extends CustomPainter {
       final path = Path();
       for (final ring in region.rings) {
         if (ring.length < 6) continue;
-        path.moveTo((ring[0] - minX) * scaleX, (ring[1] - minY) * scaleY);
+        var shift = 0.0;
+        if (spread != null) {
+          var top = double.infinity;
+          var bottom = double.negativeInfinity;
+          for (var i = 1; i < ring.length; i += 2) {
+            if (ring[i] < top) top = ring[i];
+            if (ring[i] > bottom) bottom = ring[i];
+          }
+          shift = spread!.offsetFor((top + bottom) / 2) * scaleY;
+        }
+        double y(double v) => (v - minY) * scaleY + shift;
+        path.moveTo((ring[0] - minX) * scaleX, y(ring[1]));
         for (var i = 2; i + 1 < ring.length; i += 2) {
-          path.lineTo((ring[i] - minX) * scaleX, (ring[i + 1] - minY) * scaleY);
+          path.lineTo((ring[i] - minX) * scaleX, y(ring[i + 1]));
         }
         path.close();
       }
@@ -2535,6 +2650,7 @@ class _AyahMarkPainter extends CustomPainter {
       oldDelegate.scaleY != scaleY ||
       oldDelegate.minX != minX ||
       oldDelegate.minY != minY ||
+      oldDelegate.spread?.gap != spread?.gap ||
       !_sameMarks(oldDelegate.marks);
 
   bool _sameMarks(List<(AyahHitRegion, Color)> other) {
