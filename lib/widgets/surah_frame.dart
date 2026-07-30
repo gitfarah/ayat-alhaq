@@ -14,18 +14,25 @@ class SurahFrame extends StatelessWidget {
   /// widget rather than around a string.
   final Widget? child;
 
+  /// Interior colour of the cartouche. Defaults to parchment; the
+  /// Mushaf passes the reader's chosen page colour so the frame is part
+  /// of the page rather than a cream patch sitting on it.
+  final Color? pageColor;
+
   const SurahFrame({
     super.key,
     required this.title,
     required this.isDark,
     this.fontSize = 20,
     this.child,
+    this.pageColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final gold = isDark ? AppColors.darkSecondary : AppColors.mushafBorderGold;
-    final fill = isDark ? AppColors.darkSurface : AppColors.mushafParchment;
+    final fill =
+        pageColor ?? (isDark ? AppColors.darkSurface : AppColors.mushafParchment);
     final text = isDark ? AppColors.darkText : AppColors.textPrimary;
 
     return Padding(

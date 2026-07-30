@@ -20,13 +20,17 @@ class GlyphLine {
   /// (surah, ayah, startIndex, length). Empty on header lines.
   final List<List<int>> spans;
 
+  /// Indices into [text] of the end-of-ayah medallions on this line.
+  final Set<int> endMarks;
+
   /// Whether this line is set in the shared Basmalah/surah-name font
   /// rather than the page's own. Ayah text lives in the page font;
   /// surah headers and the Basmalah are drawn from QCF_BSML, and using
   /// the wrong one turns them into unrelated words.
   final bool usesSharedFont;
 
-  const GlyphLine(this.type, this.text, this.spans, this.usesSharedFont);
+  const GlyphLine(
+      this.type, this.text, this.spans, this.endMarks, this.usesSharedFont);
 
   bool get isHeader => type == 's';
   bool get isBasmalah => type == 'b';
@@ -93,6 +97,10 @@ class MushafGlyphService {
                   for (final s in (line['v'] as List? ?? const []))
                     (s as List).cast<int>(),
                 ],
+                {
+                  for (final i in (line['e'] as List? ?? const []) )
+                    i as int,
+                },
                 line['f'] == 'b',
               ),
           ],

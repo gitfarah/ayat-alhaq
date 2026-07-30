@@ -22,6 +22,10 @@ class SurahBannerPainter extends CustomPainter {
   final double minX;
   final double minY;
 
+  /// Interior colour of the cartouche — the reader's page colour, so
+  /// the band belongs to the page instead of sitting on it.
+  final Color? pageColor;
+
   const SurahBannerPainter({
     required this.bands,
     required this.scaleX,
@@ -29,6 +33,7 @@ class SurahBannerPainter extends CustomPainter {
     required this.isDark,
     this.minX = 0,
     this.minY = 0,
+    this.pageColor,
   });
 
   @override
@@ -39,8 +44,8 @@ class SurahBannerPainter extends CustomPainter {
     // Mushaf. Dark mode uses deep emerald so the inverted white glyphs
     // stay legible on top.
     final bandFill = isDark ? const Color(0xFF16342A) : const Color(0xFFD8EADB);
-    final innerFill =
-        isDark ? const Color(0xFF0E241C) : const Color(0xFFFCFBF7);
+    final innerFill = pageColor ??
+        (isDark ? const Color(0xFF0E241C) : const Color(0xFFFCFBF7));
     final rule = isDark ? const Color(0xFFB99239) : const Color(0xFF8FB89A);
     final gold = isDark ? const Color(0xFFD4AF37) : const Color(0xFFC9A227);
 
@@ -140,6 +145,7 @@ class SurahBannerPainter extends CustomPainter {
       old.isDark != isDark ||
       old.minX != minX ||
       old.minY != minY ||
+      old.pageColor != pageColor ||
       old.bands.length != bands.length ||
       (bands.isNotEmpty &&
           old.bands.isNotEmpty &&

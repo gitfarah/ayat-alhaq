@@ -1,7 +1,7 @@
 name: quran_app_v1
 description: A Quran reading app for Android and iOS.
 publish_to: 'none'
-version: 1.7.0+37
+version: 1.7.1+38
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -45,6 +45,7 @@ flutter:
   assets:
     - assets/fonts/
     - assets/quran/
+    - assets/icon/app_icon.png
     - assets/icon/media_art.png
     - assets/icon/logo.png
     - assets/icon/logo_transparent.png

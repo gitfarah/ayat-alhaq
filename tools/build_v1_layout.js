@@ -18,6 +18,7 @@
 //   [ { "t": "s"|"b"|"a",      // sura header / basmalah / ayah text
 //       "f": "p"|"b",          // page font, or the shared BSML font
 //       "x": "<glyph string>", // codepoints, one char per glyph
+//       "e": [index, ...],     // end-of-ayah medallions in "x"
 //       "v": [[surah, ayah, startIndex, length], ...]   // ayah lines
 //     }, ... ]
 
@@ -52,12 +53,18 @@ function eachInsert(table, tupleRe, fn) {
 // needs.
 const code = new Map();
 const fontOf = new Map();
+// glyph_type 2 is the end-of-ayah medallion. There are exactly 6236 of
+// them, one per ayah — the only reliable way to find them. Guessing
+// "last glyph of the ayah's run on this line" instead painted the last
+// WORD of every ayah that carried on to the next line.
+const isEndMark = new Set();
 eachInsert(
   'glyph',
   "\\((\\d+),'([^']*)',(\\d+),(\\d+),(?:(\\d+)|NULL),(?:(\\d+)|NULL),(?:'[^']*'|NULL)\\)",
   t => {
     code.set(+t[1], +t[3]);
     fontOf.set(+t[1], t[2]);
+    if (t[5] === '2') isEndMark.add(+t[1]);
   });
 
 // glyph_id -> "surah:ayah" (ayah-text glyphs only)
@@ -109,6 +116,12 @@ for (const page of [...pages.keys()].sort((a, b) => a - b)) {
     }
     const type = TYPE[items[0].type] || 'a';
     const line = { t: type, x: text };
+    // Where the end-of-ayah medallions sit in this line.
+    const ends = [];
+    items.forEach((it, i) => {
+      if (isEndMark.has(it.gid)) ends.push(i);
+    });
+    if (ends.length) line.e = ends;
     // 'b' = the shared QCF_BSML font, 'p' = this page's own font.
     line.f = (fontOf.get(items[0].gid) || '').startsWith('QCF_BSML')
       ? 'b'

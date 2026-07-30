@@ -12,10 +12,6 @@ import '../theme.dart';
 /// are used under licences that ask for their notice to travel with the
 /// app, and the Quran text, the page artwork and the recitations each
 /// come from a different project that deserves naming.
-/// Kept in step with pubspec.yaml by hand — the app has no other need
-/// for a plugin that reads it back at runtime.
-const String appVersion = '1.7.0';
-
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
@@ -40,23 +36,36 @@ class AboutScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           _Card(isDark: isDark, children: [
+            // The app icon, not the wordmark: the wordmark is pale and
+            // vanished against the card.
             Center(
-              child: Image.asset('assets/icon/logo_transparent.png',
-                  height: 84, errorBuilder: (_, __, ___) => const SizedBox()),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset('assets/icon/app_icon.png',
+                    height: 88,
+                    width: 88,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox()),
+              ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Center(
-              child: Text('آيات الحق',
-                  style: TextStyle(
-                      fontFamily: 'QuranHafs',
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: text)),
-            ),
-            Center(
-              child: Text('${t('versionLbl')} $appVersion',
-                  style: TextStyle(
-                      fontFamily: 'Almarai', fontSize: 13, color: sub)),
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(
+                      text: 'آيات ',
+                      style: TextStyle(
+                          color: isDark
+                              ? AppColors.darkPrimary
+                              : AppColors.primary)),
+                  TextSpan(text: 'الحق', style: TextStyle(color: text)),
+                ]),
+                textDirection: TextDirection.rtl,
+                style: const TextStyle(
+                    fontFamily: 'QuranHafs',
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(height: 14),
             Text(t('aboutBlurb'),
@@ -105,9 +114,14 @@ class AboutScreen extends StatelessWidget {
                 applicationName: 'آيات الحق',
                 applicationIcon: Padding(
                   padding: const EdgeInsets.all(8),
-                  child: Image.asset('assets/icon/logo_transparent.png',
-                      height: 48,
-                      errorBuilder: (_, __, ___) => const SizedBox()),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.asset('assets/icon/app_icon.png',
+                        height: 48,
+                        width: 48,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox()),
+                  ),
                 ),
               ),
               icon: Icon(Icons.article_outlined,

@@ -1666,6 +1666,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// that is how the page is set, and the font's glyphs are drawn for
   /// exactly that width. Surah headers and the Basmalah are centred at
   /// their natural size instead.
+  /// How far a line's glyph box may exceed its share of the page before
+  /// the type size is reduced. Measured against the pages that overflow
+  /// (Ar-Rahman's opening) and the dense ones that must stay full width.
+  static const double _lineBoxSlack = 1.5;
+
   /// The single type size a page is set at.
   ///
   /// One size for the whole page, not one per line. Stretching each
@@ -1698,20 +1703,31 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       if (painter.width > widest) widest = painter.width;
       if (painter.height > tallest) tallest = painter.height;
     }
-    // A full page is designed so its lines fill the measure — so the
-    // width decides, and capping by height only squeezed the page into
-    // a thin column with wide empty margins. The opening pages hold few
-    // short lines, where width alone would give an enormous size, so
-    // there the height decides too.
+    // Width normally decides: a full page is designed so its lines fill
+    // the measure. But a page whose longest line is short — Ar-Rahman's
+    // opening, all brief ayahs — would then be set so large that the
+    // last lines fell off the bottom. So the height caps it too.
+    //
+    // The cap is not the raw glyph box: these fonts carry very tall
+    // ascenders and descenders, and requiring that whole box inside a
+    // fifteenth of the page squeezed every page into a thin column.
+    // Printed lines overlap in their metric boxes, and [_lineBoxSlack]
+    // is how much of that overlap to allow.
     final byWidth = ref * measure / widest;
-    final byHeight = ref * maxHeight / (tallest * lines.length);
-    final size = opening && byHeight < byWidth ? byHeight : byWidth;
+    final byHeight =
+        ref * maxHeight * _lineBoxSlack / (tallest * lines.length);
+    final size = byHeight < byWidth ? byHeight : byWidth;
     _glyphSizeCache[key] = size;
     if (_glyphSizeCache.length > 24) {
       _glyphSizeCache.remove(_glyphSizeCache.keys.first);
     }
     return size;
   }
+
+  /// The reader's chosen page colour, for frames that must sit ON the
+  /// page rather than look pasted onto it.
+  Color _pageColor(bool isDark) => AppColors.mushafBackground(
+      context.read<SettingsService>().mushafBackground, isDark);
 
   Widget _buildGlyphLine(
       GlyphLine line, int page, double size, Color ink, bool isDark) {
@@ -1758,6 +1774,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             scaleX: 1,
             scaleY: 1,
             isDark: isDark,
+            pageColor: _pageColor(isDark),
           ),
           child: Center(child: label),
         );
@@ -1775,21 +1792,26 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             text: line.text.substring(cursor, start),
             style: TextStyle(color: ink)));
       }
-      // The end-of-ayah medallion is the last glyph of the run — split
-      // it off so it can carry its own colour.
-      final run = line.text.substring(start, start + len);
-      final endsWithMark = _lineEndsAyah(line, s);
-      spans.add(_glyphAyahSpan(
-          endsWithMark ? run.substring(0, run.length - 1) : run,
-          s[0],
-          s[1],
-          ink,
-          isDark));
-      if (endsWithMark) {
+      // Split the run wherever an end-of-ayah medallion sits, so those
+      // glyphs — and only those — carry the marker colour. The data
+      // says exactly where they are; the last glyph of a run is NOT
+      // one whenever the ayah carries on to the next line.
+      final mark = isDark ? AppColors.darkPrimary : AppColors.primary;
+      var from = start;
+      for (var i = start; i < start + len; i++) {
+        if (!line.endMarks.contains(i)) continue;
+        if (i > from) {
+          spans.add(_glyphAyahSpan(
+              line.text.substring(from, i), s[0], s[1], ink, isDark));
+        }
         spans.add(_glyphAyahSpan(
-            run.substring(run.length - 1), s[0], s[1], ink, isDark,
-            colour:
-                isDark ? AppColors.darkPrimary : AppColors.primary));
+            line.text.substring(i, i + 1), s[0], s[1], ink, isDark,
+            colour: mark));
+        from = i + 1;
+      }
+      if (from < start + len) {
+        spans.add(_glyphAyahSpan(
+            line.text.substring(from, start + len), s[0], s[1], ink, isDark));
       }
       cursor = start + len;
     }
@@ -1810,20 +1832,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
   /// One ayah's stretch of a glyph line, tinted for the mark it carries
   /// and long-pressable for the same options sheet as everywhere else.
-  /// Whether this run of the ayah ends with its numbered medallion —
-  /// true only for the run that closes the ayah, which is the one the
-  /// next span (if any) belongs to a different ayah after.
-  bool _lineEndsAyah(GlyphLine line, List<int> span) {
-    final i = line.spans.indexOf(span);
-    final end = span[2] + span[3];
-    if (end > line.text.length) return false;
-    // The closing run either ends the line or is followed by a
-    // different ayah.
-    if (i == line.spans.length - 1) return true;
-    final next = line.spans[i + 1];
-    return next[0] != span[0] || next[1] != span[1];
-  }
-
   InlineSpan _glyphAyahSpan(
       String text, int surah, int ayah, Color ink, bool isDark,
       {Color? colour}) {
@@ -1858,7 +1866,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
   Widget _buildTextPage(int page, bool isDark) {
     final future = _textFutures[page] ??= QuranService.ayahsOnPage(page);
-    final cream = isDark ? AppColors.darkSurfaceAlt : AppColors.mushafParchment;
     final ink = isDark ? AppColors.darkText : AppColors.textPrimary;
 
     return LayoutBuilder(builder: (context, constraints) {
@@ -1896,20 +1903,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
             physics: const ClampingScrollPhysics(),
-            // Fill the screen height even when the type ends short of
-            // it — the parchment reads as a full page, not a floating
-            // card.
+            // No card of its own: the page draws straight onto the
+            // chosen Mushaf background, like every other edition. It
+            // still claims the full height so a short page reads as a
+            // page rather than a floating block of text.
             child: Container(
               width: double.infinity,
               constraints:
                   BoxConstraints(minHeight: constraints.maxHeight - 32),
-              decoration: BoxDecoration(
-                color: cream,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                    color: AppColors.mushafBorderGold.withValues(alpha: 0.55),
-                    width: 1.2),
-              ),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2067,6 +2068,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           title: 'سورة ${_surahName(surah)}',
           isDark: isDark,
           fontSize: fontSize * 0.9,
+          pageColor: _pageColor(isDark),
         ),
       );
 
@@ -2181,6 +2183,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       minX: data.viewBoxMinX,
                       minY: data.viewBoxMinY,
                       isDark: isDark,
+                      pageColor: _pageColor(isDark),
                     ),
                   ),
                 ),
