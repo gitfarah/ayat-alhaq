@@ -71,7 +71,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   final Expando<String> _tintedCache = Expando<String>('tinted mushaf page');
 
   /// Measured type size for a glyph page, keyed by page and measure.
-  final Map<String, double> _glyphSizeCache = {};
+  final Map<String, (double, double)> _glyphSizeCache = {};
 
   bool _isCachedOffline = false;
   bool _barsVisible = true;
@@ -1594,17 +1594,32 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       // Same zoom model as the artwork editions: the page is drawn
       // WIDER and read by scrolling, never dragged around in two
       // dimensions. Here that costs nothing in sharpness.
-      final width = constraints.maxWidth * _zoom;
-      final height = width / (345 / 550);
+      //
+      // The page box must fit the SCREEN, not just its width. A Mushaf
+      // page is proportionally much taller than it is wide, so on a
+      // tablet held upright a width-driven box runs off the bottom —
+      // which is why the last lines were missing there while a phone
+      // looked fine. The artwork editions have always clamped this; the
+      // glyph pages did not.
+      const aspect = 345 / 550;
+      var width = constraints.maxWidth * _zoom;
+      var height = width / aspect;
+      if (!_isZoomed && height > constraints.maxHeight) {
+        height = constraints.maxHeight;
+        width = height * aspect;
+      }
 
-      // The opening spread is set in a narrower column than a full
-      // page, the way the printed Mushaf frames it.
       // The opening spread is set in a narrower column, the way the
       // printed Mushaf frames it; a full page uses the whole measure.
       final opening = page <= 2;
       final inset = opening ? 0.16 : 0.045;
       final measure = width * (1 - inset * 2);
-      final size = _glyphFontSize(page, lines, measure, height * 0.9, opening);
+      final textHeight = height * 0.96;
+      final m = _glyphMetrics(page, lines, measure, textHeight);
+      final size = m.size;
+      // The opening pages are a centred block at the font's own leading;
+      // a full page is fifteen lines set to fill the height exactly.
+      final leading = opening ? null : m.leading;
 
       final page0 = SizedBox(
         width: width,
@@ -1627,11 +1642,13 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   // the fifteen equal slots already provide it.
                   SizedBox(
                     height: line.isHeader ? size * 2.1 : null,
-                    child: _buildGlyphLine(line, page, size, ink, isDark),
+                    child: _buildGlyphLine(
+                        line, page, size, leading, ink, isDark),
                   )
                 else
                   Expanded(
-                      child: _buildGlyphLine(line, page, size, ink, isDark)),
+                      child: _buildGlyphLine(
+                          line, page, size, leading, ink, isDark)),
             ],
           ),
         ),
@@ -1669,22 +1686,29 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// How far a line's glyph box may exceed its share of the page before
   /// the type size is reduced. Measured against the pages that overflow
   /// (Ar-Rahman's opening) and the dense ones that must stay full width.
-  static const double _lineBoxSlack = 1.5;
+  /// How far a line's ink may exceed its share of the page. The Mushaf
+  /// font's own line box is about 1.9x the type size, and fifteen of
+  /// those will not fit a page — a printed page packs its lines tighter
+  /// than the font's metrics and lets the tall glyphs overlap. Measured
+  /// across pages 50, 77, 128, 151 and 531, the natural box runs 1.21x
+  /// the available slot, so this leaves a little headroom above that and
+  /// only bites on a page whose lines are unusually short.
+  static const double _maxLineOverlap = 1.35;
 
-  /// The single type size a page is set at.
+  /// The type size a page is set at, and the leading to set it with.
   ///
-  /// One size for the whole page, not one per line. Stretching each
-  /// line to the full measure looked right on a dense page — every line
-  /// there really does fill it — but wrecked the opening pages, where a
-  /// short line was blown up to the width of a long one and Al-Fatiha
-  /// came out with verses at half a dozen different sizes. The page
-  /// font's glyphs are drawn so a full line fills the measure at one
-  /// size; short lines are simply short, and centre.
-  double _glyphFontSize(int page, List<GlyphLine> lines, double measure,
-      double maxHeight, bool opening) {
-    final key = '$page:${measure.round()}';
+  /// The width decides the size: these fonts draw each line to fill the
+  /// measure, so that is the page's own design. The leading is then
+  /// chosen so the lines exactly fill the page height — which is the
+  /// part I had wrong twice. Shrinking the type until its natural line
+  /// box fit squeezed the page into a thin column; leaving the natural
+  /// box alone pushed the last lines off the bottom. Neither was
+  /// needed: the size comes from the width, the leading from the height.
+  ({double size, double leading}) _glyphMetrics(
+      int page, List<GlyphLine> lines, double measure, double textHeight) {
+    final key = '$page:${measure.round()}x${textHeight.round()}';
     final hit = _glyphSizeCache[key];
-    if (hit != null) return hit;
+    if (hit != null) return (size: hit.$1, leading: hit.$2);
 
     const ref = 100.0;
     var widest = 1.0;
@@ -1703,25 +1727,22 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       if (painter.width > widest) widest = painter.width;
       if (painter.height > tallest) tallest = painter.height;
     }
-    // Width normally decides: a full page is designed so its lines fill
-    // the measure. But a page whose longest line is short — Ar-Rahman's
-    // opening, all brief ayahs — would then be set so large that the
-    // last lines fell off the bottom. So the height caps it too.
-    //
-    // The cap is not the raw glyph box: these fonts carry very tall
-    // ascenders and descenders, and requiring that whole box inside a
-    // fifteenth of the page squeezed every page into a thin column.
-    // Printed lines overlap in their metric boxes, and [_lineBoxSlack]
-    // is how much of that overlap to allow.
-    final byWidth = ref * measure / widest;
-    final byHeight =
-        ref * maxHeight * _lineBoxSlack / (tallest * lines.length);
-    final size = byHeight < byWidth ? byHeight : byWidth;
-    _glyphSizeCache[key] = size;
+
+    final slot = textHeight / lines.length;
+    final natural = tallest / ref; // line box per unit of type size
+    var size = ref * measure / widest;
+    // Only a page with unusually short lines can ask for a size whose
+    // ink would swamp the slot; pull those back.
+    final maxSize = slot * _maxLineOverlap / natural;
+    if (size > maxSize) size = maxSize;
+    // Leading that makes lines.length lines fill textHeight exactly.
+    final leading = slot / size;
+
+    _glyphSizeCache[key] = (size, leading);
     if (_glyphSizeCache.length > 24) {
       _glyphSizeCache.remove(_glyphSizeCache.keys.first);
     }
-    return size;
+    return (size: size, leading: leading);
   }
 
   /// The reader's chosen page colour, for frames that must sit ON the
@@ -1729,8 +1750,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   Color _pageColor(bool isDark) => AppColors.mushafBackground(
       context.read<SettingsService>().mushafBackground, isDark);
 
-  Widget _buildGlyphLine(
-      GlyphLine line, int page, double size, Color ink, bool isDark) {
+  Widget _buildGlyphLine(GlyphLine line, int page, double size,
+      double? leading, Color ink, bool isDark) {
     final family = line.usesSharedFont
         ? MushafGlyphService.sharedFamily
         : MushafGlyphService.familyFor(page);
@@ -1742,6 +1763,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           style: TextStyle(
               fontFamily: family,
               fontSize: size,
+              height: leading,
               color: line.isHeader ? gold : ink));
       if (!line.isHeader) return Center(child: label);
 
@@ -1825,7 +1847,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         TextSpan(children: spans),
         textDirection: TextDirection.rtl,
         maxLines: 1,
-        style: TextStyle(fontFamily: family, fontSize: size, color: ink),
+        style: TextStyle(
+            fontFamily: family,
+            fontSize: size,
+            height: leading,
+            color: ink),
       ),
     );
   }
