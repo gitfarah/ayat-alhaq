@@ -106,6 +106,20 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// edition nearly everyone reads.
   bool get _spreadsLines => MushafSvgService.edition.id == 'hafs';
 
+  /// Ceiling on the line spread, as a share of the page's own height.
+  static const double _maxSpread = 0.30;
+
+  /// Height of the band under the leaf that carries the page number.
+  ///
+  /// It DOUBLES AS the bottom safe-area inset rather than stacking on
+  /// top of it. Stacked, the two together took 64 logical pixels off the
+  /// foot of a phone screen to show a 30-pixel ornament, and that band
+  /// was the dead space under the last line. The number hugs the outer
+  /// edge of the leaf and the home indicator sits in the middle, so they
+  /// share the strip without ever meeting.
+  double _footerHeight(BuildContext context) =>
+      math.max(30.0, MediaQuery.viewPaddingOf(context).bottom);
+
   void _onScaleStart(ScaleStartDetails d) => _zoomStart = _zoom;
 
   void _onScaleUpdate(ScaleUpdateDetails d) {
@@ -1378,7 +1392,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     Expanded(child: _buildSinglePage(pages[0], isDark)),
                   ]),
                 );
-          return SafeArea(child: content);
+          // The leaf runs to the bottom of the screen when it carries
+          // its own foot: that band already reserves the inset (see
+          // [_footerHeight]), and insetting twice is what left the dead
+          // strip under the last line.
+          return SafeArea(bottom: !_usesPageFurniture, child: content);
         },
       ),
     );
@@ -1500,7 +1518,15 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   Widget _buildSinglePage(MushafPageData data, bool isDark) {
     // Pages 1-2 get the illuminated opening frame
     if (data.pageNumber <= 2) {
-      return _buildIlluminatedPage(data, isDark);
+      final opening = _buildIlluminatedPage(data, isDark);
+      // The opening spread prints no page number, so it has no foot to
+      // reserve the bottom inset the leaf now runs into. It still must
+      // not end up under the home indicator.
+      return _usesPageFurniture
+          ? Padding(
+              padding: EdgeInsets.only(bottom: _footerHeight(context)),
+              child: opening)
+          : opening;
     }
     final artwork = Padding(
       padding: const EdgeInsets.all(2),
@@ -1525,6 +1551,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         isDark: isDark,
         pageColor: _pageColor(isDark),
         onTap: _jumpDialog,
+        height: _footerHeight(context),
       ),
     ]);
   }
@@ -1880,25 +1907,23 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     ];
   }
 
-  /// Line boundaries per page, measured once — the page data itself is
-  /// cached, so keying off it keeps the measurement alive exactly as
-  /// long as the page it describes.
-  /// Where each page has no ink, as fractions of its height, measured
-  /// off the rasterised artwork by [MushafSpreadArtwork].
+  /// Where each page's lines end and the space between them begins, as
+  /// fractions of its height, measured off the rasterised artwork by
+  /// [MushafSpreadArtwork].
   ///
-  /// A page is drawn unstretched until its blank runs are known. That
-  /// costs one small re-settle the first time a page is shown and
-  /// nothing after, and it is the price of never GUESSING where the ink
-  /// is — guessing, from the ayah polygons, is what clipped the tops off
+  /// A page is drawn unstretched until its gaps are known. That costs
+  /// one small re-settle the first time a page is shown and nothing
+  /// after, and it is the price of never GUESSING where the ink is —
+  /// guessing, from the ayah polygons, is what clipped the tops off
   /// letters, because the script does not stay inside those boxes.
-  final Map<String, List<double>> _blankRuns = {};
+  final Map<String, List<double>> _gapRuns = {};
 
   String _cutKey(int page) => '${MushafSvgService.edition.id}:$page';
 
   void _onPageMeasured(int page, List<double> runs) {
     final key = _cutKey(page);
-    if (_blankRuns[key] != null || !mounted) return;
-    setState(() => _blankRuns[key] = runs);
+    if (_gapRuns[key] != null || !mounted) return;
+    setState(() => _gapRuns[key] = runs);
   }
 
   Widget _buildPageArtwork(MushafPageData data, bool isDark) {
@@ -1931,12 +1956,15 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         // give, and the raster it is blitted from would be upscaled.
         MushafPageStretch? spread;
         if (_spreadsLines && _zoom == 1.0 && !scrollZoom) {
-          final runs = _blankRuns[_cutKey(data.pageNumber)];
+          final runs = _gapRuns[_cutKey(data.pageNumber)];
           final slack = constraints.maxHeight - renderHeight;
           if (runs != null && slack > 4) {
             // Never more than a fraction of the page: past that the
-            // lines drift apart and it stops reading as a page.
-            final extraPx = math.min(slack, renderHeight * 0.22);
+            // lines drift apart and it stops reading as a page. A leaf
+            // fitted by width leaves about 15% of a phone's height over,
+            // so the ceiling has to clear that comfortably or the page
+            // goes on ending in the dead band this is here to remove.
+            final extraPx = math.min(slack, renderHeight * _maxSpread);
             spread = MushafPageStretch.build(
               runs,
               top: data.viewBoxMinY,

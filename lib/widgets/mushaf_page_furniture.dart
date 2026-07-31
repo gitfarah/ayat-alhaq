@@ -96,7 +96,15 @@ class MushafPageHeader extends StatelessWidget {
 class MushafPageFooter extends StatelessWidget {
   final int page;
   final bool isDark;
+
+  /// Height of the band. The ornament inside it keeps its own size —
+  /// the band is as deep as the space under the leaf happens to be
+  /// (a phone's bottom inset, say), and a page number that grew with
+  /// the device's gesture bar would just look wrong.
   final double height;
+
+  /// The ornament never gets bigger than this, however deep the band.
+  static const double _maxBadge = 32;
 
   /// Interior colour of the cartouche — the reader's chosen page colour,
   /// so the frame belongs to the paper instead of sitting on top of it.
@@ -125,7 +133,7 @@ class MushafPageFooter extends StatelessWidget {
       isDark: isDark,
       pageColor: pageColor,
       pointLeft: onLeft,
-      height: height,
+      height: math.min(height, _maxBadge),
     );
 
     return SizedBox(

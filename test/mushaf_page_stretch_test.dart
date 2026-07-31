@@ -1,8 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:quran_app_v1/widgets/mushaf_page_furniture.dart';
 import 'package:quran_app_v1/widgets/mushaf_spread_page.dart';
@@ -12,26 +11,41 @@ import 'package:quran_app_v1/widgets/mushaf_spread_page.dart';
 /// into one strip per line clipped every alif and kasra that reached
 /// into a neighbouring line — the script simply does not stay inside the
 /// ayah boxes. These tests pin down the replacement: a continuous
-/// mapping that stretches only the rows carrying no ink.
+/// mapping that stretches only the rows between the lines.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   /// A page profile: 15 lines of ink separated by 6-row gaps, with
-  /// margins top and bottom.
-  List<int> syntheticPage() {
-    final ink = List<int>.filled(600, 0);
+  /// margins top and bottom. Each row carries a plausible ink COUNT —
+  /// how many sampled columns of it are not clear.
+  List<int> syntheticPage({int gapInk = 0}) {
+    final ink = List<int>.filled(600, gapInk);
+    for (var y = 0; y < 20; y++) {
+      ink[y] = 0; // head margin
+    }
+    for (var y = 20 + 15 * 38 - 6; y < 600; y++) {
+      ink[y] = 0; // foot margin
+    }
     for (var line = 0; line < 15; line++) {
       final top = 20 + line * 38;
       for (var y = top; y < top + 32; y++) {
-        ink[y] = 1;
+        ink[y] = 40;
       }
     }
     return ink;
   }
 
-  group('Blank-run measurement', () {
+  /// The real thing: per-row ink counts measured off rasterised Hafs
+  /// pages, exactly as [MushafSpreadArtwork] measures them on the device
+  /// (1080 px wide, every third column, alpha > 40).
+  final fixtures = jsonDecode(
+      File('test/fixtures/hafs_ink_profiles.json').readAsStringSync()) as Map;
+  List<int> realPage(String page) =>
+      (fixtures[page]['inkPerRow'] as List).cast<int>();
+
+  group('Line-gap measurement', () {
     test('finds the gaps between lines, not the page margins', () {
-      final runs = MushafPageStretch.blankRunsOf(syntheticPage())!;
+      final runs = MushafPageStretch.gapRunsOf(syntheticPage())!;
       // 15 lines leave 14 interior gaps; margins are excluded.
       expect(runs.length, 14 * 2);
       // The first gap starts after the first line's ink, not at the top.
@@ -39,9 +53,55 @@ void main() {
     });
 
     test('a page with no gaps is left alone', () {
-      expect(MushafPageStretch.blankRunsOf(List<int>.filled(600, 1)), isNull);
-      expect(MushafPageStretch.blankRunsOf(List<int>.filled(600, 0)), isNull);
+      expect(MushafPageStretch.gapRunsOf(List<int>.filled(600, 40)), isNull);
+      expect(MushafPageStretch.gapRunsOf(List<int>.filled(600, 0)), isNull);
     });
+
+    test('a gap crossed by ascenders is still a gap', () {
+      // THE BUG THIS REPLACED. Requiring rows with literally no ink lost
+      // every gap a single alif or ya reached into — which on a real
+      // page is most of them — so the page was left unstretched and all
+      // of the leftover height piled up under the last line.
+      final crossed = syntheticPage(gapInk: 3);
+      expect(crossed.where((v) => v == 0).length, lessThan(60),
+          reason: 'the gaps are no longer clear rows');
+      expect(MushafPageStretch.gapRunsOf(crossed)?.length, 14 * 2);
+    });
+
+    test('a pinch inside one line is not mistaken for line spacing', () {
+      // [build] gives the most height to the SHORTEST gaps, so a two-row
+      // dip in the middle of a line would be prised wide open.
+      final ink = syntheticPage();
+      ink[20 + 3 * 38 + 10] = 2;
+      ink[20 + 3 * 38 + 11] = 2;
+      expect(MushafPageStretch.gapRunsOf(ink)!.length, 14 * 2);
+    });
+
+    for (final page in ['050', '255']) {
+      test('finds a gap for nearly every line of real page $page', () {
+        final runs = MushafPageStretch.gapRunsOf(realPage(page));
+        expect(runs, isNotNull, reason: 'a set page must have line gaps');
+        // A Hafs page carries 15 lines, so ~14 interior gaps, plus the
+        // space under a surah band or a Basmala where the page opens one.
+        expect(runs!.length ~/ 2, greaterThanOrEqualTo(12));
+      });
+
+      test('page $page is only ever stretched where the ink is thin', () {
+        final ink = realPage(page);
+        final runs = MushafPageStretch.gapRunsOf(ink)!;
+        final busiest = [
+          for (var i = 0; i + 1 < runs.length; i += 2)
+            for (var y = (runs[i] * ink.length).round();
+                y < (runs[i + 1] * ink.length).round();
+                y++)
+              ink[y]
+        ].reduce((a, b) => a > b ? a : b);
+        final onALine = (ink.where((v) => v > 0).toList()..sort());
+        final median = onALine[onALine.length ~/ 2];
+        expect(busiest, lessThan(median * 0.3),
+            reason: 'a stretched row carries a line, not a stray stroke');
+      });
+    }
   });
 
   group('Page stretch', () {
@@ -49,7 +109,7 @@ void main() {
     late List<double> runs;
 
     setUp(() {
-      runs = MushafPageStretch.blankRunsOf(syntheticPage())!;
+      runs = MushafPageStretch.gapRunsOf(syntheticPage())!;
       stretch = MushafPageStretch.build(runs, top: 0, height: 600, extra: 60)!;
     });
 
@@ -64,14 +124,14 @@ void main() {
       }
     });
 
-    test('leaves inked rows undistorted — only blank rows stretch', () {
-      // Every row carrying ink must map at unit scale, or glyphs would
-      // be squashed or stretched vertically.
+    test('leaves inked rows undistorted — only the gaps stretch', () {
+      // Every row carrying a line must map at unit scale, or glyphs
+      // would be squashed or stretched vertically.
       final ink = syntheticPage();
       for (var line = 0; line < 15; line++) {
         final top = (20 + line * 38).toDouble();
         final bottom = top + 31;
-        expect(ink[top.toInt()], 1);
+        expect(ink[top.toInt()], greaterThan(0));
         final height = stretch.mapY(bottom) - stretch.mapY(top);
         expect(height, closeTo(bottom - top, 0.001),
             reason: 'line $line was distorted');
@@ -105,59 +165,51 @@ void main() {
   });
 
   group('Real Hafs artwork', () {
-    // Uses a page fetched into the scratch dir; skipped otherwise so CI
-    // never depends on the network.
-    const svgPath =
-        r'C:\Users\mroma\AppData\Local\Temp\claude\D--flutter\a17e59c2-4325-48e1-ac29-42f2416ea1ec\scratchpad\321.svg';
+    // A phone-shaped box: a 345x550 leaf fitted to a 386-wide screen is
+    // ~615 tall, and the reader's page area is ~733 — so ~118 logical
+    // pixels of slack, which is the dead band under the last line that
+    // the spread exists to remove.
+    const boxHeight = 733.0;
+    const renderWidth = 386.0;
 
-    test('stretching page 321 distorts no inked row', () async {
-      if (!File(svgPath).existsSync()) {
-        markTestSkipped('page artwork not fetched');
-        return;
-      }
-      final info = await vg.loadPicture(
-          SvgStringLoader(File(svgPath).readAsStringSync()), null);
-      const w = 720;
-      const h = (w * 550) ~/ 345;
-      final rec = ui.PictureRecorder();
-      Canvas(rec)
-        ..scale(w / 345)
-        ..drawPicture(info.picture);
-      final pic = rec.endRecording();
-      final image = await pic.toImage(w, h);
-      final bytes =
-          (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
-      final data = bytes.buffer.asUint8List();
+    for (final page in ['050', '255']) {
+      test('page $page fills the screen instead of ending in dead space', () {
+        final ink = realPage(page);
+        final vbWidth = (fixtures[page]['viewBoxWidth'] as num).toDouble();
+        final vbHeight = (fixtures[page]['viewBoxHeight'] as num).toDouble();
+        final renderHeight = renderWidth / (vbWidth / vbHeight);
+        final scaleY = renderHeight / vbHeight;
+        final slack = boxHeight - renderHeight;
+        expect(slack, greaterThan(80), reason: 'the leaf is the wider shape');
 
-      final ink = List<int>.filled(h, 0);
-      for (var y = 0; y < h; y++) {
-        for (var x = 0; x < w; x++) {
-          if (data[(y * w + x) * 4 + 3] > 40) {
-            ink[y] = 1;
-            break;
-          }
+        final runs = MushafPageStretch.gapRunsOf(ink)!;
+        final stretch = MushafPageStretch.build(runs,
+            top: 0, height: vbHeight, extra: slack / scaleY)!;
+
+        expect(renderHeight + stretch.extraHeight * scaleY,
+            closeTo(boxHeight, 0.5));
+      });
+
+      test('page $page distorts no row that carries a line', () {
+        final ink = realPage(page);
+        final vbHeight = (fixtures[page]['viewBoxHeight'] as num).toDouble();
+        final runs = MushafPageStretch.gapRunsOf(ink)!;
+        final stretch = MushafPageStretch.build(runs,
+            top: 0, height: vbHeight, extra: vbHeight * 0.18)!;
+
+        final onALine = (ink.where((v) => v > 0).toList()..sort());
+        final median = onALine[onALine.length ~/ 2];
+        final perUnit = ink.length / vbHeight;
+        for (var y = 0; y < ink.length; y++) {
+          if (ink[y] < median) continue; // thin rows are the gaps
+          final top = y / perUnit;
+          final bottom = (y + 1) / perUnit;
+          expect(stretch.mapY(bottom) - stretch.mapY(top),
+              closeTo(bottom - top, 0.0001),
+              reason: 'raster row $y was scaled — a glyph would distort');
         }
-      }
-
-      final runs = MushafPageStretch.blankRunsOf(ink);
-      expect(runs, isNotNull, reason: 'a set page must have line gaps');
-      final s = MushafPageStretch.build(runs!,
-          top: 0, height: 550, extra: 550 * 0.18)!;
-
-      // Every inked row of the REAL page must map at unit scale.
-      const perUnit = h / 550;
-      for (var y = 0; y < h; y++) {
-        if (ink[y] == 0) continue;
-        final top = y / perUnit;
-        final bottom = (y + 1) / perUnit;
-        expect(s.mapY(bottom) - s.mapY(top), closeTo(bottom - top, 0.0001),
-            reason: 'inked raster row $y was scaled — a glyph would distort');
-      }
-
-      image.dispose();
-      pic.dispose();
-      info.picture.dispose();
-    });
+      });
+    }
   });
 
   group('Page furniture', () {
@@ -182,6 +234,21 @@ void main() {
             .first);
         expect(align.alignment, alignment, reason: 'page $page');
         expect(find.text(arabicDigits(page)), findsOneWidget);
+      }
+    });
+
+    testWidgets('the ornament keeps its size in a deeper band',
+        (tester) async {
+      // The foot band doubles as the phone's bottom inset, so it is as
+      // deep as the device says — the page number must not grow with it.
+      for (final height in [30.0, 48.0]) {
+        await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+              body: MushafPageFooter(page: 50, isDark: false, height: height)),
+        ));
+        expect(tester.getSize(find.byType(MushafPageFooter)).height, height);
+        expect(tester.getSize(find.byType(MushafPageBadge)).height,
+            lessThanOrEqualTo(32.0));
       }
     });
 
