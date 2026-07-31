@@ -1935,8 +1935,21 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           final slack = constraints.maxHeight - renderHeight;
           if (runs != null && slack > 4) {
             // Never more than a fraction of the page: past that the
-            // lines drift apart and it stops reading as a page.
-            final extraPx = math.min(slack, renderHeight * 0.22);
+            // lines drift apart and it stops reading as a page. That
+            // fraction can't be a single constant, though: a tablet's
+            // screen is close enough to the leaf's own aspect ratio that
+            // slack is always small, but a phone's tall/narrow screen
+            // routinely leaves slack far past 22% of renderHeight — a
+            // fixed 22% cap left the rest as dead space under the last
+            // line. Let the cap grow with how mismatched the screen is,
+            // so a phone gets more of its slack absorbed into the lines
+            // instead of dumping the remainder below the page.
+            final slackRatio = slack / renderHeight;
+            final capFraction = math.min(
+              0.40,
+              0.22 + math.max(0.0, slackRatio - 0.22) * 0.5,
+            );
+            final extraPx = math.min(slack, renderHeight * capFraction);
             spread = MushafPageStretch.build(
               runs,
               top: data.viewBoxMinY,
