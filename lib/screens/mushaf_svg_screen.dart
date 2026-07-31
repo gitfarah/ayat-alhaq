@@ -1192,7 +1192,13 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     final wide = _isWideScreen(context);
     if (_pageCtrl == null || wide != _wide) {
       _wide = wide;
-      _pageCtrl?.dispose();
+      // Disposing a controller a PageView is still attached to is an
+      // error, and this runs mid-build — let the old one go once the
+      // frame that replaces it has been laid out.
+      final previous = _pageCtrl;
+      if (previous != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => previous.dispose());
+      }
       _pageCtrl = PageController(initialPage: _indexForPage(_pageNum));
       _pageFutures.clear();
     }
@@ -1212,6 +1218,10 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           // advances).
           Positioned.fill(
             child: PageView.builder(
+              // Keyed on the layout mode so a rotation builds a FRESH
+              // page view instead of reusing the old one's scroll
+              // position, which belongs to a different index space.
+              key: ValueKey(wide),
               controller: _pageCtrl,
               reverse: true,
               // A zoomed page IMAGE has to be panned, so a drag there
@@ -1223,6 +1233,13 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   : const PageScrollPhysics(),
               itemCount: _pageCount,
               onPageChanged: (i) {
+                // An index only means a page WITHIN the layout mode it
+                // was reported for. Rotating an iPad flips single pages
+                // to 2-page spreads, and a stale index arriving after
+                // the flip used to be read with the new mapping — page
+                // 30 became page 59, and a second flip 119, which is
+                // how a rotation could land the reader anywhere.
+                if (wide != _wide) return;
                 _setBars(false);
                 // The zoom level deliberately CARRIES to the next page:
                 // a reader who enlarged the type wants it enlarged for
@@ -2265,16 +2282,22 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// Line boundaries per page, measured once — the page data itself is
   /// cached, so keying off it keeps the measurement alive exactly as
   /// long as the page it describes.
-  final Expando<Object> _bandCache = Expando<Object>('mushaf line bands');
+  /// Where each page has no ink, as fractions of its height, measured
+  /// off the rasterised artwork by [MushafSpreadArtwork].
+  ///
+  /// A page is drawn unstretched until its blank runs are known. That
+  /// costs one small re-settle the first time a page is shown and
+  /// nothing after, and it is the price of never GUESSING where the ink
+  /// is — guessing, from the ayah polygons, is what clipped the tops off
+  /// letters, because the script does not stay inside those boxes.
+  final Map<String, List<double>> _blankRuns = {};
 
-  MushafLineBands? _lineBandsFor(MushafPageData data) {
-    final hit = _bandCache[data];
-    if (hit != null) return hit is MushafLineBands ? hit : null;
-    final measured = MushafLineBands.measure(data);
-    // Expando can't hold null, so a page that has no usable bands is
-    // remembered as a plain marker object instead of re-measured.
-    _bandCache[data] = measured ?? const Object();
-    return measured;
+  String _cutKey(int page) => '${MushafSvgService.edition.id}:$page';
+
+  void _onPageMeasured(int page, List<double> runs) {
+    final key = _cutKey(page);
+    if (_blankRuns[key] != null || !mounted) return;
+    setState(() => _blankRuns[key] = runs);
   }
 
   Widget _buildPageArtwork(MushafPageData data, bool isDark) {
@@ -2305,17 +2328,20 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         // is what makes the type readable. Only at rest: a zoomed page
         // is already taller than the screen, so there is no slack to
         // give, and the raster it is blitted from would be upscaled.
-        MushafLineBands? spread;
+        MushafPageStretch? spread;
         if (_spreadsLines && _zoom == 1.0 && !scrollZoom) {
-          final measured = _lineBandsFor(data);
-          if (measured != null && measured.bandCount > 1) {
-            final slack = constraints.maxHeight - renderHeight;
-            // Never more than a fraction of a line: past that the page
-            // stops reading as a page and starts reading as a list.
-            final lineHeight = renderHeight / measured.bandCount;
-            final gapPx =
-                math.min(slack / (measured.bandCount - 1), lineHeight * 0.45);
-            if (gapPx > 1.0) spread = measured.withGap(gapPx / scaleY);
+          final runs = _blankRuns[_cutKey(data.pageNumber)];
+          final slack = constraints.maxHeight - renderHeight;
+          if (runs != null && slack > 4) {
+            // Never more than a fraction of the page: past that the
+            // lines drift apart and it stops reading as a page.
+            final extraPx = math.min(slack, renderHeight * 0.22);
+            spread = MushafPageStretch.build(
+              runs,
+              top: data.viewBoxMinY,
+              height: data.viewBoxHeight,
+              extra: extraPx / scaleY,
+            );
           }
         }
         final spreadHeight = renderHeight + (spread?.extraHeight ?? 0) * scaleY;
@@ -2464,17 +2490,22 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   Widget _artworkLayer(
     MushafPageData data,
     bool isDark,
-    MushafLineBands? spread, {
+    MushafPageStretch? spread, {
     required double width,
     required double naturalHeight,
     required double scaleY,
   }) {
-    final artwork = spread == null
+    // Editions that spread their lines always draw through the raster,
+    // even before any spread is possible: rasterising is what measures
+    // where the page may safely be cut, and drawing it whole is exactly
+    // what a gap of zero produces.
+    final viaRaster = _spreadsLines && _zoom == 1.0;
+    final artwork = !viaRaster
         ? SvgPicture.string(_tintedSvg(data), fit: BoxFit.contain)
         : MushafSpreadArtwork(
             svg: _tintedSvg(data),
-            cacheKey: '${MushafSvgService.edition.id}:${data.pageNumber}',
-            bands: spread,
+            cacheKey: _cutKey(data.pageNumber),
+            stretch: spread,
             width: width,
             naturalHeight: naturalHeight,
             scale: scaleY,
@@ -2482,6 +2513,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             minX: data.viewBoxMinX,
             minY: data.viewBoxMinY,
             background: _pageColor(isDark),
+            onMeasured: (cuts) => _onPageMeasured(data.pageNumber, cuts),
           );
     if (!isDark) return artwork;
     return ColorFiltered(
@@ -2658,11 +2690,11 @@ class _AyahMarkPainter extends CustomPainter {
   final double minX;
   final double minY;
 
-  /// The line spread in force, if any. Each ring is one text LINE, so a
-  /// ring moves down by however far its line moved — measured once from
-  /// the ring's middle, so the rectangle travels rigidly instead of
-  /// being stretched across a line boundary.
-  final MushafLineBands? spread;
+  /// The stretch in force, if any. Each ring is one text LINE, so a ring
+  /// moves down by however far its line moved — measured once from the
+  /// ring's middle, so the rectangle travels rigidly rather than being
+  /// stretched across a boundary.
+  final MushafPageStretch? spread;
 
   _AyahMarkPainter({
     required this.marks,
@@ -2706,7 +2738,7 @@ class _AyahMarkPainter extends CustomPainter {
       oldDelegate.scaleY != scaleY ||
       oldDelegate.minX != minX ||
       oldDelegate.minY != minY ||
-      oldDelegate.spread?.gap != spread?.gap ||
+      oldDelegate.spread?.extraHeight != spread?.extraHeight ||
       !_sameMarks(oldDelegate.marks);
 
   bool _sameMarks(List<(AyahHitRegion, Color)> other) {

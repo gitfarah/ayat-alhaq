@@ -1,7 +1,7 @@
 name: quran_app_v1
 description: A Quran reading app for Android and iOS.
 publish_to: 'none'
-version: 1.7.2+41
+version: 1.7.2+42
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
