@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
@@ -85,60 +84,4 @@ class MushafFileStorage {
 
   /// Phones have ample storage — full offline download is offered.
   static const bool supportsFullOfflineDownload = true;
-}
-
-/// Page-font bytes for the glyph-rendered editions (KFGQPC V1). Each
-/// page has its own font, so these are cached exactly like page
-/// artwork — fetched once, then read from disk.
-class MushafFontStorage {
-  static Future<Directory> _dir() async {
-    final base = await getApplicationDocumentsDirectory();
-    final dir = Directory('${base.path}/mushaf_fonts');
-    if (!await dir.exists()) await dir.create(recursive: true);
-    return dir;
-  }
-
-  static Future<Uint8List?> read(int page) async {
-    try {
-      final f = File('${(await _dir()).path}/p$page.ttf');
-      if (!await f.exists()) return null;
-      return f.readAsBytes();
-    } catch (_) {
-      return null;
-    }
-  }
-
-  static Future<void> write(int page, Uint8List bytes) async {
-    try {
-      final f = File('${(await _dir()).path}/p$page.ttf');
-      await f.writeAsBytes(bytes, flush: true);
-    } catch (_) {
-      // Caching is opportunistic; the font is already in memory.
-    }
-  }
-
-  /// Drops one page's cached font — used when the file turns out to be
-  /// truncated or otherwise unusable, so the next attempt refetches it.
-  static Future<void> remove(int page) async {
-    try {
-      final f = File('${(await _dir()).path}/p$page.ttf');
-      if (await f.exists()) await f.delete();
-    } catch (_) {}
-  }
-
-  static Future<int> cachedCount() async {
-    try {
-      final dir = await _dir();
-      return dir.listSync().whereType<File>().length;
-    } catch (_) {
-      return 0;
-    }
-  }
-
-  static Future<void> clear() async {
-    try {
-      final dir = await _dir();
-      if (await dir.exists()) await dir.delete(recursive: true);
-    } catch (_) {}
-  }
 }

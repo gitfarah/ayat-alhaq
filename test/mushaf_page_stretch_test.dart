@@ -50,8 +50,7 @@ void main() {
 
     setUp(() {
       runs = MushafPageStretch.blankRunsOf(syntheticPage())!;
-      stretch =
-          MushafPageStretch.build(runs, top: 0, height: 600, extra: 60)!;
+      stretch = MushafPageStretch.build(runs, top: 0, height: 600, extra: 60)!;
     });
 
     test('adds exactly the height it was asked for', () {
@@ -98,8 +97,8 @@ void main() {
     });
 
     test('too little to work with is refused rather than guessed', () {
-      expect(MushafPageStretch.build(runs, top: 0, height: 600, extra: 0),
-          isNull);
+      expect(
+          MushafPageStretch.build(runs, top: 0, height: 600, extra: 0), isNull);
       expect(MushafPageStretch.build(const [], top: 0, height: 600, extra: 60),
           isNull);
     });

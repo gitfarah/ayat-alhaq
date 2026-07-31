@@ -7,7 +7,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/quran_page_meta.dart';
-import '../services/mushaf_glyph_service.dart';
 import '../services/mushaf_svg_service.dart';
 import '../services/quran_service.dart';
 import '../services/bookmark_service.dart';
@@ -74,9 +73,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// the entry dies with the page it belongs to.
   final Expando<String> _tintedCache = Expando<String>('tinted mushaf page');
 
-  /// Measured type size for a glyph page, keyed by page and measure.
-  final Map<String, (double, double)> _glyphSizeCache = {};
-
   bool _isCachedOffline = false;
   bool _barsVisible = true;
   List<Bookmark> _bookmarks = [];
@@ -103,15 +99,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// running head and the ornamented page number — instead of leaving
   /// that to the floating bars. Those editions also lose the bottom
   /// page-number bar and its arrows, which only duplicate it.
-  bool get _usesPageFurniture =>
-      const {'hafs', 'v1'}.contains(MushafSvgService.edition.id);
+  bool get _usesPageFurniture => MushafSvgService.edition.id == 'hafs';
 
   /// Whether the page artwork's printed lines are pulled apart to fill
-  /// the height the furniture leaves over.
-  ///
-  /// Hafs only: it is the one edition drawn as a fixed page IMAGE whose
-  /// lines can be re-spaced by blitting. V1 sets its own lines from a
-  /// font and already fills the page exactly.
+  /// the height the furniture leaves over. Currently just Hafs, the
+  /// edition nearly everyone reads.
   bool get _spreadsLines => MushafSvgService.edition.id == 'hafs';
 
   void _onScaleStart(ScaleStartDetails d) => _zoomStart = _zoom;
@@ -153,12 +145,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     _audioService!.addListener(_followRecitation);
     // Ornamental surah-name frames (measured band positions, per edition).
     _loadHeaderBands();
-    // Page layout for the glyph-rendered edition.
-    if (!MushafGlyphService.isLayoutLoaded) {
-      MushafGlyphService.loadLayout().then((_) {
-        if (mounted) setState(() {});
-      });
-    }
     // Tajweed colouring for the reflowing text edition. Loaded up front
     // so flipping the setting is instant.
     if (!TajweedService.isLoaded) {
@@ -193,13 +179,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     context.read<SettingsService>().saveLastRead(page: basePage);
     KhatmaService.markPageRead(basePage);
     if (_wide && basePage + 1 <= 604) KhatmaService.markPageRead(basePage + 1);
-
-    if (MushafSvgService.edition.isGlyph) {
-      MushafGlyphService.preload(basePage);
-      final cached = MushafGlyphService.hasFont(basePage);
-      if (cached != _isCachedOffline) setState(() => _isCachedOffline = cached);
-      return;
-    }
 
     // The text edition is bundled — nothing to prefetch, and it is
     // offline by definition.
@@ -1310,25 +1289,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       );
     }
 
-    if (MushafSvgService.edition.isGlyph) {
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _setBars(!_barsVisible),
-        child: SafeArea(
-          child: !_wide || base + 1 > 604
-              ? _withPageFurniture(base, isDark, _buildGlyphPage(base, isDark))
-              : Row(children: [
-                  Expanded(
-                      child: _withPageFurniture(
-                          base + 1, isDark, _buildGlyphPage(base + 1, isDark))),
-                  Expanded(
-                      child: _withPageFurniture(
-                          base, isDark, _buildGlyphPage(base, isDark))),
-                ]),
-        ),
-      );
-    }
-
     final edition = MushafSvgService.edition.id;
     var entry = _pageFutures[index];
     if (entry == null || entry.$1 != edition) {
@@ -1532,6 +1492,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     );
   }
 
+  /// The reader's chosen page colour, for frames that must sit ON the
+  /// page rather than look pasted onto it.
+  Color _pageColor(bool isDark) => AppColors.mushafBackground(
+      context.read<SettingsService>().mushafBackground, isDark);
+
   Widget _buildSinglePage(MushafPageData data, bool isDark) {
     // Pages 1-2 get the illuminated opening frame
     if (data.pageNumber <= 2) {
@@ -1636,370 +1601,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// zoom changes the TYPE size and the lines re-wrap to whatever the
   /// screen is — the text is always fully within the screen width, at
   /// any zoom and in any orientation.
-  /// A page of the KFGQPC V1 Mushaf, typeset from that page's own font.
-  ///
-  /// Unlike the artwork editions this is real text: the printed line
-  /// breaks are preserved exactly (they are baked into the font), but
-  /// it stays sharp at any zoom, and each ayah's position comes from
-  /// the text layout instead of from a polygon — so tapping, tinting
-  /// and the recitation highlight all work off the same spans.
-  Widget _buildGlyphPage(int page, bool isDark) {
-    final lines = MushafGlyphService.linesOf(page);
-    final ready = MushafGlyphService.hasFont(page);
-    final failed = MushafGlyphService.hasFailed(page);
-    if (!ready && !failed) {
-      // Kick the download off and repaint when the family lands — or
-      // when it turns out it cannot be made to draw.
-      MushafGlyphService.ensureFont(page).then((_) {
-        if (mounted) setState(() {});
-      });
-    }
-    final ink = isDark ? AppColors.darkText : AppColors.textPrimary;
-
-    // A page whose font will not draw must SAY so. Typesetting it anyway
-    // would not fail loudly: this edition's glyph codes are real Arabic
-    // Presentation Forms, so the engine would quietly substitute another
-    // font and present a page that reads like the Quran but is not the
-    // printed page — which is far worse than an error.
-    if (failed) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            const Icon(Icons.font_download_off_rounded,
-                size: 44, color: Colors.grey),
-            const SizedBox(height: 12),
-            Text(
-                'تعذّر تحميل خط صفحة ${_ar(page)}\nتحقق من اتصالك ثم أعد المحاولة',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontFamily: 'Almarai',
-                    height: 1.6,
-                    color: isDark
-                        ? AppColors.darkTextSec
-                        : AppColors.textSecondary)),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12))),
-              onPressed: () {
-                MushafGlyphService.clearFailure(page);
-                setState(() {});
-              },
-              icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-              label: const Text('إعادة المحاولة',
-                  style: TextStyle(color: Colors.white, fontFamily: 'Almarai')),
-            ),
-          ]),
-        ),
-      );
-    }
-
-    if (lines.isEmpty || !ready) {
-      return Center(
-          child: CircularProgressIndicator(
-              color: isDark ? AppColors.darkPrimary : AppColors.primary));
-    }
-
-    return LayoutBuilder(builder: (context, constraints) {
-      // Same zoom model as the artwork editions: the page is drawn
-      // WIDER and read by scrolling, never dragged around in two
-      // dimensions. Here that costs nothing in sharpness.
-      //
-      // The page box must fit the SCREEN, not just its width. A Mushaf
-      // page is proportionally much taller than it is wide, so on a
-      // tablet held upright a width-driven box runs off the bottom —
-      // which is why the last lines were missing there while a phone
-      // looked fine. The artwork editions have always clamped this; the
-      // glyph pages did not.
-      const aspect = 345 / 550;
-      var width = constraints.maxWidth * _zoom;
-      var height = width / aspect;
-      if (!_isZoomed && height > constraints.maxHeight) {
-        height = constraints.maxHeight;
-        width = height * aspect;
-      }
-
-      // The opening spread is set in a narrower column, the way the
-      // printed Mushaf frames it; a full page uses the whole measure.
-      final opening = page <= 2;
-      final inset = opening ? 0.16 : 0.045;
-      final measure = width * (1 - inset * 2);
-      final textHeight = height * 0.96;
-      final m = _glyphMetrics(page, lines, measure, textHeight);
-      final size = m.size;
-      // The opening pages are a centred block at the font's own leading;
-      // a full page is fifteen lines set to fill the height exactly.
-      final leading = opening ? null : m.leading;
-
-      final page0 = SizedBox(
-        width: width,
-        height: height,
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-              horizontal: width * inset, vertical: height * 0.02),
-          // A full page divides its height into fifteen equal lines, as
-          // printed. The opening pages hold only eight, so spreading
-          // them the same way tore them apart — they sit at their
-          // natural spacing, as a block, instead.
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: opening ? MainAxisSize.min : MainAxisSize.max,
-            children: [
-              for (final line in lines)
-                if (opening)
-                  // The band is painted around the name, so the header
-                  // line needs room of its own here; inside a full page
-                  // the fifteen equal slots already provide it.
-                  SizedBox(
-                    height: line.isHeader ? size * 2.1 : null,
-                    child:
-                        _buildGlyphLine(line, page, size, leading, ink, isDark),
-                  )
-                else
-                  Expanded(
-                      child: _buildGlyphLine(
-                          line, page, size, leading, ink, isDark)),
-            ],
-          ),
-        ),
-      );
-
-      final scrollable = _isZoomed || _isLandscapeCompact(context);
-      return GestureDetector(
-        onScaleStart: _onScaleStart,
-        onScaleUpdate: _onScaleUpdate,
-        child: SingleChildScrollView(
-          physics: scrollable
-              ? const ClampingScrollPhysics()
-              : const NeverScrollableScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Center(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: _isZoomed
-                    ? const ClampingScrollPhysics()
-                    : const NeverScrollableScrollPhysics(),
-                child: page0,
-              ),
-            ),
-          ),
-        ),
-      );
-    });
-  }
-
-  /// One printed line. Ayah lines are stretched to the full measure —
-  /// that is how the page is set, and the font's glyphs are drawn for
-  /// exactly that width. Surah headers and the Basmalah are centred at
-  /// their natural size instead.
-  /// How far a line's glyph box may exceed its share of the page before
-  /// the type size is reduced. Measured against the pages that overflow
-  /// (Ar-Rahman's opening) and the dense ones that must stay full width.
-  /// How far a line's ink may exceed its share of the page. The Mushaf
-  /// font's own line box is about 1.9x the type size, and fifteen of
-  /// those will not fit a page — a printed page packs its lines tighter
-  /// than the font's metrics and lets the tall glyphs overlap. Measured
-  /// across pages 50, 77, 128, 151 and 531, the natural box runs 1.21x
-  /// the available slot, so this leaves a little headroom above that and
-  /// only bites on a page whose lines are unusually short.
-  static const double _maxLineOverlap = 1.35;
-
-  /// The type size a page is set at, and the leading to set it with.
-  ///
-  /// The width decides the size: these fonts draw each line to fill the
-  /// measure, so that is the page's own design. The leading is then
-  /// chosen so the lines exactly fill the page height — which is the
-  /// part I had wrong twice. Shrinking the type until its natural line
-  /// box fit squeezed the page into a thin column; leaving the natural
-  /// box alone pushed the last lines off the bottom. Neither was
-  /// needed: the size comes from the width, the leading from the height.
-  ({double size, double leading}) _glyphMetrics(
-      int page, List<GlyphLine> lines, double measure, double textHeight) {
-    final key = '$page:${measure.round()}x${textHeight.round()}';
-    final hit = _glyphSizeCache[key];
-    if (hit != null) return (size: hit.$1, leading: hit.$2);
-
-    const ref = 100.0;
-    var widest = 1.0;
-    var tallest = 1.0;
-    for (final line in lines) {
-      final painter = TextPainter(
-        textDirection: TextDirection.rtl,
-        text: TextSpan(
-            text: line.text,
-            style: TextStyle(
-                fontFamily: line.usesSharedFont
-                    ? MushafGlyphService.sharedFamily
-                    : MushafGlyphService.familyFor(page),
-                fontSize: ref)),
-      )..layout();
-      if (painter.width > widest) widest = painter.width;
-      if (painter.height > tallest) tallest = painter.height;
-    }
-
-    final slot = textHeight / lines.length;
-    final natural = tallest / ref; // line box per unit of type size
-    var size = ref * measure / widest;
-    // Only a page with unusually short lines can ask for a size whose
-    // ink would swamp the slot; pull those back.
-    final maxSize = slot * _maxLineOverlap / natural;
-    if (size > maxSize) size = maxSize;
-    // Leading that makes lines.length lines fill textHeight exactly.
-    final leading = slot / size;
-
-    _glyphSizeCache[key] = (size, leading);
-    if (_glyphSizeCache.length > 24) {
-      _glyphSizeCache.remove(_glyphSizeCache.keys.first);
-    }
-    return (size: size, leading: leading);
-  }
-
-  /// The reader's chosen page colour, for frames that must sit ON the
-  /// page rather than look pasted onto it.
-  Color _pageColor(bool isDark) => AppColors.mushafBackground(
-      context.read<SettingsService>().mushafBackground, isDark);
-
-  Widget _buildGlyphLine(GlyphLine line, int page, double size, double? leading,
-      Color ink, bool isDark) {
-    final family = line.usesSharedFont
-        ? MushafGlyphService.sharedFamily
-        : MushafGlyphService.familyFor(page);
-    final gold = isDark ? AppColors.darkSecondary : AppColors.mushafBorderGold;
-
-    if (line.spans.isEmpty) {
-      final label = Text(line.text,
-          textDirection: TextDirection.rtl,
-          style: TextStyle(
-              fontFamily: family,
-              fontSize: size,
-              height: leading,
-              color: line.isHeader ? gold : ink));
-      if (!line.isHeader) return Center(child: label);
-
-      // The surah name gets the SAME band the artwork editions draw —
-      // the green field with a gold cartouche hugging the name — not a
-      // pill stretched across the page with the name lost inside it.
-      // The name's width is measured here, exactly as it was measured
-      // off the artwork pages for the other editions.
-      final painter = TextPainter(
-        textDirection: TextDirection.rtl,
-        text: TextSpan(
-            text: line.text,
-            style: TextStyle(fontFamily: family, fontSize: size)),
-      )..layout();
-      return LayoutBuilder(builder: (context, c) {
-        final w = c.maxWidth;
-        final h = c.maxHeight.isFinite ? c.maxHeight : painter.height * 1.5;
-        final half = painter.width / 2;
-        final band = SurahHeaderBand(
-          surah: 0,
-          page: 0,
-          top: h * 0.22,
-          bottom: h * 0.78,
-          left: w / 2 - half,
-          right: w / 2 + half,
-        );
-        return CustomPaint(
-          painter: SurahBannerPainter(
-            bands: [band],
-            scaleX: 1,
-            scaleY: 1,
-            isDark: isDark,
-            pageColor: _pageColor(isDark),
-          ),
-          child: Center(child: label),
-        );
-      });
-    }
-
-    // Split the line at ayah boundaries so each ayah is its own span:
-    // that is what carries the tint and the long-press.
-    final spans = <InlineSpan>[];
-    var cursor = 0;
-    for (final s in line.spans) {
-      final start = s[2], len = s[3];
-      if (start > cursor) {
-        spans.add(TextSpan(
-            text: line.text.substring(cursor, start),
-            style: TextStyle(color: ink)));
-      }
-      // Split the run wherever an end-of-ayah medallion sits, so those
-      // glyphs — and only those — carry the marker colour. The data
-      // says exactly where they are; the last glyph of a run is NOT
-      // one whenever the ayah carries on to the next line.
-      final mark = isDark ? AppColors.darkPrimary : AppColors.primary;
-      var from = start;
-      for (var i = start; i < start + len; i++) {
-        if (!line.endMarks.contains(i)) continue;
-        if (i > from) {
-          spans.add(_glyphAyahSpan(
-              line.text.substring(from, i), s[0], s[1], ink, isDark));
-        }
-        spans.add(_glyphAyahSpan(
-            line.text.substring(i, i + 1), s[0], s[1], ink, isDark,
-            colour: mark));
-        from = i + 1;
-      }
-      if (from < start + len) {
-        spans.add(_glyphAyahSpan(
-            line.text.substring(from, start + len), s[0], s[1], ink, isDark));
-      }
-      cursor = start + len;
-    }
-    if (cursor < line.text.length) {
-      spans.add(TextSpan(
-          text: line.text.substring(cursor), style: TextStyle(color: ink)));
-    }
-
-    return Center(
-      child: Text.rich(
-        TextSpan(children: spans),
-        textDirection: TextDirection.rtl,
-        maxLines: 1,
-        style: TextStyle(
-            fontFamily: family, fontSize: size, height: leading, color: ink),
-      ),
-    );
-  }
-
-  /// One ayah's stretch of a glyph line, tinted for the mark it carries
-  /// and long-pressable for the same options sheet as everywhere else.
-  InlineSpan _glyphAyahSpan(
-      String text, int surah, int ayah, Color ink, bool isDark,
-      {Color? colour}) {
-    final region = AyahHitRegion(
-        surahNumber: surah, ayahNumber: ayah, x: 0, y: 0, rings: const []);
-    final bookmark = _bookmarkFor(region);
-    final highlight = _highlightFor(region);
-    final playing = _playingGlobalAyah != null &&
-        _regionGlobal(region) == _playingGlobalAyah;
-
-    Color? bg;
-    if (playing) {
-      bg = (isDark ? AppColors.darkSecondary : AppColors.secondary)
-          .withValues(alpha: isDark ? 0.30 : 0.16);
-    } else if (bookmark != null) {
-      bg = AppColors.highlight(bookmark.color)
-          .withValues(alpha: isDark ? 0.32 : 0.22);
-    } else if (highlight != null) {
-      bg = AppColors.highlight(highlight.color)
-          .withValues(alpha: isDark ? 0.35 : 0.25);
-    }
-
-    final recognizer = _textRecognizers.putIfAbsent(
-        _regionGlobal(region), () => LongPressGestureRecognizer())
-      ..onLongPress = () => _showAyahOptions(region);
-
-    return TextSpan(
-        text: text,
-        recognizer: recognizer,
-        style: TextStyle(color: colour ?? ink, backgroundColor: bg));
-  }
-
   Widget _buildTextPage(int page, bool isDark) {
     final future = _textFutures[page] ??= QuranService.ayahsOnPage(page);
     final ink = isDark ? AppColors.darkText : AppColors.textPrimary;

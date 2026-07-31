@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Web storage backend — localStorage via SharedPreferences. Browsers
@@ -104,15 +103,4 @@ class MushafFileStorage {
 
   /// Browser storage quotas can't fit the full Mushaf.
   static const bool supportsFullOfflineDownload = false;
-}
-
-/// Web has no writable font cache worth the quota — the browser's own
-/// HTTP cache already keeps the page fonts, so this is a no-op shim
-/// that keeps the API identical to the io backend.
-class MushafFontStorage {
-  static Future<Uint8List?> read(int page) async => null;
-  static Future<void> write(int page, Uint8List bytes) async {}
-  static Future<void> remove(int page) async {}
-  static Future<int> cachedCount() async => 0;
-  static Future<void> clear() async {}
 }
