@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -25,8 +26,12 @@ import 'package:flutter_svg/flutter_svg.dart';
 /// that reached into a neighbouring line, and in this script a great
 /// many of them do. A mapping with no cuts in it cannot tear anything:
 /// every pixel of the page still has exactly one destination, and the
-/// only rows whose spacing changes are the ones with nothing on them.
+/// only rows whose spacing changes are the ones between the lines.
 class MushafPageStretch {
+  /// Share of a page's typical row ink at or below which a row counts
+  /// as lying BETWEEN two lines rather than on one. See [gapRunsOf].
+  static const double gapInkFraction = 0.22;
+
   /// Source breakpoints in viewBox units, ascending. The first is the
   /// page top and the last the page bottom.
   final List<double> src;
@@ -74,22 +79,22 @@ class MushafPageStretch {
   }
 
   /// Builds the mapping that adds [extra] viewBox units of height,
-  /// spending all of it on the blank runs in [blankRuns].
+  /// spending all of it on the runs in [gapRuns].
   ///
-  /// [blankRuns] is a flat list of start/end pairs as fractions of the
-  /// page height — the rows that carry no ink at all.
+  /// [gapRuns] is a flat list of start/end pairs as fractions of the
+  /// page height — the rows that fall between the printed lines.
   static MushafPageStretch? build(
-    List<double> blankRuns, {
+    List<double> gapRuns, {
     required double top,
     required double height,
     required double extra,
   }) {
-    if (blankRuns.length < 4 || blankRuns.length.isOdd || extra <= 0) {
+    if (gapRuns.length < 4 || gapRuns.length.isOdd || extra <= 0) {
       return null;
     }
     final gaps = [
-      for (var i = 0; i + 1 < blankRuns.length; i += 2)
-        (blankRuns[i + 1] - blankRuns[i]) * height,
+      for (var i = 0; i + 1 < gapRuns.length; i += 2)
+        (gapRuns[i + 1] - gapRuns[i]) * height,
     ];
     if (gaps.isEmpty) return null;
 
@@ -123,9 +128,9 @@ class MushafPageStretch {
     final dst = <double>[top];
     var shift = 0.0;
     var gapIndex = 0;
-    for (var i = 0; i + 1 < blankRuns.length; i += 2) {
-      final runTop = top + blankRuns[i] * height;
-      final runBottom = top + blankRuns[i + 1] * height;
+    for (var i = 0; i + 1 < gapRuns.length; i += 2) {
+      final runTop = top + gapRuns[i] * height;
+      final runBottom = top + gapRuns[i + 1] * height;
       // The inked stretch above this run: carried down bodily, at unit
       // scale, so nothing on it is distorted.
       src.add(runTop);
@@ -141,13 +146,31 @@ class MushafPageStretch {
     return MushafPageStretch(src, dst);
   }
 
-  /// The runs of completely blank rows in a rasterised page, as
-  /// fractions of its height.
+  /// The runs of rows that lie BETWEEN the printed lines of a rasterised
+  /// page, as fractions of its height. [inkPerRow] is how many sampled
+  /// columns carry ink on each row.
   ///
-  /// Only the runs BETWEEN the first and last inked row count: the head
+  /// Not "rows carrying no ink at all", which is what this used to look
+  /// for and is why the pages went on ending in dead space. In this
+  /// script the ascenders and descenders of neighbouring lines reach
+  /// into the space between them: on a real Hafs page barely half the
+  /// line gaps contain even one completely clear row, so the page failed
+  /// the "is this set text at all" test and was drawn unstretched — the
+  /// whole of the leftover height then piling up under the last line.
+  ///
+  /// What separates two lines is a VALLEY in the ink, not a void: a run
+  /// of rows carrying a few per cent of what a line carries. Stretching
+  /// a valley is every bit as safe as stretching a void, because what
+  /// crosses one is almost always a near-vertical stroke — an alif's
+  /// stem, a ya's tail — and making a vertical stroke slightly longer is
+  /// not a distortion anyone can see. The bowls, ligatures and diacritic
+  /// clusters that WOULD show it all sit in the line bodies, and those
+  /// are still carried down rigidly, at unit scale.
+  ///
+  /// Only the runs between the first and last inked row count: the head
   /// and foot margins are not line spacing, and spending the slack there
   /// would just push the text off centre.
-  static List<double>? blankRunsOf(List<int> inkPerRow) {
+  static List<double>? gapRunsOf(List<int> inkPerRow) {
     final h = inkPerRow.length;
     if (h < 16) return null;
 
@@ -160,22 +183,49 @@ class MushafPageStretch {
     }
     if (firstInk < 0 || lastInk - firstInk < 8) return null;
 
-    final runs = <double>[];
+    // The threshold comes from the page's OWN ink. Riwayah, page colour,
+    // type size and raster width all move the absolute counts around;
+    // the ratio between a line and the space beside it is what stays
+    // put, and the median row of a page of set text sits squarely on a
+    // line.
+    final ranked = inkPerRow.sublist(firstInk, lastInk + 1)..sort();
+    final median = ranked[ranked.length ~/ 2];
+    final threshold = math.max(1, (median * gapInkFraction).round());
+
+    final runs = <List<int>>[];
     var start = -1;
     for (var y = firstInk; y <= lastInk; y++) {
-      final blank = inkPerRow[y] <= 0;
-      if (blank && start < 0) start = y;
-      if (!blank && start >= 0) {
-        runs
-          ..add(start / h)
-          ..add(y / h);
+      final between = inkPerRow[y] <= threshold;
+      if (between && start < 0) start = y;
+      if (!between && start >= 0) {
+        runs.add([start, y]);
         start = -1;
       }
     }
+    if (start >= 0) runs.add([start, lastInk + 1]);
+
+    // Drop the slivers. The pinch between a word's body and the marks
+    // riding above it also dips under the threshold, and it is NOT line
+    // spacing — while [build] hands the most height to the shortest
+    // gaps, so leaving one in is precisely what would prise a single
+    // line apart. Measured against the page's own gaps rather than a
+    // fixed number of rows, because the raster width is not fixed.
+    final lengths = [for (final r in runs) r[1] - r[0]]..sort();
+    if (lengths.isEmpty) return null;
+    final typical = lengths[lengths.length ~/ 2];
+    final floor = math.max(2, (typical * 0.45).round());
+
+    final out = <double>[];
+    for (final r in runs) {
+      if (r[1] - r[0] < floor) continue;
+      out
+        ..add(r[0] / h)
+        ..add(r[1] / h);
+    }
     // A page of lines has a gap between most of them; far fewer than
     // that means this is not a page of set text and is better left be.
-    if (runs.length < 12) return null;
-    return runs;
+    if (out.length < 12) return null;
+    return out;
   }
 }
 
@@ -205,10 +255,10 @@ class MushafSpreadArtwork extends StatefulWidget {
   /// Shown while the page is being rasterised.
   final Color background;
 
-  /// Reports the page's blank runs once the raster has been measured.
+  /// Reports the page's line gaps once the raster has been measured.
   /// The caller turns them into a stretch on a later build — until then
   /// the page is drawn whole, never torn.
-  final void Function(List<double> blankRuns)? onMeasured;
+  final void Function(List<double> gapRuns)? onMeasured;
 
   const MushafSpreadArtwork({
     super.key,
@@ -241,7 +291,7 @@ class _MushafSpreadArtworkState extends State<MushafSpreadArtwork> {
   static final Map<String, Future<void>> _inFlight = {};
   static const int _maxRasters = 5;
 
-  /// Blank runs per raster key. Kept after the image itself is evicted —
+  /// Line gaps per raster key. Kept after the image itself is evicted —
   /// it is a handful of doubles, and losing it would make the page
   /// visibly re-settle every time the reader came back to it.
   static final Map<String, List<double>> _runs = {};
@@ -392,18 +442,20 @@ class _MushafSpreadArtworkState extends State<MushafSpreadArtwork> {
     }
 
     if (_measured.add(key)) {
-      final runs = await _blankRuns(image, w, h);
+      final runs = await _gapRuns(image, w, h);
       if (runs != null) _runs[key] = runs;
     }
   }
 
-  /// Where the page has no ink at all.
+  /// How much ink each row of the page carries.
   ///
   /// The page is drawn on TRANSPARENT ground, so "carries ink" is simply
-  /// "has a pixel that is not clear". Sampled every few columns: a blank
-  /// row is blank all the way across, and an inked row has far more than
-  /// one inked pixel, so sampling cannot miss either.
-  static Future<List<double>?> _blankRuns(ui.Image image, int w, int h) async {
+  /// "is not clear". Every few columns is sampled and the inked ones
+  /// COUNTED, rather than stopping at the first: where the lines end and
+  /// the space between them begins is a question about how much of a row
+  /// is covered, and a row that merely has something on it says nothing
+  /// — on this script almost every row does.
+  static Future<List<double>?> _gapRuns(ui.Image image, int w, int h) async {
     ByteData? bytes;
     try {
       bytes = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
@@ -418,14 +470,13 @@ class _MushafSpreadArtworkState extends State<MushafSpreadArtwork> {
     final ink = List<int>.filled(h, 0);
     for (var y = 0; y < h; y++) {
       final row = y * w * 4;
+      var inked = 0;
       for (var x = 0; x < w; x += step) {
-        if (data[row + x * 4 + 3] > alphaFloor) {
-          ink[y] = 1;
-          break;
-        }
+        if (data[row + x * 4 + 3] > alphaFloor) inked++;
       }
+      ink[y] = inked;
     }
-    return MushafPageStretch.blankRunsOf(ink);
+    return MushafPageStretch.gapRunsOf(ink);
   }
 
   @override
