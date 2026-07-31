@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -22,11 +22,11 @@ class ReaderScreen extends StatefulWidget {
   final int? targetAyah;
   final int? targetAyahNumber;
   const ReaderScreen({
-    Key? key,
+    super.key,
     required this.surah,
     this.targetAyah,
     this.targetAyahNumber,
-  }) : super(key: key);
+  });
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
 }
@@ -80,8 +80,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   /// Every surah opens with the Basmala on its own line, except
   /// Al-Fatiha (the Basmala is ayah 1 there) and At-Tawbah (has none).
-  bool get _showBasmala =>
-      widget.surah.number != 1 && widget.surah.number != 9;
+  bool get _showBasmala => widget.surah.number != 1 && widget.surah.number != 9;
 
   /// List-index shift caused by the decorated surah-name frame (always
   /// item 0) plus the Basmala header item when shown.
@@ -332,158 +331,159 @@ class _ReaderScreenState extends State<ReaderScreen> {
       // screens.
       builder: (_) => SingleChildScrollView(
         child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 14),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            Text(
-              ayah.text,
-              textAlign: TextAlign.right,
-              textDirection: TextDirection.rtl,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 18,
-                height: 1.8,
-                fontFamily: 'QuranHafs',
-                color: isDark ? AppColors.darkText : AppColors.textPrimary,
+              Text(
+                ayah.text,
+                textAlign: TextAlign.right,
+                textDirection: TextDirection.rtl,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 18,
+                  height: 1.8,
+                  fontFamily: 'QuranHafs',
+                  color: isDark ? AppColors.darkText : AppColors.textPrimary,
+                ),
               ),
-            ),
-            const Divider(height: 24),
-            // Highlight color row
-            SizedBox(
-              height: 50,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (existing != null)
-                    _Dot(
-                      name: 'none',
-                      color: Colors.grey.shade300,
-                      selected: false,
-                      onTap: () async {
-                        Navigator.pop(context);
-                        await HighlightService.deleteHighlight(
-                            widget.surah.number, ayah.numberInSurah);
-                        await _refreshBookmarkAndHighlights();
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(l('removedHighlight'))),
-                          );
-                        }
-                      },
+              const Divider(height: 24),
+              // Highlight color row
+              SizedBox(
+                height: 50,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (existing != null)
+                      _Dot(
+                        name: 'none',
+                        color: Colors.grey.shade300,
+                        selected: false,
+                        onTap: () async {
+                          Navigator.pop(context);
+                          await HighlightService.deleteHighlight(
+                              widget.surah.number, ayah.numberInSurah);
+                          await _refreshBookmarkAndHighlights();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(l('removedHighlight'))),
+                            );
+                          }
+                        },
+                      ),
+                    ...AppColors.highlights.entries.map(
+                      (e) => _Dot(
+                        name: e.key,
+                        color: e.value,
+                        selected: existing?.color == e.key,
+                        onTap: () async {
+                          Navigator.pop(context);
+                          await HighlightService.addHighlight(Highlight(
+                            surahNumber: widget.surah.number,
+                            ayahNumber: ayah.numberInSurah,
+                            surahName: widget.surah.name,
+                            color: e.key,
+                            createdAt: DateTime.now(),
+                          ));
+                          await _refreshBookmarkAndHighlights();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(l('highlighted'))),
+                            );
+                          }
+                        },
+                      ),
                     ),
-                  ...AppColors.highlights.entries.map(
-                    (e) => _Dot(
-                      name: e.key,
-                      color: e.value,
-                      selected: existing?.color == e.key,
-                      onTap: () async {
-                        Navigator.pop(context);
-                        await HighlightService.addHighlight(Highlight(
-                          surahNumber: widget.surah.number,
-                          ayahNumber: ayah.numberInSurah,
-                          surahName: widget.surah.name,
-                          color: e.key,
-                          createdAt: DateTime.now(),
-                        ));
-                        await _refreshBookmarkAndHighlights();
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(l('highlighted'))),
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const Divider(height: 8),
-            // Play / pause recitation
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                (audio.currentGlobalAyah == ayah.number && audio.isPlaying)
-                    ? Icons.pause_circle_rounded
-                    : Icons.play_circle_rounded,
-                color: AppColors.primary,
+              const Divider(height: 8),
+              // Play / pause recitation
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                  (audio.currentGlobalAyah == ayah.number && audio.isPlaying)
+                      ? Icons.pause_circle_rounded
+                      : Icons.play_circle_rounded,
+                  color: AppColors.primary,
+                ),
+                title: Text(
+                  (audio.currentGlobalAyah == ayah.number && audio.isPlaying)
+                      ? l('pauseRecitation')
+                      : l('playRecitation'),
+                  style: const TextStyle(fontFamily: 'Almarai'),
+                ),
+                onTap: () async {
+                  Navigator.pop(context);
+                  // First-ever playback: let the user pick the reciter
+                  // once; the choice then sticks until changed on purpose.
+                  if (!mounted) return;
+                  final ok = await ensureReciterChosen(context, audio, isDark);
+                  if (!ok) return;
+                  await audio.togglePlayPause(ayah.number);
+                  // Playback failures only set audio.error — without this
+                  // the tap would silently do nothing.
+                  if (mounted && audio.error != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(audio.error!)),
+                    );
+                  }
+                },
               ),
-              title: Text(
-                (audio.currentGlobalAyah == ayah.number && audio.isPlaying)
-                    ? l('pauseRecitation')
-                    : l('playRecitation'),
-                style: const TextStyle(fontFamily: 'Almarai'),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                    _bookmarkFor(ayah.numberInSurah) != null
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_add_rounded,
+                    color: _bookmarkFor(ayah.numberInSurah) != null
+                        ? AppColors.highlight(
+                            _bookmarkFor(ayah.numberInSurah)!.color)
+                        : AppColors.primary),
+                title: Text(l('bookmark'),
+                    style: const TextStyle(fontFamily: 'Almarai')),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showBookmarkPicker(ayah.numberInSurah);
+                },
               ),
-              onTap: () async {
-                Navigator.pop(context);
-                // First-ever playback: let the user pick the reciter
-                // once; the choice then sticks until changed on purpose.
-                if (!mounted) return;
-                final ok = await ensureReciterChosen(context, audio, isDark);
-                if (!ok) return;
-                await audio.togglePlayPause(ayah.number);
-                // Playback failures only set audio.error — without this
-                // the tap would silently do nothing.
-                if (mounted && audio.error != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(audio.error!)),
-                  );
-                }
-              },
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                  _bookmarkFor(ayah.numberInSurah) != null
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_add_rounded,
-                  color: _bookmarkFor(ayah.numberInSurah) != null
-                      ? AppColors.highlight(
-                          _bookmarkFor(ayah.numberInSurah)!.color)
-                      : AppColors.primary),
-              title: Text(l('bookmark'),
-                  style: const TextStyle(fontFamily: 'Almarai')),
-              onTap: () {
-                Navigator.pop(context);
-                _showBookmarkPicker(ayah.numberInSurah);
-              },
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading:
-                  const Icon(Icons.menu_book_rounded, color: AppColors.primary),
-              title: Text(l('tafsir'),
-                  style: const TextStyle(fontFamily: 'Almarai')),
-              onTap: () {
-                Navigator.pop(context);
-                _showTafsir(ayah.numberInSurah, ayah.text);
-              },
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.copy_rounded, color: AppColors.accent),
-              title: Text(l('copyAyah'),
-                  style: const TextStyle(fontFamily: 'Almarai')),
-              onTap: () {
-                Navigator.pop(context);
-                _copyAyah(ayah.text, ayah.numberInSurah);
-              },
-            ),
-          ],
-        ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.menu_book_rounded,
+                    color: AppColors.primary),
+                title: Text(l('tafsir'),
+                    style: const TextStyle(fontFamily: 'Almarai')),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showTafsir(ayah.numberInSurah, ayah.text);
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading:
+                    const Icon(Icons.copy_rounded, color: AppColors.accent),
+                title: Text(l('copyAyah'),
+                    style: const TextStyle(fontFamily: 'Almarai')),
+                onTap: () {
+                  Navigator.pop(context);
+                  _copyAyah(ayah.text, ayah.numberInSurah);
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -506,13 +506,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
         final matches = q.length < 2
             ? const <Ayah>[]
             : _ayahs
-                .where((a) =>
-                    QuranService.normalizeArabic(a.text).contains(q))
+                .where((a) => QuranService.normalizeArabic(a.text).contains(q))
                 .toList();
         return Padding(
           // Keep the sheet above the keyboard.
-          padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
           child: SizedBox(
             height: MediaQuery.of(ctx).size.height * 0.6,
             child: Column(children: [
@@ -539,8 +538,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     prefixIcon:
                         Icon(Icons.search_rounded, color: Colors.grey[400]),
                     filled: true,
-                    fillColor:
-                        isDark ? AppColors.darkBg : AppColors.background,
+                    fillColor: isDark ? AppColors.darkBg : AppColors.background,
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide.none),
@@ -560,8 +558,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                     ? AppColors.darkTextSec
                                     : AppColors.textSecondary)))
                     : ListView.builder(
-                        padding:
-                            const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                         itemCount: matches.length,
                         itemBuilder: (_, i) {
                           final a = matches[i];
@@ -665,305 +662,310 @@ class _ReaderScreenState extends State<ReaderScreen> {
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Scaffold(
-      body: _loading
-          ? Center(
-              child:
-                  CircularProgressIndicator(color: theme.colorScheme.primary))
-          : _error != null
-              ? _buildError()
-              : Stack(children: [
-                  // The text is full-bleed with CONSTANT padding — the
-                  // bars float above it, so toggling them never shifts
-                  // the page up or down.
-                  Positioned.fill(
-                    child: GestureDetector(
-                      onTap: () => _setBars(!_barsVisible),
-                      child: NotificationListener<UserScrollNotification>(
-                        // Scrolling = reading: give the text the whole
-                        // screen. A tap brings the bars back.
-                        onNotification: (n) {
-                          if (n.direction != ScrollDirection.idle) {
-                            _setBars(false);
-                          }
-                          return false;
-                        },
-                        child: ScrollablePositionedList.builder(
-                          itemScrollController: _scroll,
-                          itemPositionsListener: _positions,
-                          padding: EdgeInsets.fromLTRB(
-                              16,
-                              MediaQuery.of(context).padding.top +
-                                  kToolbarHeight +
-                                  8,
-                              16,
-                              110),
-                          itemCount: _ayahs.length + _headerOffset,
-                          itemBuilder: (context, index) {
-                            if (index == 0) {
-                              // Ornamental surah-name frame, like the
-                              // decorated headers of the printed Mushaf.
-                              // The surah name from the data already
-                              // carries the "سُورَةُ" prefix.
-                              return SurahFrame(
-                                title: widget.surah.name,
-                                isDark: isDark,
-                              );
+        body: _loading
+            ? Center(
+                child:
+                    CircularProgressIndicator(color: theme.colorScheme.primary))
+            : _error != null
+                ? _buildError()
+                : Stack(children: [
+                    // The text is full-bleed with CONSTANT padding — the
+                    // bars float above it, so toggling them never shifts
+                    // the page up or down.
+                    Positioned.fill(
+                      child: GestureDetector(
+                        onTap: () => _setBars(!_barsVisible),
+                        child: NotificationListener<UserScrollNotification>(
+                          // Scrolling = reading: give the text the whole
+                          // screen. A tap brings the bars back.
+                          onNotification: (n) {
+                            if (n.direction != ScrollDirection.idle) {
+                              _setBars(false);
                             }
-                            if (_showBasmala && index == 1) {
-                              return Padding(
-                                padding:
-                                    const EdgeInsets.only(top: 8, bottom: 16),
-                                child: Text(
-                                  QuranService.basmala,
-                                  textAlign: TextAlign.center,
-                                  textDirection: TextDirection.rtl,
-                                  style: TextStyle(
-                                    fontSize: settings.fontSize + 2,
-                                    height: 1.8,
-                                    fontFamily: 'QuranHafs',
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark
-                                        ? AppColors.darkText
-                                        : AppColors.textPrimary,
+                            return false;
+                          },
+                          child: ScrollablePositionedList.builder(
+                            itemScrollController: _scroll,
+                            itemPositionsListener: _positions,
+                            padding: EdgeInsets.fromLTRB(
+                                16,
+                                MediaQuery.of(context).padding.top +
+                                    kToolbarHeight +
+                                    8,
+                                16,
+                                110),
+                            itemCount: _ayahs.length + _headerOffset,
+                            itemBuilder: (context, index) {
+                              if (index == 0) {
+                                // Ornamental surah-name frame, like the
+                                // decorated headers of the printed Mushaf.
+                                // The surah name from the data already
+                                // carries the "سُورَةُ" prefix.
+                                return SurahFrame(
+                                  title: widget.surah.name,
+                                  isDark: isDark,
+                                );
+                              }
+                              if (_showBasmala && index == 1) {
+                                return Padding(
+                                  padding:
+                                      const EdgeInsets.only(top: 8, bottom: 16),
+                                  child: Text(
+                                    QuranService.basmala,
+                                    textAlign: TextAlign.center,
+                                    textDirection: TextDirection.rtl,
+                                    style: TextStyle(
+                                      fontSize: settings.fontSize + 2,
+                                      height: 1.8,
+                                      fontFamily: 'QuranHafs',
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark
+                                          ? AppColors.darkText
+                                          : AppColors.textPrimary,
+                                    ),
                                   ),
-                                ),
-                              );
-                            }
-                            final ayah = _ayahs[index - _headerOffset];
-                            final bookmark =
-                                _bookmarkFor(ayah.numberInSurah);
-                            final isBookmarked = bookmark != null;
-                            final highlight = _getHL(ayah.numberInSurah);
-                            final isPlayingThis =
-                                audio.currentGlobalAyah == ayah.number;
+                                );
+                              }
+                              final ayah = _ayahs[index - _headerOffset];
+                              final bookmark = _bookmarkFor(ayah.numberInSurah);
+                              final isBookmarked = bookmark != null;
+                              final highlight = _getHL(ayah.numberInSurah);
+                              final isPlayingThis =
+                                  audio.currentGlobalAyah == ayah.number;
 
-                            final bgColor = isPlayingThis
-                                ? AppColors.secondary
-                                    .withOpacity(isDark ? 0.22 : 0.12)
-                                : isBookmarked
-                                    ? AppColors.highlight(bookmark.color)
-                                        .withOpacity(isDark ? 0.28 : 0.18)
-                                    : highlight != null
-                                        ? AppColors.highlight(highlight.color)
-                                            .withOpacity(0.25)
-                                        : (isDark
-                                            ? AppColors.darkSurface
-                                            : Colors.white);
-                            final borderColor = isPlayingThis
-                                ? AppColors.secondary
-                                : isBookmarked
-                                    ? AppColors.highlight(bookmark.color)
-                                    : highlight != null
-                                        ? AppColors.highlight(highlight.color)
-                                        : (isDark
-                                            ? AppColors.darkBorder
-                                            : AppColors.border);
+                              final bgColor = isPlayingThis
+                                  ? AppColors.secondary
+                                      .withValues(alpha: isDark ? 0.22 : 0.12)
+                                  : isBookmarked
+                                      ? AppColors.highlight(bookmark.color)
+                                          .withValues(
+                                              alpha: isDark ? 0.28 : 0.18)
+                                      : highlight != null
+                                          ? AppColors.highlight(highlight.color)
+                                              .withValues(alpha: 0.25)
+                                          : (isDark
+                                              ? AppColors.darkSurface
+                                              : Colors.white);
+                              final borderColor = isPlayingThis
+                                  ? AppColors.secondary
+                                  : isBookmarked
+                                      ? AppColors.highlight(bookmark.color)
+                                      : highlight != null
+                                          ? AppColors.highlight(highlight.color)
+                                          : (isDark
+                                              ? AppColors.darkBorder
+                                              : AppColors.border);
 
-                            return GestureDetector(
-                              // Fast tap = toggle the bars (same as
-                              // empty space); options live behind a
-                              // LONG-PRESS, like the big Mushaf apps.
-                              onTap: () => _setBars(!_barsVisible),
-                              onLongPress: () {
-                                HapticFeedback.selectionClick();
-                                _showOptions(ayah);
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                padding:
-                                    const EdgeInsets.fromLTRB(12, 14, 14, 14),
-                                decoration: BoxDecoration(
-                                  color: bgColor,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: borderColor,
-                                    width: (isBookmarked || isPlayingThis)
-                                        ? 1.5
-                                        : 0.8,
+                              return GestureDetector(
+                                // Fast tap = toggle the bars (same as
+                                // empty space); options live behind a
+                                // LONG-PRESS, like the big Mushaf apps.
+                                onTap: () => _setBars(!_barsVisible),
+                                onLongPress: () {
+                                  HapticFeedback.selectionClick();
+                                  _showOptions(ayah);
+                                },
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding:
+                                      const EdgeInsets.fromLTRB(12, 14, 14, 14),
+                                  decoration: BoxDecoration(
+                                    color: bgColor,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: borderColor,
+                                      width: (isBookmarked || isPlayingThis)
+                                          ? 1.5
+                                          : 0.8,
+                                    ),
                                   ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    // Ribbon indicator — tells a
-                                    // bookmark apart from a highlight
-                                    // of the same color.
-                                    if (isBookmarked)
-                                      Padding(
-                                        padding:
-                                            const EdgeInsets.only(bottom: 4),
-                                        child: Icon(Icons.bookmark_rounded,
-                                            size: 16,
-                                            color: AppColors.highlight(
-                                                bookmark.color)),
-                                      ),
-                                    if (isPlayingThis)
-                                      Padding(
-                                        padding:
-                                            const EdgeInsets.only(bottom: 6),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              audio.isLoading
-                                                  ? Icons.hourglass_top_rounded
-                                                  : (audio.isPlaying
-                                                      ? Icons.volume_up_rounded
-                                                      : Icons
-                                                          .pause_circle_outline_rounded),
-                                              size: 14,
-                                              color: AppColors.secondary,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              audio.isLoading
-                                                  ? l('loading')
-                                                  : l('nowReciting'),
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                fontFamily: 'Almarai',
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      // Ribbon indicator — tells a
+                                      // bookmark apart from a highlight
+                                      // of the same color.
+                                      if (isBookmarked)
+                                        Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 4),
+                                          child: Icon(Icons.bookmark_rounded,
+                                              size: 16,
+                                              color: AppColors.highlight(
+                                                  bookmark.color)),
+                                        ),
+                                      if (isPlayingThis)
+                                        Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 6),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                audio.isLoading
+                                                    ? Icons
+                                                        .hourglass_top_rounded
+                                                    : (audio.isPlaying
+                                                        ? Icons
+                                                            .volume_up_rounded
+                                                        : Icons
+                                                            .pause_circle_outline_rounded),
+                                                size: 14,
                                                 color: AppColors.secondary,
-                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                audio.isLoading
+                                                    ? l('loading')
+                                                    : l('nowReciting'),
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontFamily: 'Almarai',
+                                                  color: AppColors.secondary,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      RichText(
+                                        // Right-aligned (not justified):
+                                        // justification inserted spacing
+                                        // that broke the visual flow of
+                                        // Arabic words.
+                                        textAlign: TextAlign.right,
+                                        textDirection: TextDirection.rtl,
+                                        text: TextSpan(
+                                          style: TextStyle(
+                                            fontSize: settings.fontSize,
+                                            height: 2.1,
+                                            color: isDark
+                                                ? AppColors.darkText
+                                                : AppColors.textPrimary,
+                                            // Quran verses only.
+                                            fontFamily: 'QuranHafs',
+                                          ),
+                                          children: [
+                                            ..._ayahSpans(
+                                                ayah, settings, isDark),
+                                            const WidgetSpan(
+                                                child: SizedBox(width: 6)),
+                                            WidgetSpan(
+                                              alignment:
+                                                  PlaceholderAlignment.middle,
+                                              child: Container(
+                                                margin: const EdgeInsets.only(
+                                                    right: 4),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 7,
+                                                        vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  border: Border.all(
+                                                      color: (isDark
+                                                              ? AppColors
+                                                                  .darkSecondary
+                                                              : AppColors
+                                                                  .accent)
+                                                          .withValues(
+                                                              alpha: 0.5)),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  color: isDark
+                                                      ? AppColors.darkBg
+                                                      : AppColors.background,
+                                                ),
+                                                child: Text(
+                                                  _ar(ayah.numberInSurah),
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isDark
+                                                        ? AppColors
+                                                            .darkSecondary
+                                                        : AppColors.accent,
+                                                    fontFamily: 'Almarai',
+                                                  ),
+                                                ),
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                    RichText(
-                                      // Right-aligned (not justified):
-                                      // justification inserted spacing
-                                      // that broke the visual flow of
-                                      // Arabic words.
-                                      textAlign: TextAlign.right,
-                                      textDirection: TextDirection.rtl,
-                                      text: TextSpan(
-                                        style: TextStyle(
-                                          fontSize: settings.fontSize,
-                                          height: 2.1,
-                                          color: isDark
-                                              ? AppColors.darkText
-                                              : AppColors.textPrimary,
-                                          // Quran verses only.
-                                          fontFamily: 'QuranHafs',
-                                        ),
-                                        children: [
-                                          ..._ayahSpans(ayah, settings,
-                                              isDark),
-                                          const WidgetSpan(
-                                              child: SizedBox(width: 6)),
-                                          WidgetSpan(
-                                            alignment:
-                                                PlaceholderAlignment.middle,
-                                            child: Container(
-                                              margin: const EdgeInsets.only(
-                                                  right: 4),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 7,
-                                                      vertical: 2),
-                                              decoration: BoxDecoration(
-                                                border: Border.all(
-                                                    color: (isDark
-                                                            ? AppColors
-                                                                .darkSecondary
-                                                            : AppColors.accent)
-                                                        .withOpacity(0.5)),
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                                color: isDark
-                                                    ? AppColors.darkBg
-                                                    : AppColors.background,
-                                              ),
-                                              child: Text(
-                                                _ar(ayah.numberInSurah),
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: isDark
-                                                      ? AppColors.darkSecondary
-                                                      : AppColors.accent,
-                                                  fontFamily: 'Almarai',
-                                                ),
-                                              ),
+                                      if (ayah.translation != null) ...[
+                                        Divider(
+                                            height: 18,
+                                            color: (isDark
+                                                    ? Colors.white
+                                                    : Colors.black)
+                                                .withValues(alpha: 0.08)),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: Text(
+                                            '${ayah.numberInSurah}. ${ayah.translation!}',
+                                            textDirection: _loadedEdition !=
+                                                        null &&
+                                                    QuranService.isRtlEdition(
+                                                        _loadedEdition!)
+                                                ? TextDirection.rtl
+                                                : TextDirection.ltr,
+                                            style: TextStyle(
+                                              fontSize: (settings.fontSize - 10)
+                                                  .clamp(13.0, 22.0),
+                                              height: 1.5,
+                                              color: isDark
+                                                  ? AppColors.darkTextSec
+                                                  : AppColors.textSecondary,
                                             ),
                                           ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (ayah.translation != null) ...[
-                                      Divider(
-                                          height: 18,
-                                          color: (isDark
-                                                  ? Colors.white
-                                                  : Colors.black)
-                                              .withValues(alpha: 0.08)),
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: Text(
-                                          '${ayah.numberInSurah}. ${ayah.translation!}',
-                                          textDirection: _loadedEdition !=
-                                                      null &&
-                                                  QuranService.isRtlEdition(
-                                                      _loadedEdition!)
-                                              ? TextDirection.rtl
-                                              : TextDirection.ltr,
-                                          style: TextStyle(
-                                            fontSize: (settings.fontSize - 10)
-                                                .clamp(13.0, 22.0),
-                                            height: 1.5,
-                                            color: isDark
-                                                ? AppColors.darkTextSec
-                                                : AppColors.textSecondary,
-                                          ),
                                         ),
-                                      ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  // Floating top bar
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: AnimatedSlide(
-                      offset:
-                          _barsVisible ? Offset.zero : const Offset(0, -1.1),
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOut,
-                      child: _buildTopBar(settings, isDark),
+                    // Floating top bar
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: AnimatedSlide(
+                        offset:
+                            _barsVisible ? Offset.zero : const Offset(0, -1.1),
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOut,
+                        child: _buildTopBar(settings, isDark),
+                      ),
                     ),
-                  ),
-                  // Floating bottom bar: Now-Playing controls take over
-                  // when audio is active; otherwise hizb/juz/page info.
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: AnimatedSlide(
-                      offset:
-                          _barsVisible ? Offset.zero : const Offset(0, 1.1),
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOut,
-                      child: Container(
-                        color: isDark ? AppColors.darkSurface : Colors.white,
-                        child: SafeArea(
-                          top: false,
-                          child: audio.hasActiveTrack
-                              ? _buildNowPlayingBar(isDark, audio)
-                              : _buildInfoBar(isDark),
+                    // Floating bottom bar: Now-Playing controls take over
+                    // when audio is active; otherwise hizb/juz/page info.
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: AnimatedSlide(
+                        offset:
+                            _barsVisible ? Offset.zero : const Offset(0, 1.1),
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOut,
+                        child: Container(
+                          color: isDark ? AppColors.darkSurface : Colors.white,
+                          child: SafeArea(
+                            top: false,
+                            child: audio.hasActiveTrack
+                                ? _buildNowPlayingBar(isDark, audio)
+                                : _buildInfoBar(isDark),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ]),
-    ),
+                  ]),
+      ),
     );
   }
 
@@ -977,8 +979,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       decoration: BoxDecoration(
         color: bg.withValues(alpha: 0.97),
         boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06), blurRadius: 5),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 5),
         ],
       ),
       child: SafeArea(
@@ -1054,7 +1055,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         color: isDark ? AppColors.darkSurface : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, -2),
           )
@@ -1064,9 +1065,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
         children: [
           IconButton(
             icon: Icon(Icons.stop_circle_rounded,
-                color: isDark
-                    ? AppColors.darkTextSec
-                    : AppColors.textSecondary),
+                color:
+                    isDark ? AppColors.darkTextSec : AppColors.textSecondary),
             onPressed: audio.stop,
           ),
           IconButton(
@@ -1136,9 +1136,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   : Icons.repeat_rounded,
               color: audio.autoAdvance
                   ? (isDark ? AppColors.darkPrimary : AppColors.primary)
-                  : (isDark
-                      ? AppColors.darkTextSec
-                      : AppColors.textSecondary),
+                  : (isDark ? AppColors.darkTextSec : AppColors.textSecondary),
               size: 20,
             ),
             onPressed: audio.toggleAutoAdvance,
@@ -1156,7 +1154,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         color: isDark ? AppColors.darkSurface : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, -2),
           )
@@ -1270,52 +1268,56 @@ class _ReaderScreenState extends State<ReaderScreen> {
       builder: (_) => StatefulBuilder(
         builder: (ctx, setSheet) => SingleChildScrollView(
           child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(L10n.of(context)('fontSizeLbl'),
-                  style: TextStyle(
-                    color: isDark ? AppColors.darkText : AppColors.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Almarai',
-                  )),
-              const SizedBox(height: 20),
-              Text('بِسْمِ اللَّهِ',
-                  style: TextStyle(
-                    fontSize: settings.fontSize,
-                    fontFamily: 'Almarai',
-                    color: isDark ? AppColors.darkText : AppColors.textPrimary,
-                  )),
-              Slider(
-                value: settings.fontSize,
-                min: 18,
-                max: 44,
-                divisions: 13,
-                activeColor:
-                    isDark ? AppColors.darkPrimary : AppColors.primary,
-                onChanged: (v) {
-                  settings.setFontSize(v);
-                  setSheet(() {});
-                },
-              ),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('أ',
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(L10n.of(context)('fontSizeLbl'),
                     style: TextStyle(
-                        fontSize: 12,
-                        color: isDark
-                            ? AppColors.darkTextSec
-                            : AppColors.textSecondary)),
-                Text('أ',
+                      color:
+                          isDark ? AppColors.darkText : AppColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Almarai',
+                    )),
+                const SizedBox(height: 20),
+                Text('بِسْمِ اللَّهِ',
                     style: TextStyle(
-                        fontSize: 22,
-                        color: isDark
-                            ? AppColors.darkTextSec
-                            : AppColors.textSecondary)),
-              ]),
-            ],
-          ),
+                      fontSize: settings.fontSize,
+                      fontFamily: 'Almarai',
+                      color:
+                          isDark ? AppColors.darkText : AppColors.textPrimary,
+                    )),
+                Slider(
+                  value: settings.fontSize,
+                  min: 18,
+                  max: 44,
+                  divisions: 13,
+                  activeColor:
+                      isDark ? AppColors.darkPrimary : AppColors.primary,
+                  onChanged: (v) {
+                    settings.setFontSize(v);
+                    setSheet(() {});
+                  },
+                ),
+                Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('أ',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? AppColors.darkTextSec
+                                  : AppColors.textSecondary)),
+                      Text('أ',
+                          style: TextStyle(
+                              fontSize: 22,
+                              color: isDark
+                                  ? AppColors.darkTextSec
+                                  : AppColors.textSecondary)),
+                    ]),
+              ],
+            ),
           ),
         ),
       ),
@@ -1331,9 +1333,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
         Text(_error!,
             textAlign: TextAlign.center,
             style: TextStyle(
-                color: isDark
-                    ? AppColors.darkTextSec
-                    : AppColors.textSecondary)),
+                color:
+                    isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
         const SizedBox(height: 16),
         ElevatedButton(
           onPressed: () {
@@ -1380,7 +1381,7 @@ class _Dot extends StatelessWidget {
           border:
               selected ? Border.all(color: AppColors.primary, width: 3) : null,
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)
+            BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)
           ],
         ),
         child: name == 'none'
@@ -1392,4 +1393,3 @@ class _Dot extends StatelessWidget {
     );
   }
 }
-

@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -20,7 +18,6 @@ import '../services/tajweed_service.dart';
 import '../l10n/app_strings.dart';
 import '../theme.dart';
 import '../widgets/mushaf_page_furniture.dart';
-import '../widgets/mushaf_spread_page.dart';
 import '../widgets/reciter_picker.dart';
 import '../widgets/surah_banner_painter.dart';
 import '../widgets/surah_frame.dart';
@@ -100,11 +97,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// that to the floating bars. Those editions also lose the bottom
   /// page-number bar and its arrows, which only duplicate it.
   bool get _usesPageFurniture => MushafSvgService.edition.id == 'hafs';
-
-  /// Whether the page artwork's printed lines are pulled apart to fill
-  /// the height the furniture leaves over. Currently just Hafs, the
-  /// edition nearly everyone reads.
-  bool get _spreadsLines => MushafSvgService.edition.id == 'hafs';
 
   void _onScaleStart(ScaleStartDetails d) => _zoomStart = _zoom;
 
@@ -583,7 +575,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   final s = context.watch<SettingsService>();
                   return SwitchListTile(
                     value: s.tajweed,
-                    activeColor: AppColors.gold,
+                    activeThumbColor: AppColors.gold,
                     secondary: Icon(Icons.palette_rounded, color: iconColor),
                     title: Text(L10n.of(context)('tajweedLbl'),
                         style:
@@ -730,9 +722,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     await context.read<SettingsService>().setMushafEdition(id);
     if (!mounted) return;
     _loadHeaderBands();
-    // Cached page rasters belong to the edition that was showing; none
-    // of them can appear again, and each one is several megabytes.
-    MushafSpreadArtwork.evictAll();
     setState(() {
       _pageFutures.clear();
       _textFutures.clear();
@@ -1880,27 +1869,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     ];
   }
 
-  /// Line boundaries per page, measured once — the page data itself is
-  /// cached, so keying off it keeps the measurement alive exactly as
-  /// long as the page it describes.
-  /// Where each page has no ink, as fractions of its height, measured
-  /// off the rasterised artwork by [MushafSpreadArtwork].
-  ///
-  /// A page is drawn unstretched until its blank runs are known. That
-  /// costs one small re-settle the first time a page is shown and
-  /// nothing after, and it is the price of never GUESSING where the ink
-  /// is — guessing, from the ayah polygons, is what clipped the tops off
-  /// letters, because the script does not stay inside those boxes.
-  final Map<String, List<double>> _blankRuns = {};
-
-  String _cutKey(int page) => '${MushafSvgService.edition.id}:$page';
-
-  void _onPageMeasured(int page, List<double> runs) {
-    final key = _cutKey(page);
-    if (_blankRuns[key] != null || !mounted) return;
-    setState(() => _blankRuns[key] = runs);
-  }
-
   Widget _buildPageArtwork(MushafPageData data, bool isDark) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1922,39 +1890,22 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         final scaleX = renderWidth / data.viewBoxWidth;
         final scaleY = renderHeight / data.viewBoxHeight;
 
-        // ── Spread the printed lines into the leftover height ────────
+        // The page is drawn EXACTLY as it was printed — no attempt to
+        // re-space its lines.
         //
-        // Fitting a Mushaf leaf's width to a phone always leaves slack
-        // below the last line; handing that slack to the line spacing
-        // is what makes the type readable. Only at rest: a zoomed page
-        // is already taller than the screen, so there is no slack to
-        // give, and the raster it is blitted from would be upscaled.
-        MushafPageStretch? spread;
-        if (_spreadsLines && _zoom == 1.0 && !scrollZoom) {
-          final runs = _blankRuns[_cutKey(data.pageNumber)];
-          final slack = constraints.maxHeight - renderHeight;
-          if (runs != null && slack > 4) {
-            // Never more than a fraction of the page: past that the
-            // lines drift apart and it stops reading as a page.
-            final extraPx = math.min(slack, renderHeight * 0.22);
-            spread = MushafPageStretch.build(
-              runs,
-              top: data.viewBoxMinY,
-              height: data.viewBoxHeight,
-              extra: extraPx / scaleY,
-            );
-          }
-        }
-        final spreadHeight = renderHeight + (spread?.extraHeight ?? 0) * scaleY;
-        // Painted overlays live in the SPREAD coordinate space, so each
-        // shape moves with the line it belongs to.
-        double shiftPx(double viewBoxY) =>
-            (spread?.offsetFor(viewBoxY) ?? 0) * scaleY;
-
+        // Opening up the line spacing was tried twice and both attempts
+        // damaged the page. Cutting it into strips clipped every letter
+        // that reached into a neighbouring line, and stretching only the
+        // ink-free rows left the spacing lumpy (many lines' ink touches,
+        // so there is nowhere to add space between them) and forced the
+        // page through a raster, which cost sharpness and made switching
+        // edition flash stale artwork. A printed leaf is one fixed
+        // image: the honest thing is to show it as it is, and let the
+        // reader pinch when they want it bigger.
         final page = Center(
           child: SizedBox(
             width: renderWidth,
-            height: spreadHeight,
+            height: renderHeight,
             child: Stack(children: [
               // Ornamental surah-name frames — painted BEHIND the page
               // artwork so the surah names the SVG already draws land
@@ -1971,17 +1922,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       minY: data.viewBoxMinY,
                       isDark: isDark,
                       pageColor: _pageColor(isDark),
-                      shiftY: shiftPx,
                     ),
                   ),
                 ),
               ),
-              Positioned.fill(
-                child: _artworkLayer(data, isDark, spread,
-                    width: renderWidth,
-                    naturalHeight: renderHeight,
-                    scaleY: scaleY),
-              ),
+              Positioned.fill(child: _artworkLayer(data, isDark)),
               // Tint marked ayahs using their exact polygon outlines (a
               // bounding-box tint would bleed onto neighbouring ayahs
               // for multi-line ayahs). Priority: currently-recited gold
@@ -1995,7 +1940,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       scaleY: scaleY,
                       minX: data.viewBoxMinX,
                       minY: data.viewBoxMinY,
-                      spread: spread,
                     ),
                   ),
                 ),
@@ -2012,12 +1956,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   onLongPressStart: (details) {
                     final vx =
                         details.localPosition.dx / scaleX + data.viewBoxMinX;
-                    // Undo the line spread before hit-testing: the ayah
-                    // polygons are written against the printed page, not
-                    // against the spread one.
-                    final rawY =
+                    final vy =
                         details.localPosition.dy / scaleY + data.viewBoxMinY;
-                    final vy = spread?.unmap(rawY) ?? rawY;
                     for (final region in data.ayahRegions) {
                       if (region.ayahNumber > 0 &&
                           region.surahNumber > 0 &&
@@ -2070,7 +2010,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       : const NeverScrollableScrollPhysics(),
                   child: SizedBox(
                     width: renderWidth,
-                    height: spreadHeight,
+                    height: renderHeight,
                     child: page,
                   ),
                 ),
@@ -2082,40 +2022,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     );
   }
 
-  /// The page artwork itself — blitted line by line when the lines are
-  /// being spread, drawn straight from the SVG otherwise.
+  /// The page artwork itself, drawn straight from the SVG so it stays
+  /// vector-sharp at every zoom level and on every screen density.
   ///
   /// Dark mode inverts the whole layer rather than recolouring the
   /// artwork: the pages are black ink on white, and inverting is the one
   /// transform that keeps the ayah medallions and the script in step.
-  Widget _artworkLayer(
-    MushafPageData data,
-    bool isDark,
-    MushafPageStretch? spread, {
-    required double width,
-    required double naturalHeight,
-    required double scaleY,
-  }) {
-    // Editions that spread their lines always draw through the raster,
-    // even before any spread is possible: rasterising is what measures
-    // where the page may safely be cut, and drawing it whole is exactly
-    // what a gap of zero produces.
-    final viaRaster = _spreadsLines && _zoom == 1.0;
-    final artwork = !viaRaster
-        ? SvgPicture.string(_tintedSvg(data), fit: BoxFit.contain)
-        : MushafSpreadArtwork(
-            svg: _tintedSvg(data),
-            cacheKey: _cutKey(data.pageNumber),
-            stretch: spread,
-            width: width,
-            naturalHeight: naturalHeight,
-            scale: scaleY,
-            viewBoxWidth: data.viewBoxWidth,
-            minX: data.viewBoxMinX,
-            minY: data.viewBoxMinY,
-            background: _pageColor(isDark),
-            onMeasured: (cuts) => _onPageMeasured(data.pageNumber, cuts),
-          );
+  Widget _artworkLayer(MushafPageData data, bool isDark) {
+    final artwork = SvgPicture.string(_tintedSvg(data), fit: BoxFit.contain);
     if (!isDark) return artwork;
     return ColorFiltered(
       colorFilter: const ColorFilter.matrix([
@@ -2291,19 +2205,12 @@ class _AyahMarkPainter extends CustomPainter {
   final double minX;
   final double minY;
 
-  /// The stretch in force, if any. Each ring is one text LINE, so a ring
-  /// moves down by however far its line moved — measured once from the
-  /// ring's middle, so the rectangle travels rigidly rather than being
-  /// stretched across a boundary.
-  final MushafPageStretch? spread;
-
   _AyahMarkPainter({
     required this.marks,
     required this.scaleX,
     required this.scaleY,
     this.minX = 0,
     this.minY = 0,
-    this.spread,
   });
 
   @override
@@ -2312,20 +2219,9 @@ class _AyahMarkPainter extends CustomPainter {
       final path = Path();
       for (final ring in region.rings) {
         if (ring.length < 6) continue;
-        var shift = 0.0;
-        if (spread != null) {
-          var top = double.infinity;
-          var bottom = double.negativeInfinity;
-          for (var i = 1; i < ring.length; i += 2) {
-            if (ring[i] < top) top = ring[i];
-            if (ring[i] > bottom) bottom = ring[i];
-          }
-          shift = spread!.offsetFor((top + bottom) / 2) * scaleY;
-        }
-        double y(double v) => (v - minY) * scaleY + shift;
-        path.moveTo((ring[0] - minX) * scaleX, y(ring[1]));
+        path.moveTo((ring[0] - minX) * scaleX, (ring[1] - minY) * scaleY);
         for (var i = 2; i + 1 < ring.length; i += 2) {
-          path.lineTo((ring[i] - minX) * scaleX, y(ring[i + 1]));
+          path.lineTo((ring[i] - minX) * scaleX, (ring[i + 1] - minY) * scaleY);
         }
         path.close();
       }
@@ -2339,7 +2235,6 @@ class _AyahMarkPainter extends CustomPainter {
       oldDelegate.scaleY != scaleY ||
       oldDelegate.minX != minX ||
       oldDelegate.minY != minY ||
-      oldDelegate.spread?.extraHeight != spread?.extraHeight ||
       !_sameMarks(oldDelegate.marks);
 
   bool _sameMarks(List<(AyahHitRegion, Color)> other) {

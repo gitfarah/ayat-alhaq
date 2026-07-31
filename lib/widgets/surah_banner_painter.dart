@@ -26,12 +26,6 @@ class SurahBannerPainter extends CustomPainter {
   /// the band belongs to the page instead of sitting on it.
   final Color? pageColor;
 
-  /// How far the band at a given viewBox y has been pushed down, in
-  /// rendered pixels. Non-zero when the page's lines are spread to fill
-  /// the screen: the frame has to travel with the name it encloses, or
-  /// it is left painted over the line above.
-  final double Function(double viewBoxY)? shiftY;
-
   const SurahBannerPainter({
     required this.bands,
     required this.scaleX,
@@ -40,7 +34,6 @@ class SurahBannerPainter extends CustomPainter {
     this.minX = 0,
     this.minY = 0,
     this.pageColor,
-    this.shiftY,
   });
 
   @override
@@ -71,12 +64,8 @@ class SurahBannerPainter extends CustomPainter {
     final right = size.width - 6.0 * scaleX;
 
     for (final b in bands) {
-      // Measured from the band's MIDDLE so the whole frame moves as one
-      // piece even when its top and bottom edges fall either side of a
-      // line boundary.
-      final shift = shiftY?.call((b.top + b.bottom) / 2) ?? 0;
-      final inkTop = (b.top - minY) * scaleY + shift;
-      final inkBottom = (b.bottom - minY) * scaleY + shift;
+      final inkTop = (b.top - minY) * scaleY;
+      final inkBottom = (b.bottom - minY) * scaleY;
       final inkH = inkBottom - inkTop;
       if (inkH <= 0) continue;
 
@@ -229,7 +218,6 @@ class SurahBannerPainter extends CustomPainter {
       old.minX != minX ||
       old.minY != minY ||
       old.pageColor != pageColor ||
-      old.shiftY != shiftY ||
       old.bands.length != bands.length ||
       (bands.isNotEmpty &&
           old.bands.isNotEmpty &&

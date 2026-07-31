@@ -101,7 +101,7 @@ class AboutScreen extends StatelessWidget {
             (t('aboutPrayer'), 'Adhan calculation, on-device'),
           ]),
           const SizedBox(height: 14),
-          _Section(isDark: isDark, title: t('aboutFonts'), rows: [
+          _Section(isDark: isDark, title: t('aboutFonts'), rows: const [
             ('Almarai', 'SIL Open Font License 1.1'),
             (
               'KFGQPC HAFS Uthmanic Script',
@@ -185,7 +185,7 @@ class _Section extends StatelessWidget {
     final sub = isDark ? AppColors.darkTextSec : AppColors.textSecondary;
     return _Card(isDark: isDark, children: [
       Text(title,
-          style: TextStyle(
+          style: const TextStyle(
               fontFamily: 'Almarai',
               fontSize: 15,
               fontWeight: FontWeight.bold,
