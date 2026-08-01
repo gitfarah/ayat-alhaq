@@ -9,8 +9,8 @@
 /// needs it there to treat a new build as an upgrade, and the About
 /// screen reads it from here.
 const String kAppVersion = '1.7.2';
-const int kBuildNumber = 46;
+const int kBuildNumber = 47;
 
-/// "1.7.2 (46)" — what to show the reader and what to quote in a bug
+/// "1.7.2 (47)" — what to show the reader and what to quote in a bug
 /// report.
 String get kVersionLabel => '$kAppVersion ($kBuildNumber)';

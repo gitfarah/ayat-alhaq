@@ -1,7 +1,7 @@
 name: quran_app_v1
 description: A Quran reading app for Android and iOS.
 publish_to: 'none'
-version: 1.7.2+46
+version: 1.7.2+47
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -66,9 +66,3 @@ flutter:
     - family: QuranHafs
       fonts:
         - asset: assets/fonts/HafsQuran.ttf
-    # Surah-name bands and the Basmalah of the KFGQPC V1 Mushaf. Its
-    # page fonts are fetched per page at runtime; this one is shared by
-    # every page, so it ships with the app.
-    - family: QCF_BSML
-      fonts:
-        - asset: assets/fonts/QCF_BSML.ttf

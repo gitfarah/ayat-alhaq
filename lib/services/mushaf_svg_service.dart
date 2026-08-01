@@ -123,21 +123,12 @@ class MushafEdition {
   /// Nothing about it is downloadable or page-image based.
   final bool isText;
 
-  /// True for an edition typeset from per-page GLYPH fonts (KFGQPC V1).
-  /// It keeps the printed page's exact lines like the artwork editions
-  /// do, but as real text — so it stays crisp at any zoom, and its ayah
-  /// positions come from the text layout rather than from polygons.
-  final bool isGlyph;
-
   /// Whether this edition is fetched as SVG page artwork — the five
   /// riwayat. Guards every path that assumes page images.
-  bool get isArtwork => !isText && !isGlyph;
+  bool get isArtwork => !isText;
 
   const MushafEdition(this.id, this.nameAr, this.nameEn,
-      {this.hintAr = '',
-      this.hintEn = '',
-      this.isText = false,
-      this.isGlyph = false});
+      {this.hintAr = '', this.hintEn = '', this.isText = false});
 }
 
 class MushafSvgService {
@@ -156,10 +147,6 @@ class MushafSvgService {
     MushafEdition('douri', 'مصحف الدوري', 'Ad-Duri',
         hintAr: 'رواية الدوري عن أبي عمرو',
         hintEn: 'Riwayat ad-Dūrī ʿan Abī ʿAmr'),
-    MushafEdition('v1', 'مصحف المدينة ١٤٠٥هـ', 'Madinah V1 (1405 AH)',
-        hintAr: 'طبعة مجمع الملك فهد الأولى — نص حاد عند التكبير',
-        hintEn: 'King Fahd Complex first print — crisp at any zoom',
-        isGlyph: true),
     MushafEdition('text', 'نص متجاوب', 'Reflowing text',
         hintAr: 'يتكيّف مع التكبير وحجم الشاشة',
         hintEn: 'Reflows to the zoom level and screen size',
