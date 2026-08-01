@@ -1318,11 +1318,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               ? _withPageFurniture(base, isDark, _buildGlyphPage(base, isDark))
               : Row(children: [
                   Expanded(
-                      child: _withPageFurniture(
-                          base + 1, isDark, _buildGlyphPage(base + 1, isDark))),
+                      child: _withPageFurniture(base + 1, isDark,
+                          _buildGlyphPage(base + 1, isDark, peerPage: base))),
                   Expanded(
-                      child: _withPageFurniture(
-                          base, isDark, _buildGlyphPage(base, isDark))),
+                      child: _withPageFurniture(base, isDark,
+                          _buildGlyphPage(base, isDark, peerPage: base + 1))),
                 ]),
         ),
       );
@@ -1639,7 +1639,19 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// it stays sharp at any zoom, and each ayah's position comes from
   /// the text layout instead of from a polygon — so tapping, tinting
   /// and the recitation highlight all work off the same spans.
-  Widget _buildGlyphPage(int page, bool isDark) {
+  ///
+  /// [peerPage] is the page facing this one in a two-page spread, if
+  /// any. Each page's own type size is fitted independently to that
+  /// page's own busiest line — correct on its own, but on a printed
+  /// Mushaf the type size is constant across the whole book, only the
+  /// letter-spacing varies to justify a line. Sized purely independently
+  /// two facing pages can land a few percent apart, and even that little
+  /// is enough to make the fifteen lines look like they no longer line
+  /// up between the pages, though the ROWS themselves never move — see
+  /// [_glyphMetrics]. [peerPage] lets a page match its size down to
+  /// whichever of the pair naturally needed the smaller one, never up,
+  /// so neither page is pushed past its own fit.
+  Widget _buildGlyphPage(int page, bool isDark, {int? peerPage}) {
     final lines = MushafGlyphService.linesOf(page);
     final ready = MushafGlyphService.hasFont(page);
     final failed = MushafGlyphService.hasFailed(page);
@@ -1754,10 +1766,32 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       final measure = width * (1 - inset * 2);
       final textHeight = height * 0.96;
       final m = _glyphMetrics(page, lines, measure, textHeight);
-      final size = m.size;
+      var size = m.size;
       // The opening pages are a centred block at the font's own leading;
       // a full page is fifteen lines set to fill the height exactly.
-      final leading = opening && !expandOpening ? null : m.leading;
+      var leading = opening && !expandOpening ? null : m.leading;
+
+      // Match the facing page's type size — see the note on [peerPage]
+      // above. Both pages get an identical width/height box (equal
+      // Expanded flex in the same Row), so measure and textHeight are
+      // shared automatically; only the SIZE has to be reconciled
+      // explicitly. If the peer's font has not finished loading yet this
+      // quietly falls back to this page's own fit, and self-corrects on
+      // the rebuild that follows once it has. Gated the same way as the
+      // slot layout below: an opening page only takes part once it too
+      // has been expanded to the full fifteen-slot rhythm.
+      if (peerPage != null &&
+          MushafGlyphService.hasFont(peerPage) &&
+          (!opening || expandOpening)) {
+        final peerLines = MushafGlyphService.linesOf(peerPage);
+        if (peerLines.isNotEmpty) {
+          final peerM = _glyphMetrics(peerPage, peerLines, measure, textHeight);
+          if (peerM.size < size) {
+            size = peerM.size;
+            leading = (textHeight / lines.length) / size;
+          }
+        }
+      }
 
       final page0 = SizedBox(
         width: width,
