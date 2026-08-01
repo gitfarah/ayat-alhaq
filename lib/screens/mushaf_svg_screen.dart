@@ -431,6 +431,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     return size.width > size.height && !_isWideScreen(context);
   }
 
+  /// Portrait phones are much taller than a printed Mushaf leaf. The V1
+  /// renderer can use the extra height by distributing its fixed fifteen
+  /// lines through the available reading area; tablets keep paper geometry.
+  bool _isPortraitPhone(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    return size.height >= size.width && size.shortestSide < 600;
+  }
+
   /// Jumps straight to [page] (menu pickers, recitation follow). The
   /// PageView's onPageChanged then runs the usual bookkeeping.
   void _loadPage(int page) {
@@ -1711,16 +1719,37 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       // that, using the same [scrollable] flag below to make it possible.
       const aspect = 345 / 550;
       final scrollZoom = _isLandscapeCompact(context);
-      var width = constraints.maxWidth * _zoom;
-      var height = width / aspect;
-      if (!_isZoomed && !scrollZoom && height > constraints.maxHeight) {
-        height = constraints.maxHeight;
-        width = height * aspect;
+      final phoneFit = _isPortraitPhone(context);
+      late double width;
+      late double height;
+      if (phoneFit) {
+        // A live glyph page is not a frozen leaf: its glyph size follows
+        // the width and its fifteen line slots fill the phone vertically.
+        // This removes the large empty bands above and below the page while
+        // retaining every glyph, ayah position and printed page boundary.
+        width = constraints.maxWidth * _zoom;
+        height = constraints.maxHeight * _zoom;
+      } else {
+        width = constraints.maxWidth * _zoom;
+        height = width / aspect;
+        // Tablets retain the physical page proportion, contained inside the
+        // reading area so the final lines are never pushed off-screen.
+        if (!_isZoomed && !scrollZoom && height > constraints.maxHeight) {
+          height = constraints.maxHeight;
+          width = height * aspect;
+        }
       }
 
       // The opening spread is set in a narrower column, the way the
       // printed Mushaf frames it; a full page uses the whole measure.
       final opening = page <= 2;
+      // The opening spread has fewer than fifteen printed lines. Leaving
+      // those at their natural font height looks balanced on a phone, but
+      // creates a broken-looking island of text in each half of a large
+      // tablet spread. On tablets, give those lines the same full-height
+      // page rhythm as every other leaf; phones retain the compact opening
+      // composition that already fits their narrow canvas well.
+      final expandOpening = opening && !_isPortraitPhone(context);
       final inset = opening ? 0.16 : 0.045;
       final measure = width * (1 - inset * 2);
       final textHeight = height * 0.96;
@@ -1728,7 +1757,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       final size = m.size;
       // The opening pages are a centred block at the font's own leading;
       // a full page is fifteen lines set to fill the height exactly.
-      final leading = opening ? null : m.leading;
+      final leading = opening && !expandOpening ? null : m.leading;
 
       final page0 = SizedBox(
         width: width,
@@ -1742,10 +1771,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           // natural spacing, as a block, instead.
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: opening ? MainAxisSize.min : MainAxisSize.max,
+            mainAxisSize:
+                opening && !expandOpening ? MainAxisSize.min : MainAxisSize.max,
             children: [
               for (final line in lines)
-                if (opening)
+                if (opening && !expandOpening)
                   // The band is painted around the name, so the header
                   // line needs room of its own here; inside a full page
                   // the fifteen equal slots already provide it.
