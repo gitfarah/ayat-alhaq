@@ -95,6 +95,11 @@ class AboutScreen extends StatelessWidget {
               'quranpedia/quran-svg — Hafs, Warsh,\n'
                   'Qalon, Shubah, ad-Duri'
             ),
+            (
+              t('aboutV1'),
+              'KFGQPC V1 (1405H) — layout from quran.com-images,\n'
+                  'page fonts from QUL (qul.tarteel.ai)'
+            ),
             (t('aboutTajweed'), 'quran.com tajweed rule data'),
             (t('aboutTafsir'), 'spa5k/tafsir_api'),
             (t('aboutAudio'), 'islamic.network / everyayah.com'),
@@ -105,6 +110,10 @@ class AboutScreen extends StatelessWidget {
             ('Almarai', 'SIL Open Font License 1.1'),
             (
               'KFGQPC HAFS Uthmanic Script',
+              'King Fahd Glorious Quran Printing Complex'
+            ),
+            (
+              'KFGQPC V1 page fonts (QCF)',
               'King Fahd Glorious Quran Printing Complex'
             ),
           ]),

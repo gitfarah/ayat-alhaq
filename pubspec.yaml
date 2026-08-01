@@ -66,3 +66,9 @@ flutter:
     - family: QuranHafs
       fonts:
         - asset: assets/fonts/HafsQuran.ttf
+    # Surah-name bands and the Basmalah of the KFGQPC V1 Mushaf. Its
+    # page fonts are fetched per page at runtime; this one is shared by
+    # every page, so it ships with the app.
+    - family: QCF_BSML
+      fonts:
+        - asset: assets/fonts/QCF_BSML.ttf
