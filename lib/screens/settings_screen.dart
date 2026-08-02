@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_strings.dart';
+import '../services/ayah_insight_service.dart';
 import '../services/settings_service.dart';
 import '../services/mushaf_svg_service.dart';
 import '../services/prayer_service.dart';
@@ -21,6 +22,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int? _cacheBytes;
   bool _clearing = false;
 
+  // Ayah study layers (الإعراب/التصريف/المعنى/القراءات). These have no
+  // bulk download — they accumulate as the reader opens ayahs — so the
+  // only control offered is the size and a way to clear it.
+  int? _insightBytes;
+  bool _clearingInsights = false;
+
   // Offline-tafsir download state, keyed by edition id.
   final Map<int, bool> _tafsirDownloaded = {};
   final Map<int, int> _tafsirSize = {};
@@ -38,6 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _loadCacheSize();
+    _loadInsightCacheSize();
     _loadTafsirStatus();
     _loadPrayerConfig();
   }
@@ -256,6 +264,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadCacheSize() async {
     final size = await MushafSvgService.getCacheSizeBytes();
     if (mounted) setState(() => _cacheBytes = size);
+  }
+
+  Future<void> _loadInsightCacheSize() async {
+    if (!AyahInsightService.supportsCache) return;
+    final size = await AyahInsightService.cachedSizeBytes();
+    if (mounted) setState(() => _insightBytes = size);
+  }
+
+  Future<void> _confirmClearInsights() async {
+    final isDark = context.read<SettingsService>().isDarkIn(context);
+    final t = L10n.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(t('clearStudyTitle'),
+            textDirection: TextDirection.rtl,
+            style: const TextStyle(
+                fontFamily: '.SF Pro Text', fontWeight: FontWeight.bold)),
+        content: Text(t('clearStudyBody'),
+            textDirection: TextDirection.rtl,
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontFamily: '.SF Pro Text', height: 1.6)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(t('cancel'))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child:
+                Text(t('clearBtn'), style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _clearingInsights = true);
+      await AyahInsightService.clearCache();
+      await _loadInsightCacheSize();
+      if (mounted) {
+        setState(() => _clearingInsights = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(L10n.of(context)('clearedMsg'))));
+      }
+    }
   }
 
   String _formatBytes(int bytes) {
@@ -818,6 +874,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ])
                 : null,
           ),
+          if (AyahInsightService.supportsCache) ...[
+            const SizedBox(height: 16),
+            _SectionLabel(t('studyOffline'), isDark),
+            _Tile(
+              isDark: isDark,
+              icon: Icons.auto_stories_rounded,
+              title: t('savedStudy'),
+              subtitle: _insightBytes == null
+                  ? t('calculating')
+                  : _insightBytes == 0
+                      ? t('noSavedStudy')
+                      : '${_formatBytes(_insightBytes!)} ${t('onDevice')}',
+              child: Column(children: [
+                const SizedBox(height: 4),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    t('savedStudyInfo'),
+                    textAlign: TextAlign.start,
+                    style: TextStyle(
+                        fontFamily: '.SF Pro Text',
+                        fontSize: 14,
+                        color: isDark
+                            ? AppColors.darkTextSec
+                            : AppColors.textSecondary,
+                        height: 1.6),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: (_insightBytes != null &&
+                            _insightBytes! > 0 &&
+                            !_clearingInsights)
+                        ? _confirmClearInsights
+                        : null,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    icon: _clearingInsights
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.red))
+                        : const Icon(Icons.delete_outline_rounded, size: 18),
+                    label: Text(
+                        _clearingInsights ? t('clearing') : t('clearSavedStudy'),
+                        style: const TextStyle(fontFamily: '.SF Pro Text')),
+                  ),
+                ),
+              ]),
+            ),
+          ],
           const SizedBox(height: 16),
           _SectionLabel(t('about'), isDark),
           // Everything that used to be listed here — version, text

@@ -156,6 +156,15 @@ class L10n {
       'cancel': 'إلغاء',
       'clearBtn': 'مسح',
       'clearedMsg': 'تم مسح الصفحات المحفوظة',
+      'studyOffline': 'الدراسة دون اتصال',
+      'savedStudy': 'الآيات المحفوظة للدراسة',
+      'noSavedStudy': 'لا توجد آيات محفوظة بعد',
+      'savedStudyInfo':
+          'الإعراب والتصريف والمعنى والقراءات تُحفظ تلقائياً لكل آية تفتحها، فتعود إليها لاحقاً دون اتصال. لا يوجد تحميل شامل لهذه الكتب — تُجمع بالقراءة فقط.',
+      'clearSavedStudy': 'مسح الآيات المحفوظة',
+      'clearStudyTitle': 'مسح بيانات الدراسة المحفوظة',
+      'clearStudyBody':
+          'سيتم حذف الإعراب والتصريف والمعنى والقراءات المحفوظة لكل الآيات التي فتحتها. ستحتاج لإعادة تحميلها عند فتحها مجدداً.',
       'tafsirSubtitleMobile': 'حمّل ما تحتاجه فقط — كل تفسير على حدة',
       'tafsirSubtitleWebOnly': 'التحميل متاح على تطبيق الهاتف فقط',
       'tafsirDownloadingLbl': 'جارٍ التحميل...',
@@ -323,6 +332,15 @@ class L10n {
       'cancel': 'Cancel',
       'clearBtn': 'Clear',
       'clearedMsg': 'Saved pages cleared',
+      'studyOffline': 'Offline study',
+      'savedStudy': 'Saved ayah study data',
+      'noSavedStudy': 'No saved ayahs yet',
+      'savedStudyInfo':
+          'I‘rab, morphology, meaning and qira’at are saved automatically for every ayah you open, so you can revisit it offline. These works have no bulk download — they build up as you read.',
+      'clearSavedStudy': 'Clear saved study data',
+      'clearStudyTitle': 'Clear saved study data',
+      'clearStudyBody':
+          'The saved i‘rab, morphology, meaning and qira’at for every ayah you have opened will be deleted. You will need to download them again when you reopen them.',
       'tafsirSubtitleMobile': 'Download only what you need — each tafsir separately',
       'tafsirSubtitleWebOnly': 'Download is available on the mobile app only',
       'tafsirDownloadingLbl': 'Downloading…',
@@ -490,6 +508,15 @@ class L10n {
       'cancel': 'Abbrechen',
       'clearBtn': 'Löschen',
       'clearedMsg': 'Gespeicherte Seiten gelöscht',
+      'studyOffline': 'Offline-Studium',
+      'savedStudy': 'Gespeicherte Studiendaten',
+      'noSavedStudy': 'Noch keine gespeicherten Verse',
+      'savedStudyInfo':
+          'I‘rāb, Morphologie, Bedeutung und Qirā’āt werden für jeden geöffneten Vers automatisch gespeichert, sodass du ihn später offline nachlesen kannst. Für diese Werke gibt es keinen Gesamt-Download — sie sammeln sich beim Lesen an.',
+      'clearSavedStudy': 'Gespeicherte Studiendaten löschen',
+      'clearStudyTitle': 'Gespeicherte Studiendaten löschen',
+      'clearStudyBody':
+          'Die gespeicherten I‘rāb-, Morphologie-, Bedeutungs- und Qirā’āt-Daten aller geöffneten Verse werden gelöscht. Beim erneuten Öffnen müssen sie neu geladen werden.',
       'tafsirSubtitleMobile': 'Lade nur, was du brauchst — jeden Tafsir einzeln',
       'tafsirSubtitleWebOnly': 'Download nur in der Mobil-App verfügbar',
       'tafsirDownloadingLbl': 'Wird geladen…',

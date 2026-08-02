@@ -292,6 +292,44 @@ class QuranService {
     return text;
   }
 
+  /// The GLOBAL ayah number (1-6236) of a surah:ayah pair, or 0 when
+  /// out of range. Inverse of [locateGlobalAyah].
+  static Future<int> globalAyahNumber(int surahNumber, int ayahNumber) async {
+    await _ensureLoaded();
+    if (surahNumber < 1 || surahNumber > _rawAyahs!.length) return 0;
+    final tuples = _rawAyahs![surahNumber - 1];
+    if (ayahNumber < 1 || ayahNumber > tuples.length) return 0;
+    return tuples[ayahNumber - 1][0] as int;
+  }
+
+  /// Resolves a GLOBAL ayah number (1-6236) to its surah, position and
+  /// text. Returns null when out of range. Powers the mutashabihat
+  /// list, whose dataset addresses ayahs globally.
+  ///
+  /// Unlike [getAyahText] the Basmala is NOT stripped from a surah's
+  /// first ayah: a mutashabiha match points at the ayah as recited, and
+  /// dropping its opening would hide the very words being compared.
+  static Future<AyahSearchResult?> locateGlobalAyah(int globalAyah) async {
+    await _ensureLoaded();
+    for (var s = 0; s < _rawAyahs!.length; s++) {
+      final tuples = _rawAyahs![s];
+      if (tuples.isEmpty) continue;
+      if (globalAyah > (tuples.last[0] as int)) continue;
+      if (globalAyah < (tuples.first[0] as int)) return null;
+      for (final t in tuples) {
+        if (t[0] as int != globalAyah) continue;
+        return AyahSearchResult(
+          surahNumber: s + 1,
+          surahName: _surahCache![s].name,
+          numberInSurah: t[1] as int,
+          text: t[5] as String,
+        );
+      }
+      return null;
+    }
+    return null;
+  }
+
   /// The Mushaf page a GLOBAL ayah number (1-6236) appears on, from the
   /// bundled metadata. Returns 1 when out of range.
   static Future<int> pageOfGlobalAyah(int globalAyah) async {
