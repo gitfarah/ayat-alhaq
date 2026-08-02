@@ -9,7 +9,7 @@
 /// needs it there to treat a new build as an upgrade, and the About
 /// screen reads it from here.
 const String kAppVersion = '1.7.2';
-const int kBuildNumber = 49;
+const int kBuildNumber = 50;
 
 /// "1.7.2 (47)" — what to show the reader and what to quote in a bug
 /// report.

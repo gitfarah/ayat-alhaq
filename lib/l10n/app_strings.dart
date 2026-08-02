@@ -266,6 +266,11 @@ class L10n {
       'tajweedOff': 'غير مفعّلة',
       'tajweedNote':
           'تُطبَّق الألوان في وضع «الآيات» (القراءة المتجاوبة). صفحات المصحف صور جاهزة، فلا يمكن تلوينها.',
+      'wordHlLbl': 'تتبّع الكلمات أثناء التلاوة',
+      'wordHlOn': 'مفعّل — تُميَّز الكلمة التي يتلوها القارئ',
+      'wordHlOff': 'غير مفعّل',
+      'wordHlNote':
+          'يُقدَّر توقيت كل كلمة من طول المقطع الصوتي ومن حروف الكلمة ومدودها، إذ لا توفّر مصادر الصوت توقيتاً لكل كلمة. فقد تسبق الإضاءة صوت القارئ أو تتأخّر عنه قليلاً. ويعمل في وضع «الآيات» فقط.',
     },
     'en': {
       'tabHighlights': 'Highlights',
@@ -428,6 +433,11 @@ class L10n {
       'tajweedOff': 'Off',
       'tajweedNote':
           'Colours apply in the verse-by-verse reader. Mushaf pages are pre-rendered images and cannot be recoloured.',
+      'wordHlLbl': 'Follow the words while reciting',
+      'wordHlOn': 'On — the word being recited is highlighted',
+      'wordHlOff': 'Off',
+      'wordHlNote':
+          'The audio sources carry no per-word timestamps, so each word\'s moment is estimated from the clip length and from the word\'s letters and elongations. The highlight can run slightly ahead of or behind the voice. Verse-by-verse reader only.',
     },
     'de': {
       'tabHighlights': 'Markierungen',
@@ -590,6 +600,11 @@ class L10n {
       'tajweedOff': 'Aus',
       'tajweedNote':
           'Die Farben gelten im Vers-für-Vers-Leser. Mushaf-Seiten sind fertige Bilder und können nicht eingefärbt werden.',
+      'wordHlLbl': 'Wörter beim Rezitieren mitverfolgen',
+      'wordHlOn': 'An — das rezitierte Wort wird hervorgehoben',
+      'wordHlOff': 'Aus',
+      'wordHlNote':
+          'Die Audioquellen liefern keine Zeitmarken pro Wort. Der Zeitpunkt jedes Wortes wird aus der Länge der Aufnahme sowie aus Buchstaben und Dehnungen des Wortes geschätzt und kann der Stimme leicht voraus- oder nachlaufen. Nur im Vers-für-Vers-Leser.',
     },
   };
 }

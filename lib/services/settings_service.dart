@@ -11,6 +11,7 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
   String? _translationEdition;
   String _appLanguage = 'ar';
   bool _tajweed = false;
+  bool _recitationHighlight = true;
   String _mushafEdition = 'hafs';
   String _mushafBackground = 'parchment';
 
@@ -42,6 +43,15 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> setTajweed(bool on) async {
     _tajweed = on;
     (await SharedPreferences.getInstance()).setBool('tajweed', on);
+    notifyListeners();
+  }
+
+  /// Light up each word of the ayah as the reciter reaches it.
+  bool get recitationHighlight => _recitationHighlight;
+
+  Future<void> setRecitationHighlight(bool on) async {
+    _recitationHighlight = on;
+    (await SharedPreferences.getInstance()).setBool('recitationHighlight', on);
     notifyListeners();
   }
 
@@ -157,6 +167,7 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
     _translationEdition = (edition == null || edition.isEmpty) ? null : edition;
     _appLanguage = p.getString('appLanguage') ?? 'ar';
     _tajweed = p.getBool('tajweed') ?? false;
+    _recitationHighlight = p.getBool('recitationHighlight') ?? true;
     _mushafEdition = p.getString('mushafEdition') ?? 'hafs';
     _mushafBackground = p.getString('mushafBackground') ?? 'parchment';
     MushafSvgService.setEdition(_mushafEdition);

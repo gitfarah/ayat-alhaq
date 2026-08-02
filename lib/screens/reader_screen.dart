@@ -16,6 +16,7 @@ import '../l10n/app_strings.dart';
 import '../theme.dart';
 import '../widgets/ayah_note_sheet.dart';
 import '../widgets/reciter_picker.dart';
+import '../widgets/reciting_ayah_text.dart';
 import '../widgets/surah_frame.dart';
 import 'tafsir_screen.dart';
 
@@ -666,23 +667,91 @@ class _ReaderScreenState extends State<ReaderScreen>
     return number.toString().split('').map((d) => ar[int.parse(d)]).join();
   }
 
-  /// The ayah's text as spans — one plain span normally, or a coloured
-  /// span per tajweed rule when the setting is on and data is available.
-  List<InlineSpan> _ayahSpans(
-      Ayah ayah, SettingsService settings, bool isDark) {
-    if (!settings.tajweed) return [TextSpan(text: ayah.text)];
+  /// The ayah's text as coloured runs — one plain run normally, or a
+  /// run per tajweed rule when the setting is on and data is available.
+  List<AyahRun> _ayahRuns(Ayah ayah, SettingsService settings) {
+    if (!settings.tajweed) return [AyahRun(ayah.text)];
     final segs =
         TajweedService.segments(widget.surah.number, ayah.numberInSurah);
-    if (segs == null) return [TextSpan(text: ayah.text)];
+    if (segs == null) return [AyahRun(ayah.text)];
     return [
       for (final s in segs)
-        TextSpan(
-          text: s.text,
-          style: s.isPlain
-              ? null
-              : TextStyle(color: TajweedService.colorFor(s.rule)),
-        ),
+        AyahRun(s.text, s.isPlain ? null : TajweedService.colorFor(s.rule)),
     ];
+  }
+
+  /// The ayah's Arabic text plus its number badge.
+  ///
+  /// While this ayah is the one being recited (and the setting is on) it
+  /// is drawn by [RecitingAyahText], which follows the audio position
+  /// and lights up each word as the reciter reaches it. Every other ayah
+  /// is a plain RichText that never rebuilds during playback.
+  Widget _ayahBody(Ayah ayah, SettingsService settings, bool isDark,
+      QuranAudioService audio, bool isPlayingThis) {
+    final runs = _ayahRuns(ayah, settings);
+    // Right-aligned (not justified): justification inserted spacing that
+    // broke the visual flow of Arabic words.
+    final baseStyle = TextStyle(
+      fontSize: settings.fontSize,
+      height: 2.1,
+      color: isDark ? AppColors.darkText : AppColors.textPrimary,
+      // Quran verses only.
+      fontFamily: 'QuranHafs',
+    );
+    final trailing = <InlineSpan>[
+      const WidgetSpan(child: SizedBox(width: 6)),
+      WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: Container(
+          margin: const EdgeInsets.only(right: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+          decoration: BoxDecoration(
+            border: Border.all(
+                color: (isDark ? AppColors.darkSecondary : AppColors.accent)
+                    .withValues(alpha: 0.5)),
+            borderRadius: BorderRadius.circular(8),
+            color: isDark ? AppColors.darkBg : AppColors.background,
+          ),
+          child: Text(
+            _ar(ayah.numberInSurah),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: isDark ? AppColors.darkSecondary : AppColors.accent,
+              fontFamily: '.SF Pro Text',
+            ),
+          ),
+        ),
+      ),
+    ];
+
+    if (isPlayingThis && settings.recitationHighlight) {
+      return RecitingAyahText.forAudio(
+        // Keyed by ayah so auto-advance restarts the word tracking
+        // instead of carrying the previous ayah's position over.
+        key: ValueKey('reciting-${ayah.number}'),
+        runs: runs,
+        trailing: trailing,
+        baseStyle: baseStyle,
+        audio: audio,
+        isDark: isDark,
+      );
+    }
+
+    return RichText(
+      textAlign: TextAlign.right,
+      textDirection: TextDirection.rtl,
+      text: TextSpan(
+        style: baseStyle,
+        children: [
+          for (final r in runs)
+            TextSpan(
+                text: r.text,
+                style: r.color == null ? null : TextStyle(color: r.color)),
+          ...trailing,
+        ],
+      ),
+    );
   }
 
   @override
@@ -880,70 +949,8 @@ class _ReaderScreenState extends State<ReaderScreen>
                                             ],
                                           ),
                                         ),
-                                      RichText(
-                                        // Right-aligned (not justified):
-                                        // justification inserted spacing
-                                        // that broke the visual flow of
-                                        // Arabic words.
-                                        textAlign: TextAlign.right,
-                                        textDirection: TextDirection.rtl,
-                                        text: TextSpan(
-                                          style: TextStyle(
-                                            fontSize: settings.fontSize,
-                                            height: 2.1,
-                                            color: isDark
-                                                ? AppColors.darkText
-                                                : AppColors.textPrimary,
-                                            // Quran verses only.
-                                            fontFamily: 'QuranHafs',
-                                          ),
-                                          children: [
-                                            ..._ayahSpans(
-                                                ayah, settings, isDark),
-                                            const WidgetSpan(
-                                                child: SizedBox(width: 6)),
-                                            WidgetSpan(
-                                              alignment:
-                                                  PlaceholderAlignment.middle,
-                                              child: Container(
-                                                margin: const EdgeInsets.only(
-                                                    right: 4),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 7,
-                                                        vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  border: Border.all(
-                                                      color: (isDark
-                                                              ? AppColors
-                                                                  .darkSecondary
-                                                              : AppColors
-                                                                  .accent)
-                                                          .withValues(
-                                                              alpha: 0.5)),
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                  color: isDark
-                                                      ? AppColors.darkBg
-                                                      : AppColors.background,
-                                                ),
-                                                child: Text(
-                                                  _ar(ayah.numberInSurah),
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: isDark
-                                                        ? AppColors
-                                                            .darkSecondary
-                                                        : AppColors.accent,
-                                                    fontFamily: '.SF Pro Text',
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                      _ayahBody(ayah, settings, isDark, audio,
+                                          isPlayingThis),
                                       if (ayah.translation != null) ...[
                                         Divider(
                                             height: 18,

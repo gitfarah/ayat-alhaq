@@ -639,6 +639,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ]),
           ),
+          _Tile(
+            isDark: isDark,
+            icon: Icons.record_voice_over_rounded,
+            title: t('wordHlLbl'),
+            subtitle: s.recitationHighlight ? t('wordHlOn') : t('wordHlOff'),
+            child: Column(children: [
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Switch(
+                  value: s.recitationHighlight,
+                  activeThumbColor: AppColors.gold,
+                  onChanged: (v) => s.setRecitationHighlight(v),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(t('wordHlNote'),
+                    textAlign: TextAlign.start,
+                    style: TextStyle(
+                        fontFamily: '.SF Pro Text',
+                        fontSize: 13,
+                        height: 1.5,
+                        color: isDark
+                            ? AppColors.darkTextSec
+                            : AppColors.textSecondary)),
+              ),
+            ]),
+          ),
           const SizedBox(height: 16),
           _SectionLabel(t('prayerTimes'), isDark),
           GestureDetector(

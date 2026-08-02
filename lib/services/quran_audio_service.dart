@@ -98,6 +98,17 @@ class QuranAudioService extends ChangeNotifier {
 
   int? Function(int currentGlobalAyah)? nextAyahResolver;
 
+  /// Playback position of the current ayah, ticking while it plays.
+  ///
+  /// Exposed as a STREAM rather than as ChangeNotifier state on purpose:
+  /// it fires many times a second, and only the word-highlight cares. A
+  /// notifyListeners() at that rate would rebuild every reading screen.
+  Stream<Duration> get positionStream => _player.positionStream;
+
+  /// Length of the current ayah's clip, once known.
+  Duration? get trackDuration => _player.duration;
+  Stream<Duration?> get durationStream => _player.durationStream;
+
   QuranAudioService() {
     _player.playerStateStream.listen((state) {
       _isPlaying = state.playing;
