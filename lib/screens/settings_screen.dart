@@ -857,8 +857,8 @@ class _SectionLabel extends StatelessWidget {
       child: Align(
         alignment: AlignmentDirectional.centerStart,
         child: Text(text,
-            style: const TextStyle(
-                color: AppColors.primary,
+            style: TextStyle(
+                color: isDark ? AppColors.darkPrimary : AppColors.primary,
                 fontWeight: FontWeight.bold,
                 fontFamily: '.SF Pro Text',
                 fontSize: 18)),
