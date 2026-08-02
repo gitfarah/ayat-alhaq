@@ -26,6 +26,21 @@ class Highlight {
 
   bool get isFromMushaf => page != null;
 
+  /// A note counts as present only when it has actual text — an empty
+  /// string is stored as null so the UI never shows a blank note card.
+  bool get hasNote => note != null && note!.trim().isNotEmpty;
+
+  Highlight copyWith({String? color, String? note, bool clearNote = false}) =>
+      Highlight(
+        surahNumber: surahNumber,
+        ayahNumber: ayahNumber,
+        surahName: surahName,
+        color: color ?? this.color,
+        note: clearNote ? null : (note ?? this.note),
+        createdAt: createdAt,
+        page: page,
+      );
+
   Map<String, dynamic> toJson() => {
         'surahNumber': surahNumber,
         'ayahNumber': ayahNumber,
@@ -58,13 +73,70 @@ class HighlightService {
     final List<String> highlights = prefs.getStringList(_key) ?? [];
 
     // إزالة التمييز السابق لنفس الآية
+    String? previousNote;
     highlights.removeWhere((h) {
       final decoded = jsonDecode(h);
-      return decoded['surahNumber'] == highlight.surahNumber &&
+      final same = decoded['surahNumber'] == highlight.surahNumber &&
           decoded['ayahNumber'] == highlight.ayahNumber;
+      // Recolouring an ayah must not throw away the note written on it —
+      // the colour pickers build a fresh Highlight with no note.
+      if (same) previousNote = decoded['note'] as String?;
+      return same;
     });
 
-    highlights.add(jsonEncode(highlight.toJson()));
+    final toSave = highlight.note == null && previousNote != null
+        ? highlight.copyWith(note: previousNote)
+        : highlight;
+    highlights.add(jsonEncode(toSave.toJson()));
+    await prefs.setStringList(_key, highlights);
+    LibraryEvents.highlights.ping();
+  }
+
+  /// Writes (or clears) the note on an ayah. Passing null/blank removes
+  /// the note but keeps the colour mark.
+  ///
+  /// Notes live on the mark, so writing one on an ayah that isn't marked
+  /// yet creates the mark too — [defaultColor] is used in that case, and
+  /// [surahName]/[page] describe where the note was written so the
+  /// Highlights tab can reopen it in the right mode.
+  static Future<void> setNote(
+    int surahNumber,
+    int ayahNumber, {
+    required String? note,
+    String surahName = '',
+    int? page,
+    String defaultColor = 'yellow',
+  }) async {
+    final clean = note?.trim();
+    final existing = await getHighlight(surahNumber, ayahNumber);
+
+    if (existing == null) {
+      // Nothing to attach an empty note to — don't create a bare mark.
+      if (clean == null || clean.isEmpty) return;
+      await addHighlight(Highlight(
+        surahNumber: surahNumber,
+        ayahNumber: ayahNumber,
+        surahName: surahName,
+        color: defaultColor,
+        note: clean,
+        createdAt: DateTime.now(),
+        page: page,
+      ));
+      return;
+    }
+
+    final updated = (clean == null || clean.isEmpty)
+        ? existing.copyWith(clearNote: true)
+        : existing.copyWith(note: clean);
+
+    final prefs = await SharedPreferences.getInstance();
+    final List<String> highlights = prefs.getStringList(_key) ?? [];
+    highlights.removeWhere((h) {
+      final decoded = jsonDecode(h);
+      return decoded['surahNumber'] == surahNumber &&
+          decoded['ayahNumber'] == ayahNumber;
+    });
+    highlights.add(jsonEncode(updated.toJson()));
     await prefs.setStringList(_key, highlights);
     LibraryEvents.highlights.ping();
   }
