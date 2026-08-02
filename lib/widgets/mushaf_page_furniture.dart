@@ -49,7 +49,7 @@ class MushafPageHeader extends StatelessWidget {
         .join(' • ');
 
     final style = TextStyle(
-      fontFamily: 'Almarai',
+      fontFamily: 'SF Arabic',
       fontSize: math.min(13, height * 0.5),
       color: ink,
       height: 1.2,
@@ -173,7 +173,7 @@ class MushafPageBadge extends StatelessWidget {
       text: TextSpan(
           text: label,
           style: TextStyle(
-              fontFamily: 'Almarai',
+              fontFamily: 'SF Arabic',
               fontWeight: FontWeight.bold,
               fontSize: height * 0.42)),
       textDirection: TextDirection.rtl,
@@ -201,7 +201,7 @@ class MushafPageBadge extends StatelessWidget {
               child: Text(label,
                   textDirection: TextDirection.rtl,
                   style: TextStyle(
-                      fontFamily: 'Almarai',
+                      fontFamily: 'SF Arabic',
                       fontWeight: FontWeight.bold,
                       fontSize: height * 0.42,
                       height: 1.0,

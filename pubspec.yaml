@@ -1,7 +1,7 @@
 name: quran_app_v1
 description: A Quran reading app for Android and iOS.
 publish_to: 'none'
-version: 1.7.2+47
+version: 1.7.2+48
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -51,17 +51,9 @@ flutter:
     - assets/icon/logo_transparent.png
     - assets/icon/bismillah.png
   fonts:
-    # UI everywhere: menus, labels, buttons, surah lists.
-    - family: Almarai
-      fonts:
-        - asset: assets/fonts/Almarai-Light.ttf
-          weight: 300
-        - asset: assets/fonts/Almarai-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/Almarai-Bold.ttf
-          weight: 700
-        - asset: assets/fonts/Almarai-ExtraBold.ttf
-          weight: 800
+    # UI everywhere: menus, labels, buttons, surah lists. SF Arabic is
+    # Apple's system font — resolved by family name from the on-device
+    # font, never bundled (its licence doesn't allow redistribution).
     # Quran VERSES ONLY — the Uthmanic Hafs typeface of the printed Mushaf.
     - family: QuranHafs
       fonts:

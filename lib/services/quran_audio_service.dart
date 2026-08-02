@@ -34,6 +34,24 @@ class QuranAudioService extends ChangeNotifier {
     'ar.muhammadayyoub': 'محمد أيوب',
     'ar.shaatree': 'أبو بكر الشاطري',
     'ar.ahmedajamy': 'أحمد العجمي',
+    'ar.minshawi': 'محمد صديق المنشاوي',
+    'ar.mustafaismail': 'مصطفى إسماعيل',
+    'ar.mahmoudalbanna': 'محمود البنا',
+  };
+
+  /// Reciters served only as whole-surah files everywhere they're
+  /// archived (islamic.network, mp3quran.net, quran.com) have no
+  /// per-ayah audio at all and can't support ayah-by-ayah playback:
+  /// عبدالرشيد الصوفي and أحمد بن طالب (بن حميد) were requested but
+  /// dropped for this reason — no per-ayah source exists to point at.
+  ///
+  /// Ayah-by-ayah audio for the reciters above that AREN'T on the
+  /// islamic.network/alquran.cloud CDN comes from everyayah.com
+  /// instead, which splits recordings into one file per ayah using a
+  /// zero-padded "surah+ayah" name (e.g. 114006.mp3 for 114:6).
+  static const Map<String, String> _everyayahFolder = {
+    'ar.mustafaismail': 'Mustafa_Ismail_48kbps',
+    'ar.mahmoudalbanna': 'mahmoud_ali_al_banna_32kbps',
   };
 
   static const String _defaultReciter = 'ar.mahermuaiqly';
@@ -116,11 +134,21 @@ class QuranAudioService extends ChangeNotifier {
         '${_docsDir!.path}${Platform.pathSeparator}audio${Platform.pathSeparator}$reciter${Platform.pathSeparator}$globalAyah.mp3');
   }
 
-  List<String> _urlsFor(String reciter, int globalAyah) => [
-        'https://cdn.islamic.network/quran/audio/128/$reciter/$globalAyah.mp3',
-        'https://cdn.islamic.network/quran/audio/64/$reciter/$globalAyah.mp3',
-        'https://cdn.alquran.cloud/media/audio/ayah/$reciter/$globalAyah',
-      ];
+  List<String> _urlsFor(String reciter, int globalAyah) {
+    final everyayahFolder = _everyayahFolder[reciter];
+    if (everyayahFolder != null) {
+      final (surah, first, _) = surahRangeOf(globalAyah);
+      final ayahInSurah = globalAyah - first + 1;
+      final name =
+          '${surah.toString().padLeft(3, '0')}${ayahInSurah.toString().padLeft(3, '0')}';
+      return ['https://everyayah.com/data/$everyayahFolder/$name.mp3'];
+    }
+    return [
+      'https://cdn.islamic.network/quran/audio/128/$reciter/$globalAyah.mp3',
+      'https://cdn.islamic.network/quran/audio/64/$reciter/$globalAyah.mp3',
+      'https://cdn.alquran.cloud/media/audio/ayah/$reciter/$globalAyah',
+    ];
+  }
 
   Future<File?> _ensureLocal(String reciter, int globalAyah) async {
     final file = await _localFile(reciter, globalAyah);

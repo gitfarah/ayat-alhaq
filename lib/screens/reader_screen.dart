@@ -244,7 +244,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text(l('chooseBookmarkColor'),
                 style: TextStyle(
-                    fontFamily: 'Almarai',
+                    fontFamily: 'SF Arabic',
                     fontWeight: FontWeight.bold,
                     color:
                         isDark ? AppColors.darkText : AppColors.textPrimary)),
@@ -424,7 +424,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   (audio.currentGlobalAyah == ayah.number && audio.isPlaying)
                       ? l('pauseRecitation')
                       : l('playRecitation'),
-                  style: const TextStyle(fontFamily: 'Almarai'),
+                  style: const TextStyle(fontFamily: 'SF Arabic'),
                 ),
                 onTap: () async {
                   Navigator.pop(context);
@@ -454,7 +454,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             _bookmarkFor(ayah.numberInSurah)!.color)
                         : AppColors.primary),
                 title: Text(l('bookmark'),
-                    style: const TextStyle(fontFamily: 'Almarai')),
+                    style: const TextStyle(fontFamily: 'SF Arabic')),
                 onTap: () {
                   Navigator.pop(context);
                   _showBookmarkPicker(ayah.numberInSurah);
@@ -465,7 +465,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 leading: const Icon(Icons.menu_book_rounded,
                     color: AppColors.primary),
                 title: Text(l('tafsir'),
-                    style: const TextStyle(fontFamily: 'Almarai')),
+                    style: const TextStyle(fontFamily: 'SF Arabic')),
                 onTap: () {
                   Navigator.pop(context);
                   _showTafsir(ayah.numberInSurah, ayah.text);
@@ -476,7 +476,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 leading:
                     const Icon(Icons.copy_rounded, color: AppColors.accent),
                 title: Text(l('copyAyah'),
-                    style: const TextStyle(fontFamily: 'Almarai')),
+                    style: const TextStyle(fontFamily: 'SF Arabic')),
                 onTap: () {
                   Navigator.pop(context);
                   _copyAyah(ayah.text, ayah.numberInSurah);
@@ -524,14 +524,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   textAlign: TextAlign.right,
                   onChanged: (_) => setSheet(() {}),
                   style: TextStyle(
-                      fontFamily: 'Almarai',
+                      fontFamily: 'SF Arabic',
                       color:
                           isDark ? AppColors.darkText : AppColors.textPrimary),
                   decoration: InputDecoration(
                     hintText: '${l('searchInSurah')} — ${widget.surah.name}',
                     hintTextDirection: TextDirection.rtl,
                     hintStyle: TextStyle(
-                        fontFamily: 'Almarai',
+                        fontFamily: 'SF Arabic',
                         color: isDark
                             ? AppColors.darkTextSec
                             : AppColors.textLight),
@@ -553,7 +553,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                 ? l('typeAyahWord')
                                 : l('noResultsInSurah'),
                             style: TextStyle(
-                                fontFamily: 'Almarai',
+                                fontFamily: 'SF Arabic',
                                 color: isDark
                                     ? AppColors.darkTextSec
                                     : AppColors.textSecondary)))
@@ -570,7 +570,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             },
                             leading: Text(_ar(a.numberInSurah),
                                 style: TextStyle(
-                                    fontFamily: 'Almarai',
+                                    fontFamily: 'SF Arabic',
                                     fontWeight: FontWeight.bold,
                                     color: isDark
                                         ? AppColors.darkSecondary
@@ -580,7 +580,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                    fontFamily: 'Almarai',
+                                    fontFamily: 'SF Arabic',
                                     fontSize: 15,
                                     height: 1.7,
                                     color: isDark
@@ -820,7 +820,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                                     : l('nowReciting'),
                                                 style: const TextStyle(
                                                   fontSize: 11,
-                                                  fontFamily: 'Almarai',
+                                                  fontFamily: 'SF Arabic',
                                                   color: AppColors.secondary,
                                                   fontWeight: FontWeight.bold,
                                                 ),
@@ -884,7 +884,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                                         ? AppColors
                                                             .darkSecondary
                                                         : AppColors.accent,
-                                                    fontFamily: 'Almarai',
+                                                    fontFamily: 'SF Arabic',
                                                   ),
                                                 ),
                                               ),
@@ -1015,7 +1015,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         '${widget.surah.revelationType == 'Meccan' ? l('meccan') : l('medinan')} • ${l.number(widget.surah.numberOfAyahs)} ${l('ayahUnit')}',
                         style: TextStyle(
                             fontSize: 11,
-                            fontFamily: 'Almarai',
+                            fontFamily: 'SF Arabic',
                             color: isDark
                                 ? AppColors.darkTextSec
                                 : AppColors.textSecondary)),
@@ -1095,7 +1095,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         ? '${l('ayahWord')} ${l.number(ayah.numberInSurah)}'
                         : '',
                     style: TextStyle(
-                      fontFamily: 'Almarai',
+                      fontFamily: 'SF Arabic',
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                       color:
@@ -1110,7 +1110,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             : l('paused')),
                     style: TextStyle(
                         fontSize: 11,
-                        fontFamily: 'Almarai',
+                        fontFamily: 'SF Arabic',
                         color: isDark
                             ? AppColors.darkTextSec
                             : AppColors.textSecondary),
@@ -1167,18 +1167,18 @@ class _ReaderScreenState extends State<ReaderScreen> {
               style: TextStyle(
                   color: isDark ? AppColors.darkTextSec : Colors.grey[600],
                   fontSize: 12,
-                  fontFamily: 'Almarai')),
+                  fontFamily: 'SF Arabic')),
           Text('${l('juzWord')} ${l.number(_juz)}',
               style: TextStyle(
                   color: isDark ? AppColors.darkTextSec : Colors.grey[600],
                   fontSize: 12,
-                  fontFamily: 'Almarai')),
+                  fontFamily: 'SF Arabic')),
           Text('${l('pageWord')} ${l.number(_page)}',
               style: TextStyle(
                   color: isDark ? AppColors.darkPrimary : AppColors.primary,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'Almarai')),
+                  fontFamily: 'SF Arabic')),
         ],
       ),
     );
@@ -1217,7 +1217,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           isDark ? AppColors.darkText : AppColors.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'Almarai',
+                      fontFamily: 'SF Arabic',
                     )),
                 const SizedBox(height: 8),
                 RadioGroup<String?>(
@@ -1231,7 +1231,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         activeColor: AppColors.primary,
                         title: Text(l('noTranslation'),
                             style: TextStyle(
-                                fontFamily: 'Almarai',
+                                fontFamily: 'SF Arabic',
                                 color: isDark
                                     ? AppColors.darkText
                                     : AppColors.textPrimary)),
@@ -1278,13 +1278,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           isDark ? AppColors.darkText : AppColors.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'Almarai',
+                      fontFamily: 'SF Arabic',
                     )),
                 const SizedBox(height: 20),
                 Text('بِسْمِ اللَّهِ',
                     style: TextStyle(
                       fontSize: settings.fontSize,
-                      fontFamily: 'Almarai',
+                      fontFamily: 'SF Arabic',
                       color:
                           isDark ? AppColors.darkText : AppColors.textPrimary,
                     )),

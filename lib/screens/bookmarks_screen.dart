@@ -92,7 +92,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                 onPressed: _confirmClear,
                 child: Text(l('clearAll'),
                     style: const TextStyle(
-                        color: Colors.red, fontFamily: 'Almarai', fontSize: 13))),
+                        color: Colors.red, fontFamily: 'SF Arabic', fontSize: 13))),
         ],
       ),
       body: _loading
@@ -159,7 +159,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                                   color: isDark
                                       ? AppColors.darkTextSec
                                       : AppColors.textSecondary,
-                                  fontFamily: 'Almarai',
+                                  fontFamily: 'SF Arabic',
                                   fontSize: 13)),
                           trailing: Icon(Icons.chevron_left_rounded,
                               color: isDark
@@ -208,7 +208,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
         Text(l('noBookmarks'),
             style: TextStyle(
                 fontSize: 18,
-                fontFamily: 'Almarai',
+                fontFamily: 'SF Arabic',
                 color:
                     isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
         const SizedBox(height: 8),
@@ -216,7 +216,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
                 color: isDark ? AppColors.darkTextSec : AppColors.textLight,
-                fontFamily: 'Almarai',
+                fontFamily: 'SF Arabic',
                 fontSize: 13)),
       ]));
   }

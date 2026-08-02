@@ -116,10 +116,11 @@ class AppColors {
 }
 
 class AppTypography {
-  // Almarai carries the whole UI; only Quran verses use QuranHafs.
-  static const String arabicFont = 'Almarai';
-  static const String uiFont = 'Almarai';
-  static const String serifFont = 'Almarai';
+  // SF Arabic (Apple's system font, resolved by name on-device — not
+  // bundled) carries the whole UI; only Quran verses use QuranHafs.
+  static const String arabicFont = 'SF Arabic';
+  static const String uiFont = 'SF Arabic';
+  static const String serifFont = 'SF Arabic';
 
   static const TextStyle quranDisplay = TextStyle(
     fontFamily: arabicFont,

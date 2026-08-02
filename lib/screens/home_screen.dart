@@ -258,7 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: isDark
                         ? AppColors.darkTextSec
                         : AppColors.textSecondary,
-                    fontFamily: 'Almarai')),
+                    fontFamily: 'SF Arabic')),
             const SizedBox(height: 24),
             // Fixed order in every language: Mushaf on the LEFT, the
             // responsive reader on the RIGHT (pinned LTR so the app
@@ -384,7 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ? AppColors.darkTextSec
                           : AppColors.textSecondary,
                       fontSize: 13,
-                      fontFamily: 'Almarai')))),
+                      fontFamily: 'SF Arabic')))),
     ];
     // Inline result layout: headers, then matching surahs, then — when
     // the query also hits ayah text — a section label + ayah results,
@@ -419,7 +419,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 : AppColors.primary,
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            fontFamily: 'Almarai'))));
+                            fontFamily: 'SF Arabic'))));
           }
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -457,7 +457,7 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(
                   fontSize: 16,
                   height: 1.8,
-                  fontFamily: 'Almarai',
+                  fontFamily: 'SF Arabic',
                   color: isDark ? AppColors.darkText : AppColors.textPrimary)),
           subtitle: Padding(
             padding: const EdgeInsets.only(top: 2),
@@ -514,7 +514,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           isDark ? AppColors.darkText : AppColors.textPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      fontFamily: 'Almarai')),
+                      fontFamily: 'SF Arabic')),
               Text(gregorianLine,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -523,7 +523,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ? AppColors.darkTextSec
                           : AppColors.textSecondary,
                       fontSize: 13,
-                      fontFamily: 'Almarai')),
+                      fontFamily: 'SF Arabic')),
             ])),
       ]),
     );
@@ -578,7 +578,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               : AppColors.primary,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
-                          fontFamily: 'Almarai')),
+                          fontFamily: 'SF Arabic')),
                   if (s.lastSurah != null)
                     Text(
                         '${L10n.of(context)('surahNo')} ${L10n.of(context).number(s.lastSurah!)}${s.lastAyah != null ? ' · ${L10n.of(context)('ayahWord')} ${L10n.of(context).number(s.lastAyah!)}' : ''}',
@@ -589,7 +589,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ? AppColors.darkTextSec
                                 : AppColors.textSecondary,
                             fontSize: 13,
-                            fontFamily: 'Almarai')),
+                            fontFamily: 'SF Arabic')),
                 ])),
           ]),
         ),
@@ -613,14 +613,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(
                       color:
                           isDark ? AppColors.darkText : AppColors.textPrimary,
-                      fontFamily: 'Almarai'),
+                      fontFamily: 'SF Arabic'),
                   decoration: InputDecoration(
                       hintText: L10n.of(context)('searchHint'),
                       hintStyle: TextStyle(
                           color: isDark
                               ? AppColors.darkTextSec
                               : AppColors.textLight,
-                          fontFamily: 'Almarai',
+                          fontFamily: 'SF Arabic',
                           fontSize: 14),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 14)),
@@ -675,7 +675,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: isDark
                                   ? AppColors.gold
                                   : const Color(0xFF8A6D00),
-                              fontFamily: 'Almarai')))),
+                              fontFamily: 'SF Arabic')))),
               const SizedBox(width: 14),
               Expanded(
                   child: Column(
@@ -747,7 +747,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Text(_error!,
             textAlign: TextAlign.center,
             style: TextStyle(
-                fontFamily: 'Almarai',
+                fontFamily: 'SF Arabic',
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.6)),
         const SizedBox(height: 24),
@@ -761,7 +761,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: _load,
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             label: const Text('إعادة المحاولة',
-                style: TextStyle(fontFamily: 'Almarai', color: Colors.white))),
+                style: TextStyle(fontFamily: 'SF Arabic', color: Colors.white))),
       ]));
 }
 
@@ -886,7 +886,7 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
               child: Text(L10n.of(context)('chooseCity'),
                   textAlign: TextAlign.start,
                   style: TextStyle(
-                      fontFamily: 'Almarai',
+                      fontFamily: 'SF Arabic',
                       fontSize: 13,
                       color:
                           isDark ? AppColors.darkPrimary : AppColors.primary)),
@@ -917,7 +917,7 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
             child: Text('${L10n.of(context)('prayerTimes')} — $_label',
                 textAlign: TextAlign.start,
                 style: TextStyle(
-                    fontFamily: 'Almarai',
+                    fontFamily: 'SF Arabic',
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color:
@@ -956,7 +956,7 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            fontFamily: 'Almarai',
+                            fontFamily: 'SF Arabic',
                             fontSize: 12.5,
                             fontWeight:
                                 i == next ? FontWeight.bold : FontWeight.normal,
@@ -1023,7 +1023,7 @@ class _ModeBtn extends StatelessWidget {
               style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'Almarai',
+                  fontFamily: 'SF Arabic',
                   color: isDark
                       ? (color == AppColors.primary
                           ? AppColors.darkPrimary
@@ -1034,7 +1034,7 @@ class _ModeBtn extends StatelessWidget {
                   fontSize: 12,
                   color:
                       isDark ? AppColors.darkTextSec : AppColors.textSecondary,
-                  fontFamily: 'Almarai')),
+                  fontFamily: 'SF Arabic')),
         ]),
       ));
 }

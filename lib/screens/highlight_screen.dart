@@ -171,7 +171,7 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
                                               color: isDark
                                                   ? AppColors.darkTextSec
                                                   : AppColors.textSecondary,
-                                              fontFamily: 'Almarai',
+                                              fontFamily: 'SF Arabic',
                                               fontSize: 13)),
                                       _AyahPreview(
                                           surahNumber: h.surahNumber,
@@ -222,7 +222,7 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
         Text(l('noHighlights'),
             style: TextStyle(
                 fontSize: 18,
-                fontFamily: 'Almarai',
+                fontFamily: 'SF Arabic',
                 color:
                     isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
         const SizedBox(height: 8),
@@ -230,7 +230,7 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
                 color: isDark ? AppColors.darkTextSec : AppColors.textLight,
-                fontFamily: 'Almarai',
+                fontFamily: 'SF Arabic',
                 fontSize: 13)),
       ]));
   }
@@ -272,7 +272,7 @@ class _Chip extends StatelessWidget {
                         : (isDark
                             ? AppColors.darkTextSec
                             : AppColors.textSecondary),
-                    fontFamily: 'Almarai',
+                    fontFamily: 'SF Arabic',
                     fontSize: 13,
                     fontWeight:
                         selected ? FontWeight.bold : FontWeight.normal))));

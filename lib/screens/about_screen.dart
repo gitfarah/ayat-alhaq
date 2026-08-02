@@ -28,7 +28,7 @@ class AboutScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(t('aboutApp'),
             style: const TextStyle(
-                fontFamily: 'Almarai', fontWeight: FontWeight.bold)),
+                fontFamily: 'SF Arabic', fontWeight: FontWeight.bold)),
         backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
         foregroundColor: text,
         elevation: 0,
@@ -76,13 +76,13 @@ class AboutScreen extends StatelessWidget {
               child: Text('${t('versionLbl')} $kVersionLabel',
                   textDirection: TextDirection.ltr,
                   style: TextStyle(
-                      fontFamily: 'Almarai', fontSize: 12.5, color: sub)),
+                      fontFamily: 'SF Arabic', fontSize: 12.5, color: sub)),
             ),
             const SizedBox(height: 14),
             Text(t('aboutBlurb'),
                 textAlign: TextAlign.start,
                 style: TextStyle(
-                    fontFamily: 'Almarai',
+                    fontFamily: 'SF Arabic',
                     fontSize: 14,
                     height: 1.7,
                     color: text)),
@@ -102,7 +102,7 @@ class AboutScreen extends StatelessWidget {
           ]),
           const SizedBox(height: 14),
           _Section(isDark: isDark, title: t('aboutFonts'), rows: const [
-            ('Almarai', 'SIL Open Font License 1.1'),
+            ('SF Arabic', 'Apple system font, on-device'),
             (
               'KFGQPC HAFS Uthmanic Script',
               'King Fahd Glorious Quran Printing Complex'
@@ -112,7 +112,7 @@ class AboutScreen extends StatelessWidget {
           _Card(isDark: isDark, children: [
             Text(t('aboutOffline'),
                 style: TextStyle(
-                    fontFamily: 'Almarai',
+                    fontFamily: 'SF Arabic',
                     fontSize: 13.5,
                     height: 1.7,
                     color: sub)),
@@ -139,7 +139,7 @@ class AboutScreen extends StatelessWidget {
                   color: isDark ? AppColors.darkPrimary : AppColors.primary),
               label: Text(t('aboutLicenses'),
                   style: TextStyle(
-                      fontFamily: 'Almarai',
+                      fontFamily: 'SF Arabic',
                       color:
                           isDark ? AppColors.darkPrimary : AppColors.primary)),
             ),
@@ -172,6 +172,13 @@ class _Card extends StatelessWidget {
       );
 }
 
+/// Arabic-script text keeps the ambient (locale-driven) direction; text
+/// that is entirely Latin script (proper nouns, licence names, sources)
+/// must stay left-to-right even when the app itself is in Arabic.
+bool _hasArabic(String s) => RegExp(r'[؀-ۿ]').hasMatch(s);
+TextDirection _dirFor(String s) =>
+    _hasArabic(s) ? TextDirection.rtl : TextDirection.ltr;
+
 class _Section extends StatelessWidget {
   final bool isDark;
   final String title;
@@ -186,23 +193,25 @@ class _Section extends StatelessWidget {
     return _Card(isDark: isDark, children: [
       Text(title,
           style: const TextStyle(
-              fontFamily: 'Almarai',
+              fontFamily: 'SF Arabic',
               fontSize: 15,
               fontWeight: FontWeight.bold,
               color: AppColors.gold)),
       const SizedBox(height: 10),
       for (final (label, value) in rows) ...[
         Text(label,
+            textDirection: _dirFor(label),
+            textAlign: _hasArabic(label) ? TextAlign.start : TextAlign.left,
             style: TextStyle(
-                fontFamily: 'Almarai',
+                fontFamily: 'SF Arabic',
                 fontSize: 13.5,
                 fontWeight: FontWeight.bold,
                 color: text)),
         Text(value,
-            textDirection: TextDirection.ltr,
-            textAlign: TextAlign.start,
+            textDirection: _dirFor(value),
+            textAlign: _hasArabic(value) ? TextAlign.start : TextAlign.left,
             style: TextStyle(
-                fontFamily: 'Almarai',
+                fontFamily: 'SF Arabic',
                 fontSize: 12.5,
                 height: 1.5,
                 color: sub)),

@@ -27,7 +27,7 @@ Future<bool> showReciterPicker(
             Text('اختر القارئ',
                 textDirection: TextDirection.rtl,
                 style: TextStyle(
-                    fontFamily: 'Almarai',
+                    fontFamily: 'SF Arabic',
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: isDark ? AppColors.darkText : AppColors.textPrimary)),
@@ -35,7 +35,7 @@ Future<bool> showReciterPicker(
             Text('يبقى هذا الاختيار محفوظاً حتى تغيّره',
                 textDirection: TextDirection.rtl,
                 style: TextStyle(
-                    fontFamily: 'Almarai',
+                    fontFamily: 'SF Arabic',
                     fontSize: 12,
                     color: isDark
                         ? AppColors.darkTextSec
@@ -60,7 +60,7 @@ Future<bool> showReciterPicker(
                 title: Text(e.value,
                     textAlign: TextAlign.start,
                     style: TextStyle(
-                        fontFamily: 'Almarai',
+                        fontFamily: 'SF Arabic',
                         fontSize: 16,
                         fontWeight: e.key == audio.reciter
                             ? FontWeight.bold
