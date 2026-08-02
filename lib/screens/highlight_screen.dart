@@ -6,6 +6,7 @@ import '../services/library_events.dart';
 import '../services/quran_service.dart';
 import '../services/settings_service.dart';
 import '../theme.dart';
+import '../widgets/ayah_note_sheet.dart';
 import 'mushaf_svg_screen.dart';
 import 'reader_screen.dart';
 
@@ -45,9 +46,44 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
     });
   }
 
-  List<Highlight> get _shown => _filter == null
-      ? _items
-      : _items.where((h) => h.color == _filter).toList();
+  /// Pseudo-filter value for "only marks carrying a note" — it sits in
+  /// the same chip row as the colours, so it shares [_filter].
+  static const String _notesFilter = '__notes__';
+
+  List<Highlight> get _shown => switch (_filter) {
+        null => _items,
+        _notesFilter => _items.where((h) => h.hasNote).toList(),
+        final c => _items.where((h) => h.color == c).toList(),
+      };
+
+  /// Opens the note editor for a mark straight from the list.
+  Future<void> _editNote(Highlight h) async {
+    final l = L10n.of(context);
+    // Offline/failed lookups just mean no preview above the field.
+    String? text;
+    try {
+      text = await QuranService.getAyahText(h.surahNumber, h.ayahNumber);
+    } catch (_) {}
+    if (!mounted) return;
+    final saved = await showAyahNoteSheet(
+      context,
+      surahNumber: h.surahNumber,
+      ayahNumber: h.ayahNumber,
+      surahName: h.surahName,
+      page: h.page,
+      ayahText: text,
+    );
+    if (!saved) return;
+    await _load();
+    if (!mounted) return;
+    final nowHas =
+        (await HighlightService.getHighlight(h.surahNumber, h.ayahNumber))
+                ?.hasNote ??
+            false;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(nowHas ? l('noteSaved') : l('noteRemoved'))));
+  }
 
   Future<void> _open(Highlight h) async {
     try {
@@ -171,18 +207,37 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
                                               color: isDark
                                                   ? AppColors.darkTextSec
                                                   : AppColors.textSecondary,
-                                              fontFamily: 'SF Arabic',
+                                              fontFamily: '.SF Pro Text',
                                               fontSize: 13)),
                                       _AyahPreview(
                                           surahNumber: h.surahNumber,
                                           ayahNumber: h.ayahNumber,
                                           isDark: isDark),
+                                      if (h.hasNote)
+                                        AyahNoteCard(
+                                          note: h.note!,
+                                          color: hc,
+                                          isDark: isDark,
+                                          isArabic: l.isArabic,
+                                          maxLines: 4,
+                                          onTap: () => _editNote(h),
+                                        ),
                                     ],
                                   ),
-                                  trailing: Icon(Icons.chevron_left_rounded,
-                                      color: isDark
-                                          ? AppColors.darkTextSec
-                                          : AppColors.textLight),
+                                  trailing: IconButton(
+                                    tooltip:
+                                        h.hasNote ? l('editNote') : l('addNote'),
+                                    icon: Icon(
+                                        h.hasNote
+                                            ? Icons.sticky_note_2_rounded
+                                            : Icons.note_add_outlined,
+                                        color: h.hasNote
+                                            ? AppColors.secondary
+                                            : (isDark
+                                                ? AppColors.darkTextSec
+                                                : AppColors.textLight)),
+                                    onPressed: () => _editNote(h),
+                                  ),
                                 ),
                               ),
                             );
@@ -208,6 +263,13 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
               color: e.value,
               selected: _filter == e.key,
               onTap: () => setState(() => _filter = e.key))),
+          // Only offered once at least one mark actually carries a note.
+          if (_items.any((h) => h.hasNote))
+            _Chip(
+                label: l('withNotes'),
+                color: AppColors.secondary,
+                selected: _filter == _notesFilter,
+                onTap: () => setState(() => _filter = _notesFilter)),
         ],
       ));
 
@@ -222,7 +284,7 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
         Text(l('noHighlights'),
             style: TextStyle(
                 fontSize: 18,
-                fontFamily: 'SF Arabic',
+                fontFamily: '.SF Pro Text',
                 color:
                     isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
         const SizedBox(height: 8),
@@ -230,7 +292,7 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
                 color: isDark ? AppColors.darkTextSec : AppColors.textLight,
-                fontFamily: 'SF Arabic',
+                fontFamily: '.SF Pro Text',
                 fontSize: 13)),
       ]));
   }
@@ -272,7 +334,7 @@ class _Chip extends StatelessWidget {
                         : (isDark
                             ? AppColors.darkTextSec
                             : AppColors.textSecondary),
-                    fontFamily: 'SF Arabic',
+                    fontFamily: '.SF Pro Text',
                     fontSize: 13,
                     fontWeight:
                         selected ? FontWeight.bold : FontWeight.normal))));

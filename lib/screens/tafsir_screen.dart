@@ -254,7 +254,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
                 style: TextStyle(
                   color: bodyText,
                   fontSize: 15,
-                  fontFamily: 'SF Arabic',
+                  fontFamily: '.SF Pro Text',
                 ),
                 items: _tafsirOptions.map((tafsir) {
                   return DropdownMenuItem<int>(
@@ -322,7 +322,7 @@ class _TafsirScreenState extends State<TafsirScreen> {
                                 lineHeight: const LineHeight(2.0),
                                 textAlign: TextAlign.right,
                                 direction: TextDirection.rtl,
-                                fontFamily: 'SF Arabic',
+                                fontFamily: '.SF Pro Text',
                                 color: bodyText,
                               ),
                               "p": Style(

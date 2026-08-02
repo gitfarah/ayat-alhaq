@@ -132,7 +132,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
             textAlign: TextAlign.right,
             textDirection: TextDirection.rtl,
             style: TextStyle(
-                fontFamily: 'SF Arabic',
+                fontFamily: '.SF Pro Text',
                 fontSize: 13,
                 color:
                     isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
@@ -181,7 +181,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                     style: TextStyle(
                         color:
                             isDark ? AppColors.darkText : AppColors.textPrimary,
-                        fontFamily: 'SF Arabic'),
+                        fontFamily: '.SF Pro Text'),
                     decoration: InputDecoration(
                         hintText: 'اكتب كلمة أو جزءاً من آية...',
                         hintTextDirection: TextDirection.rtl,
@@ -189,7 +189,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                             color: isDark
                                 ? AppColors.darkTextSec
                                 : AppColors.textLight,
-                            fontFamily: 'SF Arabic',
+                            fontFamily: '.SF Pro Text',
                             fontSize: 14),
                         border: InputBorder.none,
                         contentPadding:
@@ -208,12 +208,12 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                       style: TextStyle(
                           color: subColor,
                           fontSize: 13,
-                          fontFamily: 'SF Arabic')))),
+                          fontFamily: '.SF Pro Text')))),
         Expanded(
           child: _error != null
               ? Center(
                   child: Text(_error!,
-                      style: TextStyle(color: subColor, fontFamily: 'SF Arabic')))
+                      style: TextStyle(color: subColor, fontFamily: '.SF Pro Text')))
               : (_searchedOnce &&
                       _results.isEmpty &&
                       _surahResults.isEmpty &&
@@ -223,7 +223,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                           style: TextStyle(
                               color: subColor,
                               fontSize: 16,
-                              fontFamily: 'SF Arabic')))
+                              fontFamily: '.SF Pro Text')))
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: _surahResults.length + _results.length,

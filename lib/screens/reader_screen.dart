@@ -10,9 +10,11 @@ import '../services/highlight_service.dart';
 import '../services/khatma_service.dart';
 import '../services/settings_service.dart';
 import '../services/quran_audio_service.dart';
+import '../services/screen_awake.dart';
 import '../services/tajweed_service.dart';
 import '../l10n/app_strings.dart';
 import '../theme.dart';
+import '../widgets/ayah_note_sheet.dart';
 import '../widgets/reciter_picker.dart';
 import '../widgets/surah_frame.dart';
 import 'tafsir_screen.dart';
@@ -31,7 +33,10 @@ class ReaderScreen extends StatefulWidget {
   State<ReaderScreen> createState() => _ReaderScreenState();
 }
 
-class _ReaderScreenState extends State<ReaderScreen> {
+class _ReaderScreenState extends State<ReaderScreen>
+    // Reading is a long, hands-off activity — hold the screen fully lit
+    // for as long as this screen is open.
+    with KeepsScreenAwake<ReaderScreen> {
   List<Ayah> _ayahs = [];
   bool _loading = true;
   String? _error;
@@ -244,7 +249,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text(l('chooseBookmarkColor'),
                 style: TextStyle(
-                    fontFamily: 'SF Arabic',
+                    fontFamily: '.SF Pro Text',
                     fontWeight: FontWeight.bold,
                     color:
                         isDark ? AppColors.darkText : AppColors.textPrimary)),
@@ -311,6 +316,25 @@ class _ReaderScreenState extends State<ReaderScreen> {
         SnackBar(content: Text(L10n.of(context)('copiedAyah'))),
       );
     }
+  }
+
+  /// Opens the note editor for [ayah] and refreshes the marks so the
+  /// note badge on the ayah appears/disappears right away.
+  Future<void> _editNote(Ayah ayah) async {
+    final l = L10n.of(context);
+    final saved = await showAyahNoteSheet(
+      context,
+      surahNumber: widget.surah.number,
+      ayahNumber: ayah.numberInSurah,
+      surahName: widget.surah.name,
+      ayahText: ayah.text,
+    );
+    if (!saved) return;
+    await _refreshBookmarkAndHighlights();
+    if (!mounted) return;
+    final nowHas = _getHL(ayah.numberInSurah)?.hasNote ?? false;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(nowHas ? l('noteSaved') : l('noteRemoved'))));
   }
 
   Future<void> _showOptions(Ayah ayah) async {
@@ -424,7 +448,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   (audio.currentGlobalAyah == ayah.number && audio.isPlaying)
                       ? l('pauseRecitation')
                       : l('playRecitation'),
-                  style: const TextStyle(fontFamily: 'SF Arabic'),
+                  style: const TextStyle(fontFamily: '.SF Pro Text'),
                 ),
                 onTap: () async {
                   Navigator.pop(context);
@@ -443,6 +467,34 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   }
                 },
               ),
+              // Note on this ayah — lives on the colour mark, so writing
+              // one on an unmarked ayah marks it too.
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                    existing?.hasNote == true
+                        ? Icons.sticky_note_2_rounded
+                        : Icons.note_add_outlined,
+                    color: AppColors.secondary),
+                title: Text(
+                    existing?.hasNote == true ? l('editNote') : l('addNote'),
+                    style: const TextStyle(fontFamily: '.SF Pro Text')),
+                subtitle: existing?.hasNote == true
+                    ? Text(existing!.note!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontFamily: '.SF Pro Text',
+                            fontSize: 12,
+                            color: isDark
+                                ? AppColors.darkTextSec
+                                : AppColors.textSecondary))
+                    : null,
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _editNote(ayah);
+                },
+              ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(
@@ -454,7 +506,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             _bookmarkFor(ayah.numberInSurah)!.color)
                         : AppColors.primary),
                 title: Text(l('bookmark'),
-                    style: const TextStyle(fontFamily: 'SF Arabic')),
+                    style: const TextStyle(fontFamily: '.SF Pro Text')),
                 onTap: () {
                   Navigator.pop(context);
                   _showBookmarkPicker(ayah.numberInSurah);
@@ -465,7 +517,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 leading: const Icon(Icons.menu_book_rounded,
                     color: AppColors.primary),
                 title: Text(l('tafsir'),
-                    style: const TextStyle(fontFamily: 'SF Arabic')),
+                    style: const TextStyle(fontFamily: '.SF Pro Text')),
                 onTap: () {
                   Navigator.pop(context);
                   _showTafsir(ayah.numberInSurah, ayah.text);
@@ -476,7 +528,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 leading:
                     const Icon(Icons.copy_rounded, color: AppColors.accent),
                 title: Text(l('copyAyah'),
-                    style: const TextStyle(fontFamily: 'SF Arabic')),
+                    style: const TextStyle(fontFamily: '.SF Pro Text')),
                 onTap: () {
                   Navigator.pop(context);
                   _copyAyah(ayah.text, ayah.numberInSurah);
@@ -524,14 +576,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   textAlign: TextAlign.right,
                   onChanged: (_) => setSheet(() {}),
                   style: TextStyle(
-                      fontFamily: 'SF Arabic',
+                      fontFamily: '.SF Pro Text',
                       color:
                           isDark ? AppColors.darkText : AppColors.textPrimary),
                   decoration: InputDecoration(
                     hintText: '${l('searchInSurah')} — ${widget.surah.name}',
                     hintTextDirection: TextDirection.rtl,
                     hintStyle: TextStyle(
-                        fontFamily: 'SF Arabic',
+                        fontFamily: '.SF Pro Text',
                         color: isDark
                             ? AppColors.darkTextSec
                             : AppColors.textLight),
@@ -553,7 +605,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                 ? l('typeAyahWord')
                                 : l('noResultsInSurah'),
                             style: TextStyle(
-                                fontFamily: 'SF Arabic',
+                                fontFamily: '.SF Pro Text',
                                 color: isDark
                                     ? AppColors.darkTextSec
                                     : AppColors.textSecondary)))
@@ -570,7 +622,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             },
                             leading: Text(_ar(a.numberInSurah),
                                 style: TextStyle(
-                                    fontFamily: 'SF Arabic',
+                                    fontFamily: '.SF Pro Text',
                                     fontWeight: FontWeight.bold,
                                     color: isDark
                                         ? AppColors.darkSecondary
@@ -580,7 +632,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                    fontFamily: 'SF Arabic',
+                                    fontFamily: '.SF Pro Text',
                                     fontSize: 15,
                                     height: 1.7,
                                     color: isDark
@@ -820,7 +872,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                                     : l('nowReciting'),
                                                 style: const TextStyle(
                                                   fontSize: 11,
-                                                  fontFamily: 'SF Arabic',
+                                                  fontFamily: '.SF Pro Text',
                                                   color: AppColors.secondary,
                                                   fontWeight: FontWeight.bold,
                                                 ),
@@ -884,7 +936,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                                         ? AppColors
                                                             .darkSecondary
                                                         : AppColors.accent,
-                                                    fontFamily: 'SF Arabic',
+                                                    fontFamily: '.SF Pro Text',
                                                   ),
                                                 ),
                                               ),
@@ -920,6 +972,18 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                           ),
                                         ),
                                       ],
+                                      // The user's own note on this ayah,
+                                      // reading like a margin note in a
+                                      // printed Mushaf. Tap to edit.
+                                      if (highlight?.hasNote == true)
+                                        AyahNoteCard(
+                                          note: highlight!.note!,
+                                          color: AppColors.highlight(
+                                              highlight.color),
+                                          isDark: isDark,
+                                          isArabic: l.isArabic,
+                                          onTap: () => _editNote(ayah),
+                                        ),
                                     ],
                                   ),
                                 ),
@@ -1015,7 +1079,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         '${widget.surah.revelationType == 'Meccan' ? l('meccan') : l('medinan')} • ${l.number(widget.surah.numberOfAyahs)} ${l('ayahUnit')}',
                         style: TextStyle(
                             fontSize: 11,
-                            fontFamily: 'SF Arabic',
+                            fontFamily: '.SF Pro Text',
                             color: isDark
                                 ? AppColors.darkTextSec
                                 : AppColors.textSecondary)),
@@ -1095,7 +1159,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         ? '${l('ayahWord')} ${l.number(ayah.numberInSurah)}'
                         : '',
                     style: TextStyle(
-                      fontFamily: 'SF Arabic',
+                      fontFamily: '.SF Pro Text',
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                       color:
@@ -1110,7 +1174,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             : l('paused')),
                     style: TextStyle(
                         fontSize: 11,
-                        fontFamily: 'SF Arabic',
+                        fontFamily: '.SF Pro Text',
                         color: isDark
                             ? AppColors.darkTextSec
                             : AppColors.textSecondary),
@@ -1167,18 +1231,18 @@ class _ReaderScreenState extends State<ReaderScreen> {
               style: TextStyle(
                   color: isDark ? AppColors.darkTextSec : Colors.grey[600],
                   fontSize: 12,
-                  fontFamily: 'SF Arabic')),
+                  fontFamily: '.SF Pro Text')),
           Text('${l('juzWord')} ${l.number(_juz)}',
               style: TextStyle(
                   color: isDark ? AppColors.darkTextSec : Colors.grey[600],
                   fontSize: 12,
-                  fontFamily: 'SF Arabic')),
+                  fontFamily: '.SF Pro Text')),
           Text('${l('pageWord')} ${l.number(_page)}',
               style: TextStyle(
                   color: isDark ? AppColors.darkPrimary : AppColors.primary,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'SF Arabic')),
+                  fontFamily: '.SF Pro Text')),
         ],
       ),
     );
@@ -1217,7 +1281,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           isDark ? AppColors.darkText : AppColors.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'SF Arabic',
+                      fontFamily: '.SF Pro Text',
                     )),
                 const SizedBox(height: 8),
                 RadioGroup<String?>(
@@ -1231,7 +1295,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         activeColor: AppColors.primary,
                         title: Text(l('noTranslation'),
                             style: TextStyle(
-                                fontFamily: 'SF Arabic',
+                                fontFamily: '.SF Pro Text',
                                 color: isDark
                                     ? AppColors.darkText
                                     : AppColors.textPrimary)),
@@ -1278,13 +1342,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           isDark ? AppColors.darkText : AppColors.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      fontFamily: 'SF Arabic',
+                      fontFamily: '.SF Pro Text',
                     )),
                 const SizedBox(height: 20),
                 Text('بِسْمِ اللَّهِ',
                     style: TextStyle(
                       fontSize: settings.fontSize,
-                      fontFamily: 'SF Arabic',
+                      fontFamily: '.SF Pro Text',
                       color:
                           isDark ? AppColors.darkText : AppColors.textPrimary,
                     )),

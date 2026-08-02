@@ -111,7 +111,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: Text(t('gpsOption'),
                     textAlign: TextAlign.start,
                     style: TextStyle(
-                        fontFamily: 'SF Arabic',
+                        fontFamily: '.SF Pro Text',
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: isDark
@@ -144,7 +144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: Text(_lang == 'ar' ? c.label : c.city,
                   textAlign: TextAlign.start,
                   style: TextStyle(
-                      fontFamily: 'SF Arabic',
+                      fontFamily: '.SF Pro Text',
                       fontSize: 18,
                       fontWeight:
                           selected ? FontWeight.bold : FontWeight.normal,
@@ -195,7 +195,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: Text(PrayerService.methodName(e.key, _lang),
                         textAlign: TextAlign.start,
                         style: TextStyle(
-                            fontFamily: 'SF Arabic',
+                            fontFamily: '.SF Pro Text',
                             fontSize: 17,
                             fontWeight:
                                 selected ? FontWeight.bold : FontWeight.normal,
@@ -277,11 +277,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: Text(t('clearCacheTitle'),
             textDirection: TextDirection.rtl,
             style: const TextStyle(
-                fontFamily: 'SF Arabic', fontWeight: FontWeight.bold)),
+                fontFamily: '.SF Pro Text', fontWeight: FontWeight.bold)),
         content: Text(t('clearCacheBody'),
             textDirection: TextDirection.rtl,
             textAlign: TextAlign.right,
-            style: const TextStyle(fontFamily: 'SF Arabic', height: 1.6)),
+            style: const TextStyle(fontFamily: '.SF Pro Text', height: 1.6)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -374,7 +374,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Text(e.name,
                     textAlign: TextAlign.start,
                     style: TextStyle(
-                        fontFamily: 'SF Arabic',
+                        fontFamily: '.SF Pro Text',
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: isDark
@@ -383,7 +383,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Text(status,
                     textAlign: TextAlign.start,
                     style: TextStyle(
-                        fontFamily: 'SF Arabic',
+                        fontFamily: '.SF Pro Text',
                         fontSize: 13,
                         color: subColor)),
               ]),
@@ -423,7 +423,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     for (final e in t.languageChoices.entries)
                       ChoiceChip(
                         label: Text(e.value,
-                            style: const TextStyle(fontFamily: 'SF Arabic')),
+                            style: const TextStyle(fontFamily: '.SF Pro Text')),
                         selected: s.appLanguage == e.key,
                         selectedColor: (isDark
                                 ? AppColors.darkPrimary
@@ -458,7 +458,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 4, vertical: 8),
                     textStyle: const TextStyle(
-                        fontFamily: 'SF Arabic',
+                        fontFamily: '.SF Pro Text',
                         fontSize: 13,
                         fontWeight: FontWeight.w600),
                   ),
@@ -502,7 +502,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       textDirection: TextDirection.rtl,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontFamily: 'SF Arabic',
+                          fontFamily: '.SF Pro Text',
                           fontSize: s.fontSize,
                           color: isDark
                               ? AppColors.darkText
@@ -614,7 +614,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           TajweedService.ruleNames[_lang]?[rule] ??
                               TajweedService.ruleNames['en']![rule]!,
                           style: TextStyle(
-                              fontFamily: 'SF Arabic',
+                              fontFamily: '.SF Pro Text',
                               fontSize: 13,
                               color: isDark
                                   ? AppColors.darkText
@@ -630,7 +630,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Text(t('tajweedNote'),
                     textAlign: TextAlign.start,
                     style: TextStyle(
-                        fontFamily: 'SF Arabic',
+                        fontFamily: '.SF Pro Text',
                         fontSize: 13,
                         height: 1.5,
                         color: isDark
@@ -702,7 +702,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           title: Text(e.value,
                               textAlign: TextAlign.start,
                               style: TextStyle(
-                                  fontFamily: 'SF Arabic',
+                                  fontFamily: '.SF Pro Text',
                                   fontSize: 16,
                                   fontWeight:
                                       sel ? FontWeight.bold : FontWeight.normal,
@@ -735,7 +735,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   t('savedPagesInfo'),
                   textAlign: TextAlign.start,
                   style: TextStyle(
-                      fontFamily: 'SF Arabic',
+                      fontFamily: '.SF Pro Text',
                       fontSize: 14,
                       color: isDark
                           ? AppColors.darkTextSec
@@ -767,7 +767,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       : const Icon(Icons.delete_outline_rounded, size: 18),
                   label: Text(
                       _clearing ? t('clearing') : t('clearSavedPages'),
-                      style: const TextStyle(fontFamily: 'SF Arabic')),
+                      style: const TextStyle(fontFamily: '.SF Pro Text')),
                 ),
               ),
             ]),
@@ -831,7 +831,7 @@ class _SectionLabel extends StatelessWidget {
             style: const TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.bold,
-                fontFamily: 'SF Arabic',
+                fontFamily: '.SF Pro Text',
                 fontSize: 18)),
       ));
 }
@@ -874,7 +874,7 @@ class _Tile extends StatelessWidget {
                     Text(title,
                         textAlign: TextAlign.start,
                         style: TextStyle(
-                            fontFamily: 'SF Arabic',
+                            fontFamily: '.SF Pro Text',
                             fontWeight: FontWeight.bold,
                             fontSize: 19,
                             color: isDark
@@ -888,7 +888,7 @@ class _Tile extends StatelessWidget {
                                   ? AppColors.darkTextSec
                                   : AppColors.textSecondary,
                               fontSize: 15,
-                              fontFamily: 'SF Arabic')),
+                              fontFamily: '.SF Pro Text')),
                   ]),
             ),
           ]),

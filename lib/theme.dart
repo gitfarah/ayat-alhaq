@@ -116,11 +116,15 @@ class AppColors {
 }
 
 class AppTypography {
-  // SF Arabic (Apple's system font, resolved by name on-device — not
-  // bundled) carries the whole UI; only Quran verses use QuranHafs.
-  static const String arabicFont = 'SF Arabic';
-  static const String uiFont = 'SF Arabic';
-  static const String serifFont = 'SF Arabic';
+  // '.SF Pro Text' is the private CoreText name Apple's own system-font
+  // APIs resolve to San Francisco — the only way to get it in a
+  // third-party app, since "SF Arabic" isn't a nameable font (Apple
+  // hides it from by-name lookup; it's a script-fallback companion
+  // San Francisco switches to automatically for Arabic glyphs). Carries
+  // the whole UI; only Quran verses use QuranHafs.
+  static const String arabicFont = '.SF Pro Text';
+  static const String uiFont = '.SF Pro Text';
+  static const String serifFont = '.SF Pro Text';
 
   static const TextStyle quranDisplay = TextStyle(
     fontFamily: arabicFont,

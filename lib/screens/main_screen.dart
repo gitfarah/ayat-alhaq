@@ -45,11 +45,11 @@ class _MainScreenState extends State<MainScreen> {
           selectedItemColor: AppColors.gold,
           unselectedItemColor: const Color(0xFFB6C7BC),
           selectedLabelStyle: const TextStyle(
-              fontFamily: 'SF Arabic',
+              fontFamily: '.SF Pro Text',
               fontWeight: FontWeight.bold,
               fontSize: 13),
           unselectedLabelStyle: const TextStyle(
-              fontFamily: 'SF Arabic', fontSize: 12),
+              fontFamily: '.SF Pro Text', fontSize: 12),
           currentIndex: _idx,
           onTap: (i) => setState(() => _idx = i),
           items: [

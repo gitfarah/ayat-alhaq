@@ -12,11 +12,13 @@ import '../services/highlight_service.dart';
 import '../services/khatma_service.dart';
 import '../services/library_events.dart';
 import '../services/quran_audio_service.dart';
+import '../services/screen_awake.dart';
 import '../services/settings_service.dart';
 import '../services/surah_header_service.dart';
 import '../services/tajweed_service.dart';
 import '../l10n/app_strings.dart';
 import '../theme.dart';
+import '../widgets/ayah_note_sheet.dart';
 import '../widgets/mushaf_page_furniture.dart';
 import '../widgets/reciter_picker.dart';
 import '../widgets/surah_banner_painter.dart';
@@ -32,7 +34,12 @@ class MushafSvgScreen extends StatefulWidget {
 }
 
 class _MushafSvgScreenState extends State<MushafSvgScreen>
-    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+    with
+        WidgetsBindingObserver,
+        SingleTickerProviderStateMixin,
+        // Reading is a long, hands-off activity — hold the screen fully
+        // lit for as long as the Mushaf is open.
+        KeepsScreenAwake<MushafSvgScreen> {
   late int _pageNum;
 
   /// Real swipeable paging (finger-following, like printed pages).
@@ -236,7 +243,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         content: Text(
             'اضغط مطولاً على أي آية لعرض خياراتها، واضغط ضغطة سريعة لإظهار أو إخفاء الأشرطة',
             textDirection: TextDirection.rtl,
-            style: TextStyle(fontFamily: 'SF Arabic', height: 1.6))));
+            style: TextStyle(fontFamily: '.SF Pro Text', height: 1.6))));
   }
 
   /// One-time offer (per install) to download the whole Mushaf for
@@ -268,7 +275,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             textAlign: TextAlign.center,
             textDirection: TextDirection.rtl,
             style: TextStyle(
-                fontFamily: 'SF Arabic',
+                fontFamily: '.SF Pro Text',
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
                 color: isDark ? AppColors.darkText : AppColors.textPrimary)),
@@ -277,7 +284,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             textAlign: TextAlign.center,
             textDirection: TextDirection.rtl,
             style: TextStyle(
-                fontFamily: 'SF Arabic',
+                fontFamily: '.SF Pro Text',
                 height: 1.8,
                 fontSize: 14,
                 color:
@@ -296,7 +303,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               onPressed: () => Navigator.pop(context, true),
               child: const Text('تنزيل الآن',
                   style:
-                      TextStyle(color: Colors.white, fontFamily: 'SF Arabic'))),
+                      TextStyle(color: Colors.white, fontFamily: '.SF Pro Text'))),
         ],
       ),
     );
@@ -467,7 +474,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             textAlign: TextAlign.center,
             textDirection: TextDirection.rtl,
             style: TextStyle(
-                fontFamily: 'SF Arabic',
+                fontFamily: '.SF Pro Text',
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
                 color: isDark ? AppColors.darkText : AppColors.textPrimary)),
@@ -483,12 +490,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             ],
             style: TextStyle(
                 fontSize: 20,
-                fontFamily: 'SF Arabic',
+                fontFamily: '.SF Pro Text',
                 color: isDark ? AppColors.darkText : AppColors.textPrimary),
             decoration: InputDecoration(
                 hintText: '١ — ٦٠٤',
                 hintStyle:
-                    TextStyle(color: Colors.grey[400], fontFamily: 'SF Arabic'),
+                    TextStyle(color: Colors.grey[400], fontFamily: '.SF Pro Text'),
                 filled: true,
                 fillColor: isDark ? AppColors.darkSurfaceAlt : Colors.white,
                 border: OutlineInputBorder(
@@ -513,7 +520,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               },
               child: const Text('انتقال',
                   style:
-                      TextStyle(color: Colors.white, fontFamily: 'SF Arabic'))),
+                      TextStyle(color: Colors.white, fontFamily: '.SF Pro Text'))),
         ],
       ),
     );
@@ -547,7 +554,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   title: Text('الانتقال إلى سورة',
                       textDirection: TextDirection.rtl,
                       style:
-                          TextStyle(fontFamily: 'SF Arabic', color: textColor)),
+                          TextStyle(fontFamily: '.SF Pro Text', color: textColor)),
                   onTap: () {
                     Navigator.pop(context);
                     _showSurahPicker();
@@ -558,7 +565,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   title: Text('الانتقال إلى جزء',
                       textDirection: TextDirection.rtl,
                       style:
-                          TextStyle(fontFamily: 'SF Arabic', color: textColor)),
+                          TextStyle(fontFamily: '.SF Pro Text', color: textColor)),
                   onTap: () {
                     Navigator.pop(context);
                     _showJuzPicker();
@@ -568,7 +575,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   title: Text('الانتقال إلى صفحة',
                       textDirection: TextDirection.rtl,
                       style:
-                          TextStyle(fontFamily: 'SF Arabic', color: textColor)),
+                          TextStyle(fontFamily: '.SF Pro Text', color: textColor)),
                   onTap: () {
                     Navigator.pop(context);
                     _jumpDialog();
@@ -584,12 +591,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     secondary: Icon(Icons.palette_rounded, color: iconColor),
                     title: Text(L10n.of(context)('tajweedLbl'),
                         style:
-                            TextStyle(fontFamily: 'SF Arabic', color: textColor)),
+                            TextStyle(fontFamily: '.SF Pro Text', color: textColor)),
                     subtitle: Text(
                         L10n.of(context)(
                             s.tajweed ? 'tajweedOn' : 'tajweedOff'),
                         style: TextStyle(
-                            fontFamily: 'SF Arabic',
+                            fontFamily: '.SF Pro Text',
                             fontSize: 12,
                             color: isDark
                                 ? AppColors.darkTextSec
@@ -616,7 +623,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                                   : 'تنزيل المصحف كاملاً دون اتصال'),
                           textDirection: TextDirection.rtl,
                           style: TextStyle(
-                              fontFamily: 'SF Arabic', color: textColor)),
+                              fontFamily: '.SF Pro Text', color: textColor)),
                       onTap: () {
                         Navigator.pop(context);
                         if (_fullyDownloaded) return;
@@ -679,7 +686,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               Expanded(
                 child: Text(l.isArabic ? e.nameAr : e.nameEn,
                     style: TextStyle(
-                        fontFamily: 'SF Arabic',
+                        fontFamily: '.SF Pro Text',
                         fontSize: 16,
                         fontWeight: e.id == current.id
                             ? FontWeight.bold
@@ -758,7 +765,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             },
             trailing: Text('${_ar(i + 1)}.',
                 style: TextStyle(
-                    fontFamily: 'SF Arabic',
+                    fontFamily: '.SF Pro Text',
                     fontSize: 14,
                     color: isDark
                         ? AppColors.darkTextSec
@@ -770,7 +777,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     fontFamily: 'QuranHafs', fontSize: 16, color: textColor)),
             leading: Text('ص ${_ar(QuranPageMeta.surahStartPages[i])}',
                 style: TextStyle(
-                    fontFamily: 'SF Arabic',
+                    fontFamily: '.SF Pro Text',
                     fontSize: 12,
                     color: isDark
                         ? AppColors.darkTextSec
@@ -809,7 +816,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 child: Center(
                     child: Text(_ar(i + 1),
                         style: TextStyle(
-                            fontFamily: 'SF Arabic',
+                            fontFamily: '.SF Pro Text',
                             fontWeight: FontWeight.bold,
                             color: gold))),
               ),
@@ -824,6 +831,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     final isDark = context.read<SettingsService>().isDarkIn(context);
     final l = L10n.of(context);
     final bookmark = _bookmarkFor(region);
+    final existingHighlight = _highlightFor(region);
     final audio = context.read<QuranAudioService>();
     final globalAyah =
         QuranPageMeta.globalAyahNumber(region.surahNumber, region.ayahNumber);
@@ -873,7 +881,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       playingThis ? l('pauseRecitation') : l('playRecitation'),
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
-                          fontFamily: 'SF Arabic',
+                          fontFamily: '.SF Pro Text',
                           color: isDark
                               ? AppColors.darkText
                               : AppColors.textPrimary)),
@@ -900,7 +908,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   title: Text(l('tafsir'),
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
-                          fontFamily: 'SF Arabic',
+                          fontFamily: '.SF Pro Text',
                           color: isDark
                               ? AppColors.darkText
                               : AppColors.textPrimary)),
@@ -929,7 +937,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   title: Text(l('bookmark'),
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
-                          fontFamily: 'SF Arabic',
+                          fontFamily: '.SF Pro Text',
                           color: isDark
                               ? AppColors.darkText
                               : AppColors.textPrimary)),
@@ -944,13 +952,48 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   title: Text(l('highlightAyah'),
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
-                          fontFamily: 'SF Arabic',
+                          fontFamily: '.SF Pro Text',
                           color: isDark
                               ? AppColors.darkText
                               : AppColors.textPrimary)),
                   onTap: () {
                     Navigator.pop(context);
                     _showHighlightPicker(region);
+                  }),
+              // Note on this ayah — lives on the colour mark, so writing
+              // one on an unmarked ayah marks it too.
+              ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                      existingHighlight?.hasNote == true
+                          ? Icons.sticky_note_2_rounded
+                          : Icons.note_add_outlined,
+                      color: AppColors.secondary),
+                  title: Text(
+                      existingHighlight?.hasNote == true
+                          ? l('editNote')
+                          : l('addNote'),
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                          fontFamily: '.SF Pro Text',
+                          color: isDark
+                              ? AppColors.darkText
+                              : AppColors.textPrimary)),
+                  subtitle: existingHighlight?.hasNote == true
+                      ? Text(existingHighlight!.note!,
+                          textDirection: TextDirection.rtl,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontFamily: '.SF Pro Text',
+                              fontSize: 12,
+                              color: isDark
+                                  ? AppColors.darkTextSec
+                                  : AppColors.textSecondary))
+                      : null,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _editNote(region);
                   }),
             ],
           ),
@@ -976,7 +1019,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text('اختر لون الفاصل',
                 style: TextStyle(
-                    fontFamily: 'SF Arabic',
+                    fontFamily: '.SF Pro Text',
                     fontWeight: FontWeight.bold,
                     color:
                         isDark ? AppColors.darkText : AppColors.textPrimary)),
@@ -1059,6 +1102,27 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         ),
       ),
     );
+  }
+
+  /// Opens the note editor for an ayah on the page. Marks reload through
+  /// LibraryEvents, so the note dot on the page appears right away.
+  Future<void> _editNote(AyahHitRegion region) async {
+    final l = L10n.of(context);
+    final saved = await showAyahNoteSheet(
+      context,
+      surahNumber: region.surahNumber,
+      ayahNumber: region.ayahNumber,
+      surahName: _surahName(region.surahNumber),
+      // Remember this was written in the Mushaf, so opening it from the
+      // Highlights tab returns to the page.
+      page: _pageNum,
+    );
+    if (!saved || !mounted) return;
+    await _loadMarks();
+    if (!mounted) return;
+    final nowHas = _highlightFor(region)?.hasNote ?? false;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(nowHas ? l('noteSaved') : l('noteRemoved'))));
   }
 
   void _showHighlightPicker(AyahHitRegion region) {
@@ -1319,7 +1383,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   Text('تعذّر تحميل صفحة ${_ar(base)}\nتحقق من اتصالك',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontFamily: 'SF Arabic',
+                          fontFamily: '.SF Pro Text',
                           color: isDark
                               ? AppColors.darkTextSec
                               : AppColors.textSecondary,
@@ -1336,7 +1400,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           color: Colors.white),
                       label: const Text('إعادة المحاولة',
                           style: TextStyle(
-                              color: Colors.white, fontFamily: 'SF Arabic'))),
+                              color: Colors.white, fontFamily: '.SF Pro Text'))),
                 ]));
           }
           if (!snap.hasData) {
@@ -1418,7 +1482,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           ? 'صفحة ${_ar(_pageNum)} — ${_ar(_pageNum + 1)}'
                           : 'صفحة ${_ar(_pageNum)}',
                       style: TextStyle(
-                          fontFamily: 'SF Arabic',
+                          fontFamily: '.SF Pro Text',
                           fontWeight: FontWeight.bold,
                           fontSize: 20,
                           color: textColor)),
@@ -1473,7 +1537,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       const SizedBox(width: 14),
                       Text('الجزء ${_ar(juz)} • الحزب ${_ar(hizb)}',
                           style: TextStyle(
-                              fontFamily: 'SF Arabic',
+                              fontFamily: '.SF Pro Text',
                               fontSize: 12,
                               color: subText)),
                     ],
@@ -1569,7 +1633,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontFamily: 'SF Arabic',
+                        fontFamily: '.SF Pro Text',
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: gold)),
@@ -2055,27 +2119,36 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// Which ayahs on [data] are tinted, and in what colour. Priority:
   /// the just-tapped flash, then the ayah being recited, then a
   /// bookmark, then a highlight — the same order the reader uses.
-  List<(AyahHitRegion, Color)> _ayahMarks(MushafPageData data, bool isDark) {
+  /// The third field flags an ayah carrying a note, which the painter
+  /// dots so the page shows at a glance where something was written.
+  List<(AyahHitRegion, Color, bool)> _ayahMarks(
+      MushafPageData data, bool isDark) {
     final lit = isDark ? AppColors.darkSecondary : AppColors.secondary;
     return [
       for (final r in data.ayahRegions)
         if (r.ayahNumber > 0 && r.surahNumber > 0)
           if (identical(r, _flashRegion))
-            (r, lit.withValues(alpha: (1 - _flashCtrl.value) * 0.40))
+            (r, lit.withValues(alpha: (1 - _flashCtrl.value) * 0.40), false)
           else if (_playingGlobalAyah != null &&
               _regionGlobal(r) == _playingGlobalAyah)
-            (r, lit.withValues(alpha: isDark ? 0.30 : 0.16))
+            (
+              r,
+              lit.withValues(alpha: isDark ? 0.30 : 0.16),
+              _highlightFor(r)?.hasNote ?? false
+            )
           else if (_bookmarkFor(r) != null)
             (
               r,
               AppColors.highlight(_bookmarkFor(r)!.color)
-                  .withValues(alpha: isDark ? 0.32 : 0.22)
+                  .withValues(alpha: isDark ? 0.32 : 0.22),
+              _highlightFor(r)?.hasNote ?? false
             )
           else if (_highlightFor(r) != null)
             (
               r,
               AppColors.highlight(_highlightFor(r)!.color)
-                  .withValues(alpha: isDark ? 0.35 : 0.25)
+                  .withValues(alpha: isDark ? 0.35 : 0.25),
+              _highlightFor(r)!.hasNote
             ),
     ];
   }
@@ -2134,7 +2207,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               textDirection: TextDirection.rtl,
               style: TextStyle(
                   fontSize: 12,
-                  fontFamily: 'SF Arabic',
+                  fontFamily: '.SF Pro Text',
                   color:
                       isDark ? AppColors.darkTextSec : AppColors.textSecondary),
             ),
@@ -2187,7 +2260,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                                 fontSize: compact ? 11 : 12,
                                 fontWeight: FontWeight.bold,
                                 color: gold,
-                                fontFamily: 'SF Arabic'))))),
+                                fontFamily: '.SF Pro Text'))))),
             IconButton(
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
@@ -2205,7 +2278,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 /// to render coordinates) so the tint follows the ayah's actual text
 /// flow across lines instead of a rectangular bounding box.
 class _AyahMarkPainter extends CustomPainter {
-  final List<(AyahHitRegion, Color)> marks;
+  /// (region, tint, carries a note)
+  final List<(AyahHitRegion, Color, bool)> marks;
   final double scaleX;
   final double scaleY;
 
@@ -2224,7 +2298,7 @@ class _AyahMarkPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (final (region, color) in marks) {
+    for (final (region, color, hasNote) in marks) {
       final path = Path();
       for (final ring in region.rings) {
         if (ring.length < 6) continue;
@@ -2235,6 +2309,23 @@ class _AyahMarkPainter extends CustomPainter {
         path.close();
       }
       canvas.drawPath(path, Paint()..color = color);
+      if (hasNote && !path.getBounds().isEmpty) {
+        // A small dot at the ayah's reading start (top-right, the page
+        // is RTL) — enough to say "there is a note here" without
+        // covering any of the printed script.
+        final b = path.getBounds();
+        final r = (size.width * 0.008).clamp(1.6, 4.0);
+        final c = Offset(b.right - r, b.top + r);
+        canvas.drawCircle(
+            c, r, Paint()..color = color.withValues(alpha: 0.95));
+        canvas.drawCircle(
+            c,
+            r,
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = r * 0.4
+              ..color = AppColors.secondary.withValues(alpha: 0.9));
+      }
     }
   }
 
@@ -2246,10 +2337,12 @@ class _AyahMarkPainter extends CustomPainter {
       oldDelegate.minY != minY ||
       !_sameMarks(oldDelegate.marks);
 
-  bool _sameMarks(List<(AyahHitRegion, Color)> other) {
+  bool _sameMarks(List<(AyahHitRegion, Color, bool)> other) {
     if (other.length != marks.length) return false;
     for (var i = 0; i < marks.length; i++) {
-      if (!identical(other[i].$1, marks[i].$1) || other[i].$2 != marks[i].$2) {
+      if (!identical(other[i].$1, marks[i].$1) ||
+          other[i].$2 != marks[i].$2 ||
+          other[i].$3 != marks[i].$3) {
         return false;
       }
     }
