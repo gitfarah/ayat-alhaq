@@ -1,7 +1,7 @@
 {
   "source": "تيسير متشابهات القرآن لحفاظ القرآن الكريم",
   "note": "برواية حفص. الكتاب نفسه ينبّه أنه ليس حصراً لجميع المتشابهات.",
-  "_format": "runs are \"surah:ayah\" or \"surah:from-to\" — kept as printed references, NOT global ayah numbers, so every entry can be checked against the book by eye. A group with fewer than two runs has nothing to compare and is skipped at load.",
+  "_format": "runs are \"surah:ayah\" or \"surah:from-to\" — kept as printed references, NOT global ayah numbers, so every entry can be checked against the book by eye. A group with fewer than two runs has nothing to compare and is skipped at load. Groups carrying \"derivation\":\"text-search\" were NOT transcribed from a page: their membership comes from an exhaustive search of the bundled Quran text for a shared opening, which is objective and complete, and every member was confirmed to actually begin with that opening.",
   "groups": [
     {
       "page": 1,
@@ -941,6 +941,52 @@
       "column": "left",
       "section": "متشابهات الآيات - المجموعة الثانية",
       "runs": ["70:11-13", "80:34-37"]
+    },
+
+    {
+      "page": 15,
+      "row": 1,
+      "section": "بدايات الآيات - نداء أهل الكتاب",
+      "derivation": "text-search",
+      "_why": "كل مواضع النداء «يا أهل الكتاب» في القرآن، بـ«قل» وبدونها",
+      "runs": [
+        "3:64",
+        "3:65",
+        "3:70",
+        "3:71",
+        "3:98",
+        "3:99",
+        "4:171",
+        "5:15",
+        "5:19",
+        "5:59",
+        "5:68",
+        "5:77"
+      ]
+    },
+    {
+      "page": 15,
+      "row": 2,
+      "section": "بدايات الآيات - نداء أهل الكتاب",
+      "derivation": "text-search",
+      "_why": "«لم تكفرون بآيات الله» — الفرق «قل» وحدها",
+      "runs": ["3:70", "3:98"]
+    },
+    {
+      "page": 15,
+      "row": 3,
+      "section": "بدايات الآيات - نداء أهل الكتاب",
+      "derivation": "text-search",
+      "_why": "«لا تغلوا في دينكم» — النساء بلا «قل»، المائدة بـ«قل»",
+      "runs": ["4:171", "5:77"]
+    },
+    {
+      "page": 15,
+      "row": 4,
+      "section": "بدايات الآيات - نداء أهل الكتاب",
+      "derivation": "text-search",
+      "_why": "«قد جاءكم رسولنا يبيّن لكم» مرتين في المائدة",
+      "runs": ["5:15", "5:19"]
     }
   ]
 }

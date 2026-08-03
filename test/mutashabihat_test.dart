@@ -137,6 +137,38 @@ void main() {
           isEmpty);
     });
 
+    test('the «يا أهل الكتاب» vocative links all twelve of its ayahs',
+        () async {
+      // Reported missing 2026-08-02: this family sits in the book's
+      // القسم الخامس (بدايات الآيات), which had been wrongly dismissed
+      // as not fitting the model — a chain of ayahs sharing an opening
+      // IS a similar-ayah group. Membership here comes from an
+      // exhaustive text search, so it is complete by construction.
+      const family = [
+        [3, 64], [3, 65], [3, 70], [3, 71], [3, 98], [3, 99],
+        [4, 171], [5, 15], [5, 19], [5, 59], [5, 68], [5, 77],
+      ];
+      for (final ref in family) {
+        final found = await linkedTo(ref[0], ref[1]);
+        for (final other in family) {
+          if (other[0] == ref[0] && other[1] == ref[1]) continue;
+          expect(found, contains(await g(other[0], other[1])),
+              reason: '${ref[0]}:${ref[1]} did not link to '
+                  '${other[0]}:${other[1]}');
+        }
+      }
+    });
+
+    test('the sharpest نداء أهل الكتاب near-twins are paired directly',
+        () async {
+      // Differ by «قل» alone / by a single following word — the pairs a
+      // hafiz actually slips between, so they get their own card on top
+      // of the twelve-member family.
+      expect(await linkedTo(3, 70), contains(await g(3, 98)));
+      expect(await linkedTo(4, 171), contains(await g(5, 77)));
+      expect(await linkedTo(5, 15), contains(await g(5, 19)));
+    });
+
     test('ayahs with no recorded mutashabiha come back empty, not null',
         () async {
       expect(await MutashabihatService.forGlobalAyah(3), isEmpty);
