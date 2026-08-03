@@ -934,7 +934,9 @@ class _TafsirScreenState extends State<TafsirScreen>
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF2D6A4F),
+        // Same green the options-sheet header uses — a verse quoted
+        // back to the reader looks the same wherever it appears.
+        color: AppColors.ayahPanel,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(

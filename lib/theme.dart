@@ -61,6 +61,11 @@ class AppColors {
   // and decorative accents (user-chosen #D4AF37).
   static const Color gold = Color(0xFFD4AF37);
 
+  /// The green panel an ayah is presented on — the tafsir screen's ayah
+  /// card and the ayah-options sheet header, so a verse looks the same
+  /// wherever it is quoted back to the reader.
+  static const Color ayahPanel = Color(0xFF2D6A4F);
+
   // Deep emerald used as the bottom-navigation background (matches the
   // brand and the requested layout).
   static const Color navBar = Color(0xFF143D2B);

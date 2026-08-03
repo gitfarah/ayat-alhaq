@@ -14,6 +14,7 @@ import '../services/screen_awake.dart';
 import '../services/tajweed_service.dart';
 import '../l10n/app_strings.dart';
 import '../theme.dart';
+import '../widgets/ayah_sheet_header.dart';
 import '../widgets/ayah_note_sheet.dart';
 import '../widgets/reciter_picker.dart';
 import '../widgets/reciting_ayah_text.dart';
@@ -355,37 +356,19 @@ class _ReaderScreenState extends State<ReaderScreen>
       // Scrollable so the sheet never overflows on short (landscape)
       // screens.
       builder: (_) => SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Text(
-                ayah.text,
-                textAlign: TextAlign.right,
-                textDirection: TextDirection.rtl,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 18,
-                  height: 1.8,
-                  fontFamily: 'QuranHafs',
-                  color: isDark ? AppColors.darkText : AppColors.textPrimary,
-                ),
-              ),
-              const Divider(height: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AyahSheetHeader(
+              ayahText: ayah.text,
+              label: '${widget.surah.name} — آية ${_ar(ayah.numberInSurah)}',
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
               // Highlight color row
               SizedBox(
                 height: 50,
@@ -535,8 +518,10 @@ class _ReaderScreenState extends State<ReaderScreen>
                   _copyAyah(ayah.text, ayah.numberInSurah);
                 },
               ),
-            ],
-          ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
