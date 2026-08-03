@@ -1083,39 +1083,44 @@ class _TafsirScreenState extends State<TafsirScreen>
               pinned: true,
               delegate: _TabBarHeader(
                 background: bg,
-                // The screen's chrome stays LTR (see note above), but the
-                // tab labels are Arabic study terms — this local RTL
-                // override puts التفسير first from the right, the natural
-                // reading order, without touching the tab indices used
-                // by TabBarView and initialTab elsewhere in this file.
-                child: Directionality(
-                  textDirection: TextDirection.rtl,
-                  child: TabBar(
-                    controller: _tabs,
-                    isScrollable: true,
-                    tabAlignment: TabAlignment.start,
-                    labelColor: AppColors.gold,
-                    unselectedLabelColor: subText,
-                    indicatorColor: AppColors.gold,
-                    indicatorSize: TabBarIndicatorSize.label,
-                    labelStyle: const TextStyle(
-                      fontFamily: '.SF Pro Text',
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    unselectedLabelStyle: const TextStyle(
-                      fontFamily: '.SF Pro Text',
-                      fontSize: 14,
-                    ),
-                    tabs: const [
-                      Tab(text: 'التفسير'),
-                      Tab(text: 'الإعراب'),
-                      Tab(text: 'التصريف'),
-                      Tab(text: 'المعنى'),
-                      Tab(text: 'القراءات'),
-                      Tab(text: 'المتشابهات'),
-                    ],
+                child: TabBar(
+                  controller: _tabs,
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
+                  labelColor: Colors.black,
+                  unselectedLabelColor: Colors.black,
+                  indicatorColor: Colors.transparent,
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                  labelStyle: const TextStyle(
+                    fontFamily: '.SF Pro Text',
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
                   ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontFamily: '.SF Pro Text',
+                    fontSize: 14,
+                  ),
+                  tabs: [
+                    for (final label in const [
+                      'التفسير',
+                      'الإعراب',
+                      'التصريف',
+                      'المعنى',
+                      'القراءات',
+                      'المتشابهات',
+                    ])
+                      Tab(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.gold,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(label),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -1180,7 +1185,15 @@ class _TabBarHeader extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlaps) =>
-      Container(color: background, child: child);
+      Container(
+        color: background,
+        // The screen's chrome stays LTR (see the ayah screen's own
+        // note), but the tab labels are Arabic study terms — this
+        // local RTL override puts التفسير first from the right, the
+        // natural reading order, without touching the tab indices used
+        // by TabBarView and initialTab elsewhere in this file.
+        child: Directionality(textDirection: TextDirection.rtl, child: child),
+      );
 
   @override
   bool shouldRebuild(_TabBarHeader old) =>
