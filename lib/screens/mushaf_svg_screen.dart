@@ -1469,6 +1469,15 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Row(children: [
             IconButton(
+                icon: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle),
+                    child: Icon(Icons.arrow_back_ios_rounded,
+                        size: 16, color: textColor)),
+                onPressed: () => Navigator.pop(context)),
+            IconButton(
                 tooltip: 'البحث في الآيات',
                 icon: Container(
                     padding: const EdgeInsets.all(6),
@@ -1479,15 +1488,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                         size: 16, color: textColor)),
                 onPressed: () => Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const AyahSearchScreen()))),
-            IconButton(
-                icon: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        shape: BoxShape.circle),
-                    child: Icon(Icons.arrow_back_ios_rounded,
-                        size: 16, color: textColor)),
-                onPressed: () => Navigator.pop(context)),
             Expanded(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
