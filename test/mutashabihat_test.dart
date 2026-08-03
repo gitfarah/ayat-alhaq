@@ -194,6 +194,38 @@ void main() {
       expect(await linkedTo(21, 26), contains(await g(10, 68)));
     });
 
+    test('the نفع/ضر reversals pair the identical sentences directly',
+        () async {
+      // The sharpest kind there is: same words, opposite order.
+      expect(await linkedTo(7, 188), contains(await g(10, 49)));
+      expect(await linkedTo(13, 16), contains(await g(25, 3)));
+    });
+
+    test('the نفع-first sites are exactly the book\'s three exceptions',
+        () async {
+      // الأعراف ١٨٨ / الرعد ١٦ / سبأ ٤٢ — derived independently by text
+      // search, and they matched the rule the book states, which is a
+      // good check on the search-derived method itself.
+      final found = await linkedTo(34, 42);
+      for (final ref in const [[7, 188], [13, 16]]) {
+        expect(found, contains(await g(ref[0], ref[1])));
+      }
+    });
+
+    test('لهو ولعب in الأعراف and العنكبوت link to the لعب ولهو places',
+        () async {
+      final found = await linkedTo(7, 51);
+      expect(found, contains(await g(29, 64)));
+      expect(found, contains(await g(6, 32)));
+      expect(found, contains(await g(57, 20)));
+    });
+
+    test('the three الإنس-before-الجن sites are linked', () async {
+      final found = await linkedTo(17, 88);
+      expect(found, contains(await g(6, 112)));
+      expect(found, contains(await g(72, 5)));
+    });
+
     test('ayahs with no recorded mutashabiha come back empty, not null',
         () async {
       expect(await MutashabihatService.forGlobalAyah(3), isEmpty);
