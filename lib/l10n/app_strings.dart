@@ -11,9 +11,27 @@ class L10n {
   final String code;
   const L10n(this.code);
 
-  /// Rebuilds the caller whenever the (effective) language changes.
-  static L10n of(BuildContext context) =>
-      L10n(context.watch<SettingsService>().effectiveLanguage);
+  /// Rebuilds the caller whenever the (effective) language changes —
+  /// but only when called during build, where that's valid. Dozens of
+  /// call sites use `L10n.of(context)` at the top of an event handler
+  /// (onTap/onLongPress bodies, async methods that open a dialog or
+  /// snackbar) purely to read the current strings once; they never
+  /// needed to watch, but `context.watch` outside build throws
+  /// Provider's own debug assertion before the dialog/sheet/snackbar
+  /// ever appears — which is exactly what broke every long-press menu
+  /// and audio control in the app (found 2026-08-02). Falling back to
+  /// `context.read` is the fix Provider's own assertion message
+  /// recommends; doing it here once is far safer than hand-editing the
+  /// ~30 call sites, which stay correct automatically either way.
+  static L10n of(BuildContext context) {
+    SettingsService settings;
+    try {
+      settings = context.watch<SettingsService>();
+    } catch (_) {
+      settings = context.read<SettingsService>();
+    }
+    return L10n(settings.effectiveLanguage);
+  }
 
   static const Map<String, String> languages = {
     'ar': 'العربية',
