@@ -1083,31 +1083,39 @@ class _TafsirScreenState extends State<TafsirScreen>
               pinned: true,
               delegate: _TabBarHeader(
                 background: bg,
-                child: TabBar(
-                  controller: _tabs,
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  labelColor: accent,
-                  unselectedLabelColor: subText,
-                  indicatorColor: accent,
-                  indicatorSize: TabBarIndicatorSize.label,
-                  labelStyle: const TextStyle(
-                    fontFamily: '.SF Pro Text',
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                // The screen's chrome stays LTR (see note above), but the
+                // tab labels are Arabic study terms — this local RTL
+                // override puts التفسير first from the right, the natural
+                // reading order, without touching the tab indices used
+                // by TabBarView and initialTab elsewhere in this file.
+                child: Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: TabBar(
+                    controller: _tabs,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    labelColor: AppColors.gold,
+                    unselectedLabelColor: subText,
+                    indicatorColor: AppColors.gold,
+                    indicatorSize: TabBarIndicatorSize.label,
+                    labelStyle: const TextStyle(
+                      fontFamily: '.SF Pro Text',
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    unselectedLabelStyle: const TextStyle(
+                      fontFamily: '.SF Pro Text',
+                      fontSize: 14,
+                    ),
+                    tabs: const [
+                      Tab(text: 'التفسير'),
+                      Tab(text: 'الإعراب'),
+                      Tab(text: 'التصريف'),
+                      Tab(text: 'المعنى'),
+                      Tab(text: 'القراءات'),
+                      Tab(text: 'المتشابهات'),
+                    ],
                   ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontFamily: '.SF Pro Text',
-                    fontSize: 14,
-                  ),
-                  tabs: const [
-                    Tab(text: 'التفسير'),
-                    Tab(text: 'الإعراب'),
-                    Tab(text: 'التصريف'),
-                    Tab(text: 'المعنى'),
-                    Tab(text: 'القراءات'),
-                    Tab(text: 'المتشابهات'),
-                  ],
                 ),
               ),
             ),
