@@ -339,6 +339,43 @@ class QuranAudioService extends ChangeNotifier {
     }
   }
 
+  /// Seeks within the CURRENT ayah's clip (the player bar's scrubber) —
+  /// this never crosses into a neighbouring ayah's file.
+  Future<void> seek(Duration position) => _player.seek(position);
+
+  double _speed = 1.0;
+  double get speed => _speed;
+
+  /// Cycles through a fixed set of speeds, like the "1x" button on most
+  /// recitation players — simpler than a slider for a value nobody sets
+  /// to something oddly specific like 1.35x.
+  static const List<double> speedSteps = [1.0, 1.25, 1.5, 1.75, 2.0, 0.75];
+
+  Future<void> cycleSpeed() async {
+    final i = speedSteps.indexOf(_speed);
+    _speed = speedSteps[(i + 1) % speedSteps.length];
+    await _player.setSpeed(_speed);
+    notifyListeners();
+  }
+
+  /// Steps to the ayah right after/before the one playing, the same
+  /// +1/-1 global-ayah stepping [nextAyahResolver] uses for auto-advance
+  /// — the player bar's rewind/forward buttons move by whole ayahs, not
+  /// by seconds, since that's the unit a reciter's clip comes in.
+  Future<void> playPreviousAyah() async {
+    final current = _currentGlobalAyah;
+    if (current == null || current <= 1) return;
+    await playAyah(current - 1);
+  }
+
+  Future<void> playNextAyah() async {
+    final current = _currentGlobalAyah;
+    if (current == null) return;
+    final next = nextAyahResolver?.call(current) ??
+        (current < 6236 ? current + 1 : null);
+    if (next != null) await playAyah(next);
+  }
+
   Future<void> stop() async {
     // Keep the surah download running — the user asked for the whole
     // surah, so let it finish for offline replays.

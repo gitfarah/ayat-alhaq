@@ -18,11 +18,13 @@ import '../services/surah_header_service.dart';
 import '../services/tajweed_service.dart';
 import '../l10n/app_strings.dart';
 import '../theme.dart';
+import '../widgets/ayah_sheet_header.dart';
 import '../widgets/ayah_note_sheet.dart';
 import '../widgets/mushaf_page_furniture.dart';
 import '../widgets/reciter_picker.dart';
 import '../widgets/surah_banner_painter.dart';
 import '../widgets/surah_frame.dart';
+import 'ayah_search_screen.dart';
 import 'tafsir_screen.dart';
 
 class MushafSvgScreen extends StatefulWidget {
@@ -774,11 +776,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 textAlign: TextAlign.right,
                 textDirection: TextDirection.rtl,
                 style: TextStyle(
-                    fontFamily: 'QuranHafs', fontSize: 16, color: textColor)),
+                    fontFamily: 'QuranHafs', fontSize: 19, color: textColor)),
             leading: Text('ص ${_ar(QuranPageMeta.surahStartPages[i])}',
                 style: TextStyle(
                     fontFamily: '.SF Pro Text',
-                    fontSize: 12,
+                    fontSize: 14,
                     color: isDark
                         ? AppColors.darkTextSec
                         : AppColors.textSecondary)),
@@ -845,30 +847,16 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       // Scrollable so the sheet never overflows on short (landscape)
       // screens — the content is taller than the sheet's max height there.
       builder: (_) => SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Center(
-                  child: Container(
-                      width: 36,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 14),
-                      decoration: BoxDecoration(
-                          color: Colors.grey.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(2)))),
-              Text(
-                  '${_surahName(region.surahNumber)} — آية ${_ar(region.ayahNumber)}',
-                  textDirection: TextDirection.rtl,
-                  style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'QuranHafs',
-                      color:
-                          isDark ? AppColors.darkText : AppColors.textPrimary)),
-              const Divider(height: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ayahSheetHeader(region),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
               ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(
@@ -947,7 +935,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   }),
               ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.highlight_rounded,
+                  leading: const Icon(Icons.draw_rounded,
                       color: AppColors.secondary),
                   title: Text(l('highlightAyah'),
                       textDirection: TextDirection.rtl,
@@ -995,9 +983,25 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     Navigator.pop(context);
                     _editNote(region);
                   }),
-            ],
-          ),
+                ],
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  /// The sheet's green ayah panel. The text is FETCHED rather than taken
+  /// from the tapped region: an SVG page carries only the hit polygons,
+  /// not the words inside them.
+  Widget _ayahSheetHeader(AyahHitRegion region) {
+    return FutureBuilder<String>(
+      future: QuranService.getAyahText(region.surahNumber, region.ayahNumber),
+      builder: (context, snap) => AyahSheetHeader(
+        ayahText: snap.data,
+        label:
+            '${_surahName(region.surahNumber)} — آية ${_ar(region.ayahNumber)}',
       ),
     );
   }
@@ -1464,6 +1468,17 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         bottom: false,
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Row(children: [
+            IconButton(
+                tooltip: 'البحث في الآيات',
+                icon: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle),
+                    child: Icon(Icons.search_rounded,
+                        size: 16, color: textColor)),
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const AyahSearchScreen()))),
             IconButton(
                 icon: Container(
                     padding: const EdgeInsets.all(6),
@@ -2153,66 +2168,216 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     ];
   }
 
-  /// Compact recitation controls shown while audio is active — without
-  /// this the user would have to find and re-tap the currently playing
-  /// ayah (which keeps moving with auto-advance) just to stop it.
+  static String _formatDuration(Duration d) {
+    if (d.isNegative) d = Duration.zero;
+    final m = d.inMinutes.remainder(60).toString().padLeft(1, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  /// Modern, full-width recitation player shown while audio is active —
+  /// reciter picker, ayah label, a scrubbable progress bar and
+  /// play/pause/skip/speed controls, sized closer to a dedicated media
+  /// player than the old single slim row.
   Widget _buildAudioBar(QuranAudioService audio, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : Colors.white,
-          border: Border(
-              top: BorderSide(
-                  color: (isDark ? Colors.white : Colors.black)
-                      .withValues(alpha: 0.06)))),
-      child: Row(
-        children: [
-          IconButton(
-            icon: Icon(Icons.stop_circle_rounded,
-                color:
-                    isDark ? AppColors.darkTextSec : AppColors.textSecondary),
-            onPressed: audio.stop,
-          ),
-          IconButton(
-            icon: Icon(
-              audio.isPlaying
-                  ? Icons.pause_circle_filled_rounded
-                  : Icons.play_circle_fill_rounded,
-              color: isDark ? AppColors.darkPrimary : AppColors.primary,
-              size: 30,
+    final accent = isDark ? AppColors.darkPrimary : AppColors.primary;
+    final surface = isDark ? AppColors.darkSurface : Colors.white;
+    final subColor = isDark ? AppColors.darkTextSec : AppColors.textSecondary;
+    final textColor = isDark ? AppColors.darkText : AppColors.textPrimary;
+
+    final globalAyah = audio.currentGlobalAyah;
+    var verseLabel = '';
+    if (globalAyah != null) {
+      final (surah, first, _) = QuranAudioService.surahRangeOf(globalAyah);
+      verseLabel =
+          '${QuranPageMeta.surahName(surah)}: ${_ar(globalAyah - first + 1)}';
+    }
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.10),
+                blurRadius: 14,
+                offset: const Offset(0, -3)),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  tooltip: 'إيقاف',
+                  icon: Icon(Icons.close_rounded, color: subColor),
+                  onPressed: audio.stop,
+                ),
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => showReciterPicker(context, audio, isDark),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.expand_more_rounded,
+                              color: accent, size: 18),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              audio.isLoading
+                                  ? 'جارٍ التحميل...'
+                                  : audio.reciterName,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontFamily: '.SF Pro Text',
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: accent),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 48), // balances the close button
+              ],
             ),
-            onPressed: () {
-              if (audio.currentGlobalAyah != null) {
-                audio.togglePlayPause(audio.currentGlobalAyah!);
-              }
-            },
-          ),
-          IconButton(
-            tooltip: 'تغيير القارئ',
-            icon: Icon(Icons.record_voice_over_rounded,
-                color: isDark ? AppColors.darkTextSec : AppColors.textSecondary,
-                size: 20),
-            onPressed: () => showReciterPicker(context, audio, isDark),
-          ),
-          Expanded(
-            child: Text(
-              audio.isLoading
-                  ? 'جارٍ التحميل...'
-                  : (audio.isPlaying
-                      ? (audio.isDownloadingSurah
-                          ? 'قيد التلاوة — تنزيل السورة ${audio.downloadDone}/${audio.downloadTotal}'
-                          : 'قيد التلاوة — ${audio.reciterName}')
-                      : 'متوقف مؤقتاً'),
-              textAlign: TextAlign.end,
-              textDirection: TextDirection.rtl,
-              style: TextStyle(
-                  fontSize: 12,
-                  fontFamily: '.SF Pro Text',
-                  color:
-                      isDark ? AppColors.darkTextSec : AppColors.textSecondary),
+            if (verseLabel.isNotEmpty)
+              Text(
+                  audio.isDownloadingSurah
+                      ? '$verseLabel — تنزيل السورة ${audio.downloadDone}/${audio.downloadTotal}'
+                      : verseLabel,
+                  style: TextStyle(
+                      fontFamily: '.SF Pro Text',
+                      fontSize: 12.5,
+                      color: subColor)),
+            StreamBuilder<Duration?>(
+              stream: audio.durationStream,
+              builder: (context, durSnap) {
+                var duration = durSnap.data ?? Duration.zero;
+                if (duration < Duration.zero) duration = Duration.zero;
+                return StreamBuilder<Duration>(
+                  stream: audio.positionStream,
+                  builder: (context, posSnap) {
+                    var position = posSnap.data ?? Duration.zero;
+                    if (duration > Duration.zero && position > duration) {
+                      position = duration;
+                    }
+                    final maxMs = duration.inMilliseconds > 0
+                        ? duration.inMilliseconds.toDouble()
+                        : 1.0;
+                    final valueMs = position.inMilliseconds
+                        .clamp(0, maxMs.round())
+                        .toDouble();
+                    return Column(
+                      children: [
+                        SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 3,
+                            thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 6),
+                            overlayShape: const RoundSliderOverlayShape(
+                                overlayRadius: 12),
+                          ),
+                          child: Slider(
+                            value: valueMs,
+                            max: maxMs,
+                            activeColor: accent,
+                            inactiveColor: accent.withValues(alpha: 0.2),
+                            onChanged: duration > Duration.zero
+                                ? (v) => audio
+                                    .seek(Duration(milliseconds: v.round()))
+                                : null,
+                          ),
+                        ),
+                        Padding(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 6),
+                          child: Row(
+                            mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(_formatDuration(position),
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: subColor,
+                                      fontFamily: '.SF Pro Text')),
+                              Text(
+                                  '-${_formatDuration(duration - position)}',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: subColor,
+                                      fontFamily: '.SF Pro Text')),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
             ),
-          ),
-        ],
+            const SizedBox(height: 2),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                IconButton(
+                  tooltip: audio.autoAdvance
+                      ? 'التقدم التلقائي مفعّل'
+                      : 'التقدم التلقائي متوقف',
+                  icon: Icon(Icons.repeat_rounded,
+                      color: audio.autoAdvance ? accent : subColor, size: 22),
+                  onPressed: audio.toggleAutoAdvance,
+                ),
+                IconButton(
+                  icon: Icon(Icons.fast_rewind_rounded,
+                      color: textColor, size: 30),
+                  onPressed: audio.playPreviousAyah,
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                      color: accent, shape: BoxShape.circle),
+                  child: IconButton(
+                    icon: Icon(
+                        audio.isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 32),
+                    onPressed: () {
+                      if (audio.currentGlobalAyah != null) {
+                        audio.togglePlayPause(audio.currentGlobalAyah!);
+                      }
+                    },
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.fast_forward_rounded,
+                      color: textColor, size: 30),
+                  onPressed: audio.playNextAyah,
+                ),
+                TextButton(
+                  onPressed: audio.cycleSpeed,
+                  child: Text(
+                      '${audio.speed == audio.speed.roundToDouble() ? audio.speed.round() : audio.speed}x',
+                      style: TextStyle(
+                          fontFamily: '.SF Pro Text',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: textColor)),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
