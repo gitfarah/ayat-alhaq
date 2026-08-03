@@ -226,6 +226,37 @@ void main() {
       expect(found, contains(await g(72, 5)));
     });
 
+    test('the consecutive النور pair 58/59 is linked', () async {
+      // Adjacent ayahs identical but for «الآيات» vs «آياته» — about as
+      // easy to slip between as the Quran gets.
+      expect(await linkedTo(24, 58), contains(await g(24, 59)));
+    });
+
+    test('«يبين الله لكم» links its four different endings', () async {
+      final found = await linkedTo(2, 219); // تتفكرون
+      expect(found, contains(await g(2, 242))); // تعقلون
+      expect(found, contains(await g(3, 103))); // تهتدون
+      expect(found, contains(await g(5, 89))); // تشكرون
+    });
+
+    test('الفوز العظيم links across all its prefixes', () async {
+      final found = await linkedTo(5, 119); // «ذلك»
+      expect(found, contains(await g(4, 13))); // «وذلك»
+      expect(found, contains(await g(9, 72))); // «ذلك هو»
+      expect(found, contains(await g(9, 111))); // «وذلك هو»
+      expect(found, contains(await g(37, 60))); // «لهو»
+    });
+
+    test('the counted-place rules hold exactly', () async {
+      // Both counts were derived by exhaustive search and matched the
+      // book's own «٣ مواضع» and «٤ مواضع» — so a change to either
+      // should fail loudly rather than drift.
+      expect(await linkedTo(7, 71), contains(await g(47, 26)));
+      expect(await linkedTo(7, 71), contains(await g(67, 9)));
+      expect(await linkedTo(10, 104), contains(await g(22, 49)));
+      expect(await linkedTo(10, 104), contains(await g(7, 158)));
+    });
+
     test('ayahs with no recorded mutashabiha come back empty, not null',
         () async {
       expect(await MutashabihatService.forGlobalAyah(3), isEmpty);
