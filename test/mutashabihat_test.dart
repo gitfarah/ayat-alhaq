@@ -169,6 +169,31 @@ void main() {
       expect(await linkedTo(5, 15), contains(await g(5, 19)));
     });
 
+    test('the «إنه لا يفلح» endings link across all three predicates',
+        () async {
+      // The tightest kind of tadhyil confusion: same sentence, only the
+      // final word changes — الظالمون in most places, المجرمون in Yunus,
+      // الكافرون in Al-Mu'minun.
+      expect(await linkedTo(10, 17), contains(await g(6, 21)));
+      expect(await linkedTo(10, 17), contains(await g(23, 117)));
+      expect(await linkedTo(23, 117), contains(await g(28, 37)));
+    });
+
+    test('«ويعلمهم الكتاب والحكمة» keeps البقرة ١٥١ with its «ويعلمكم»',
+        () async {
+      // 2:151 is the odd one out (يعلّمكم, and a different clause
+      // order), which is exactly why it belongs in the group.
+      final found = await linkedTo(3, 164);
+      expect(found, contains(await g(2, 129)));
+      expect(found, contains(await g(2, 151)));
+      expect(found, contains(await g(62, 2)));
+    });
+
+    test('اتخذ الله ولدا links to اتخذ الرحمن ولدا', () async {
+      expect(await linkedTo(2, 116), contains(await g(19, 88)));
+      expect(await linkedTo(21, 26), contains(await g(10, 68)));
+    });
+
     test('ayahs with no recorded mutashabiha come back empty, not null',
         () async {
       expect(await MutashabihatService.forGlobalAyah(3), isEmpty);
