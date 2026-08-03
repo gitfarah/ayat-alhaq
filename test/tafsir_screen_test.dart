@@ -86,21 +86,23 @@ void main() {
 
   testWidgets('the mutashabihat tab reads from the bundled index, not the '
       'network', (tester) async {
-    // 2:2 is global ayah 9 — the index's first entry, matched against
-    // three passages elsewhere in the Quran.
-    await open(tester, initialTab: 5, surah: 2, ayah: 2);
+    // 2:34 (the Iblis-refusal narrative) is in the book-transcribed
+    // seed, matched against three passages elsewhere in the Quran.
+    await open(tester, initialTab: 5, surah: 2, ayah: 34);
 
     expect(find.textContaining('لا توجد مواضع متشابهة'), findsNothing);
-    // Each match is headed by its own reference. The surah name comes
-    // from the bundled text, which already reads «سُورَةُ ...», so the
-    // heading must not say "سورة" a second time.
-    expect(find.textContaining('— آية'), findsWidgets);
+    // Its matches are two-ayah runs (the refusal plus the follow-up
+    // question), so each card is headed «… — الآيات ١١-١٢». The surah
+    // name comes from the bundled text, which already reads
+    // «سُورَةُ ...», so the heading must not say "سورة" a second time.
+    expect(find.textContaining('— الآيات'), findsWidgets);
     expect(find.textContaining('سورة سُورَةُ'), findsNothing);
   });
 
   testWidgets('an ayah with no recorded mutashabiha says so plainly',
       (tester) async {
-    await open(tester, initialTab: 5, surah: 1, ayah: 1);
+    // Nothing from Al-Imran has been transcribed yet.
+    await open(tester, initialTab: 5, surah: 3, ayah: 5);
     expect(find.textContaining('لا توجد مواضع متشابهة'), findsOneWidget);
   });
 

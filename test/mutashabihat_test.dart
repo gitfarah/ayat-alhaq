@@ -39,31 +39,89 @@ void main() {
     });
   });
 
-  group('MutashabihatService', () {
-    test('finds the mutashabihat of a known source ayah', () async {
-      // The dataset's very first entry: global 9 (2:2) against three
-      // matches elsewhere in the Quran.
-      final entries = await MutashabihatService.forGlobalAyah(9);
-      expect(entries, isNotEmpty);
-      final all = {for (final e in entries) ...e.similar.expand((r) => r)};
-      expect(all, containsAll([1162, 3161, 3472]));
+  // The dataset (assets/quran/mutashabihat.json) is transcribed from
+  // the reference book — see mutashabihat_service.dart's doc comment.
+  // References below are written as surah:ayah and resolved through
+  // QuranService, so they can be checked against the printed page by
+  // eye and would fail loudly if the bundled Quran asset ever shifted.
+  group('MutashabihatService (book-transcribed)', () {
+    /// Global numbers for a surah:ayah pair, for readable assertions.
+    Future<int> g(int surah, int ayah) =>
+        QuranService.globalAyahNumber(surah, ayah);
+
+    /// Everything the book links to the given ayah.
+    Future<Set<int>> linkedTo(int surah, int ayah) async {
+      final entries = await MutashabihatService.forGlobalAyah(
+          await g(surah, ayah));
+      return {for (final e in entries) ...e.similar.expand((r) => r)};
+    }
+
+    test('the Iblis-refusal row links all four of its occurrences',
+        () async {
+      // Page 2, row 1. Each surah contributes the refusal AND the
+      // follow-up question, except Al-Baqarah which prints only the
+      // refusal — an earlier transcription wrongly mixed the two
+      // patterns, so both ayahs of each pair are asserted.
+      final found = await linkedTo(2, 34);
+      expect(found, containsAll([
+        await g(7, 11), await g(7, 12),
+        await g(15, 31), await g(15, 32),
+        await g(38, 74), await g(38, 75),
+      ]));
     });
 
-    test('the index is symmetric — a match finds its source back',
+    test('the index is symmetric — every member finds the others back',
         () async {
-      final fromSource = await MutashabihatService.forGlobalAyah(9);
-      expect(fromSource.first.similar.expand((r) => r), contains(1162));
+      // Sitting on any occurrence must surface the rest of the row,
+      // which the one-way printed layout would not do on its own.
+      final row = [
+        await g(2, 34),
+        await g(7, 11),
+        await g(15, 31),
+        await g(38, 74),
+      ];
+      for (final member in row) {
+        final entries = await MutashabihatService.forGlobalAyah(member);
+        final found = {
+          for (final e in entries) ...e.similar.expand((r) => r)
+        };
+        for (final other in row.where((x) => x != member)) {
+          expect(found, contains(other),
+              reason: 'global $member did not link back to $other');
+        }
+      }
+    });
 
-      // Sitting on the match must surface the source, which the raw
-      // one-way dataset would not do on its own.
-      final fromMatch = await MutashabihatService.forGlobalAyah(1162);
-      final back = {for (final e in fromMatch) ...e.similar.expand((r) => r)};
-      expect(back, contains(9));
+    test('the ihbitu row keeps all three occurrences', () async {
+      // Page 2, row 3: البقرة ٣٨ / الأعراف ٢٤ / طه ١٢٣. Al-A'raf 24
+      // was wrongly dropped from an earlier transcription on the
+      // reasoning that its wording matches Al-Baqarah 36 instead — but
+      // the book groups it here, and the book is the source of truth.
+      final found = await linkedTo(2, 38);
+      expect(found, contains(await g(7, 24)));
+      expect(found, contains(await g(20, 123)));
+    });
+
+    test('the Adam/Jannah row links both directions', () async {
+      expect(await linkedTo(2, 35), contains(await g(7, 19)));
+      expect(await linkedTo(7, 19), contains(await g(2, 35)));
+    });
+
+    test('a surah opening finds the other surahs opening the same way',
+        () async {
+      // Page 1, row 8: the حم family plus Az-Zumar, which shares
+      // "تنزيل الكتاب من الله العزيز الحكيم" without the حم.
+      expect(await linkedTo(45, 2), contains(await g(46, 2)));
+      expect(await linkedTo(39, 1), contains(await g(45, 2)));
+
+      // Page 1, row 9: سبّح / يسبّح.
+      expect(await linkedTo(59, 1), contains(await g(61, 1)));
     });
 
     test('an entry never lists the ayah being read as its own match',
         () async {
-      for (final global in const [9, 1162, 3161, 61, 128]) {
+      for (final ref in const [[2, 34], [7, 24], [20, 123], [40, 1]]) {
+        final global = await g(ref[0], ref[1]);
         for (final e in await MutashabihatService.forGlobalAyah(global)) {
           expect(e.current, contains(global));
           expect(e.similar.expand((r) => r), isNot(contains(global)));
@@ -71,29 +129,28 @@ void main() {
       }
     });
 
-    test('every ayah of a multi-ayah run is an entry point', () async {
-      // Juz 1 holds a two-ayah run 53-54 matched against 128-129.
-      final fromFirst = await MutashabihatService.forGlobalAyah(53);
-      final fromSecond = await MutashabihatService.forGlobalAyah(54);
-      expect(fromFirst, isNotEmpty);
-      expect(fromSecond, isNotEmpty,
-          reason: 'the second ayah of the run must find the pair too');
-      expect(fromSecond.first.current, containsAll([53, 54]));
+    test('a row with a single occurrence is not indexed', () async {
+      // Page 1, row 4: المص opens Al-A'raf alone. It is kept in the
+      // JSON for faithfulness to the page, but has nothing to compare
+      // against, so it must not produce an empty card.
+      expect(await MutashabihatService.forGlobalAyah(await g(7, 1)),
+          isEmpty);
     });
 
     test('ayahs with no recorded mutashabiha come back empty, not null',
         () async {
-      expect(await MutashabihatService.forGlobalAyah(1), isEmpty);
+      expect(await MutashabihatService.forGlobalAyah(3), isEmpty);
       expect(await MutashabihatService.forGlobalAyah(999999), isEmpty);
     });
 
-    test('every referenced ayah number is a real ayah', () async {
-      // A stale or mis-indexed dataset would silently render blank
-      // cards, so check the whole thing resolves.
+    test('every transcribed reference resolves to a real ayah', () async {
+      // A typo like "2:999" would silently shrink or blank a card, so
+      // sweep the whole dataset and confirm each number is in range.
       var checked = 0;
-      for (var g = 1; g <= 6236; g++) {
-        for (final e in await MutashabihatService.forGlobalAyah(g)) {
+      for (var global = 1; global <= 6236; global++) {
+        for (final e in await MutashabihatService.forGlobalAyah(global)) {
           for (final run in [e.current, ...e.similar]) {
+            expect(run, isNotEmpty);
             for (final ayah in run) {
               expect(ayah, inInclusiveRange(1, 6236));
               checked++;
@@ -101,7 +158,7 @@ void main() {
           }
         }
       }
-      expect(checked, greaterThan(1000));
+      expect(checked, greaterThan(0));
     });
   });
 }
