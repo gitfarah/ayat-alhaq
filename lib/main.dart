@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:device_preview/device_preview.dart';
 import 'services/settings_service.dart';
 import 'services/quran_audio_service.dart';
+import 'services/adhan_notification_service.dart';
 import 'screens/main_screen.dart';
 import 'theme.dart';
 
@@ -23,6 +24,11 @@ void main() async {
     );
   } catch (_) {
     // Never let audio-session setup block app startup.
+  }
+  try {
+    await AdhanNotificationService.initialize();
+  } catch (_) {
+    // Notification setup must never prevent the Quran from opening.
   }
   // All orientations are allowed — the Mushaf and reader both have
   // dedicated landscape layouts.

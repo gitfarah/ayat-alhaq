@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/quran_page_meta.dart';
 import '../services/mushaf_svg_service.dart';
+import '../services/mushaf_v2_service.dart';
 import '../services/quran_service.dart';
 import '../services/bookmark_service.dart';
 import '../services/highlight_service.dart';
@@ -65,6 +68,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// held across rebuilds (a TextSpan recognizer must outlive the span)
   /// and disposed with the screen.
   final Map<int, Future<List<PageAyah>>> _textFutures = {};
+  final Map<int, Future<List<MushafV2Page>>> _v2Futures = {};
   final Map<int, LongPressGestureRecognizer> _textRecognizers = {};
 
   /// Measured fit sizes for the reflowing pages, keyed by page and box.
@@ -110,7 +114,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// riwayat — carries this the same way a printed leaf does. Only the
   /// reflowing text edition has no page to print it on, and keeps the
   /// floating bar for its page number.
-  bool get _usesPageFurniture => MushafSvgService.edition.isArtwork;
+  bool get _usesPageFurniture => MushafSvgService.edition.isPrintedPage;
 
   void _onScaleStart(ScaleStartDetails d) => _zoomStart = _zoom;
 
@@ -188,6 +192,17 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
     // The text edition is bundled — nothing to prefetch, and it is
     // offline by definition.
+    if (MushafSvgService.edition.isGlyph) {
+      final step = _wide ? 2 : 1;
+      MushafV2Service.preload(basePage + step);
+      MushafV2Service.preload(basePage + step + 1);
+      MushafV2Service.preload(basePage - 1);
+      final center = _indexForPage(basePage);
+      _v2Futures.removeWhere((k, _) => (k - center).abs() > 3);
+      final cached = await MushafV2Service.isCached(basePage);
+      if (mounted) setState(() => _isCachedOffline = cached);
+      return;
+    }
     if (MushafSvgService.edition.isText) {
       _textFutures.removeWhere((k, _) => (k - basePage).abs() > 4);
       if (!_isCachedOffline) setState(() => _isCachedOffline = true);
@@ -304,8 +319,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       borderRadius: BorderRadius.circular(12))),
               onPressed: () => Navigator.pop(context, true),
               child: const Text('تنزيل الآن',
-                  style:
-                      TextStyle(color: Colors.white, fontFamily: '.SF Pro Text'))),
+                  style: TextStyle(
+                      color: Colors.white, fontFamily: '.SF Pro Text'))),
         ],
       ),
     );
@@ -496,8 +511,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 color: isDark ? AppColors.darkText : AppColors.textPrimary),
             decoration: InputDecoration(
                 hintText: '١ — ٦٠٤',
-                hintStyle:
-                    TextStyle(color: Colors.grey[400], fontFamily: '.SF Pro Text'),
+                hintStyle: TextStyle(
+                    color: Colors.grey[400], fontFamily: '.SF Pro Text'),
                 filled: true,
                 fillColor: isDark ? AppColors.darkSurfaceAlt : Colors.white,
                 border: OutlineInputBorder(
@@ -521,8 +536,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 }
               },
               child: const Text('انتقال',
-                  style:
-                      TextStyle(color: Colors.white, fontFamily: '.SF Pro Text'))),
+                  style: TextStyle(
+                      color: Colors.white, fontFamily: '.SF Pro Text'))),
         ],
       ),
     );
@@ -555,8 +570,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   leading: Icon(Icons.menu_book_rounded, color: iconColor),
                   title: Text('الانتقال إلى سورة',
                       textDirection: TextDirection.rtl,
-                      style:
-                          TextStyle(fontFamily: '.SF Pro Text', color: textColor)),
+                      style: TextStyle(
+                          fontFamily: '.SF Pro Text', color: textColor)),
                   onTap: () {
                     Navigator.pop(context);
                     _showSurahPicker();
@@ -566,8 +581,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       Icon(Icons.auto_awesome_mosaic_rounded, color: iconColor),
                   title: Text('الانتقال إلى جزء',
                       textDirection: TextDirection.rtl,
-                      style:
-                          TextStyle(fontFamily: '.SF Pro Text', color: textColor)),
+                      style: TextStyle(
+                          fontFamily: '.SF Pro Text', color: textColor)),
                   onTap: () {
                     Navigator.pop(context);
                     _showJuzPicker();
@@ -576,8 +591,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   leading: Icon(Icons.tag_rounded, color: iconColor),
                   title: Text('الانتقال إلى صفحة',
                       textDirection: TextDirection.rtl,
-                      style:
-                          TextStyle(fontFamily: '.SF Pro Text', color: textColor)),
+                      style: TextStyle(
+                          fontFamily: '.SF Pro Text', color: textColor)),
                   onTap: () {
                     Navigator.pop(context);
                     _jumpDialog();
@@ -592,8 +607,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     activeThumbColor: AppColors.gold,
                     secondary: Icon(Icons.palette_rounded, color: iconColor),
                     title: Text(L10n.of(context)('tajweedLbl'),
-                        style:
-                            TextStyle(fontFamily: '.SF Pro Text', color: textColor)),
+                        style: TextStyle(
+                            fontFamily: '.SF Pro Text', color: textColor)),
                     subtitle: Text(
                         L10n.of(context)(
                             s.tajweed ? 'tajweedOn' : 'tajweedOff'),
@@ -650,6 +665,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         'warsh' => Icons.import_contacts_rounded,
         'qalon' => Icons.collections_bookmark_rounded,
         'text' => Icons.format_size_rounded,
+        'madinah1421' => Icons.auto_stories_rounded,
         _ => Icons.menu_book_rounded,
       };
 
@@ -739,6 +755,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     setState(() {
       _pageFutures.clear();
       _textFutures.clear();
+      _v2Futures.clear();
       _fitCache.clear();
       _zoom = 1.0;
     });
@@ -863,10 +880,13 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       playingThis
                           ? Icons.pause_circle_rounded
                           : Icons.play_circle_rounded,
-                      color:
-                          isDark ? AppColors.darkPrimary : AppColors.primary),
+                          color: isDark
+                              ? AppColors.darkPrimary
+                              : AppColors.primary),
                   title: Text(
-                      playingThis ? l('pauseRecitation') : l('playRecitation'),
+                          playingThis
+                              ? l('pauseRecitation')
+                              : l('playRecitation'),
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
                           fontFamily: '.SF Pro Text',
@@ -884,15 +904,16 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     await audio.togglePlayPause(globalAyah);
                     // Playback failures only set audio.error — surface it.
                     if (mounted && audio.error != null) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text(audio.error!)));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(audio.error!)));
                     }
                   }),
               ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(Icons.menu_book_rounded,
-                      color:
-                          isDark ? AppColors.darkPrimary : AppColors.primary),
+                          color: isDark
+                              ? AppColors.darkPrimary
+                              : AppColors.primary),
                   title: Text(l('tafsir'),
                       textDirection: TextDirection.rtl,
                       style: TextStyle(
@@ -1242,6 +1263,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       }
       _pageCtrl = PageController(initialPage: _indexForPage(_pageNum));
       _pageFutures.clear();
+      _v2Futures.clear();
     }
 
     // The Mushaf keeps its original fixed layout and page-turn
@@ -1332,6 +1354,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   Widget _buildPageItem(int index, bool isDark) {
     final base = _pageForIndex(index);
 
+    if (MushafSvgService.edition.isGlyph) {
+      return _buildV2PageItem(index, base, isDark);
+    }
     // The reflowing text edition is typeset from the bundled text —
     // no artwork to fetch, and no illuminated-frame special case.
     if (MushafSvgService.edition.isText) {
@@ -1404,7 +1429,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           color: Colors.white),
                       label: const Text('إعادة المحاولة',
                           style: TextStyle(
-                              color: Colors.white, fontFamily: '.SF Pro Text'))),
+                              color: Colors.white,
+                              fontFamily: '.SF Pro Text'))),
                 ]));
           }
           if (!snap.hasData) {
@@ -1446,6 +1472,406 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     );
   }
 
+  Widget _buildV2PageItem(int index, int base, bool isDark) {
+    final future = _v2Futures[index] ??= () async {
+      final first = await MushafV2Service.getPage(base);
+      if (!_wide || base + 1 > 604) return [first];
+      return [first, await MushafV2Service.getPage(base + 1)];
+    }();
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _setBars(!_barsVisible),
+      child: FutureBuilder<List<MushafV2Page>>(
+        future: future,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            final l = L10n.of(context);
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.font_download_off_rounded,
+                        size: 46, color: Colors.grey),
+                    const SizedBox(height: 12),
+                    Text(
+                      l.isArabic
+                          ? 'تعذّر تحميل خط صفحة المصحف. لن نعرض خطاً بديلاً غير مضبوط.'
+                          : 'The Mushaf page font could not be loaded. An unaligned fallback font will not be shown.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: '.SF Pro Text',
+                        height: 1.5,
+                        color: isDark
+                            ? AppColors.darkTextSec
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        MushafV2Service.getPage(base, retry: true);
+                        if (_wide && base + 1 <= 604) {
+                          MushafV2Service.getPage(base + 1, retry: true);
+                        }
+                        setState(() => _v2Futures.remove(index));
+                      },
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: Text(l.isArabic ? 'إعادة المحاولة' : 'Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          if (!snapshot.hasData) {
+            return Center(
+              child: CircularProgressIndicator(
+                color: isDark ? AppColors.darkPrimary : AppColors.primary,
+              ),
+            );
+          }
+
+          final pages = snapshot.data!;
+          final content = pages.length == 1
+              ? _buildV2Leaf(pages.first, isDark)
+              : Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    children: [
+                      Expanded(child: _buildV2Leaf(pages[1], isDark)),
+                      Container(
+                        width: 2,
+                        margin: const EdgeInsets.symmetric(vertical: 24),
+                        color: (isDark ? Colors.white : Colors.black)
+                            .withValues(alpha: 0.10),
+                      ),
+                      Expanded(child: _buildV2Leaf(pages[0], isDark)),
+                    ],
+                  ),
+                );
+          return SafeArea(child: content);
+        },
+      ),
+    );
+  }
+
+  Widget _buildV2Leaf(MushafV2Page page, bool isDark) {
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.shortestSide >= 600;
+    final isTabletLandscape = isTablet && size.width > size.height;
+    return LayoutBuilder(builder: (context, constraints) {
+      // Keep the familiar printed-page proportion on tablets in both
+      // orientations; phones retain their native full-width layout.
+      final leafWidth = !isTablet
+          ? constraints.maxWidth
+          : isTabletLandscape
+              ? math.min(constraints.maxWidth, constraints.maxHeight * 0.58)
+              : math.min(constraints.maxWidth, constraints.maxHeight * 0.72);
+      final layout = Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: _buildV2GlyphLayout(page, isDark),
+      );
+      return Center(
+        child: SizedBox(
+          width: leafWidth,
+          height: constraints.maxHeight,
+          child: _withPageFurniture(page.pageNumber, isDark, layout),
+        ),
+      );
+    });
+  }
+  /// Fits the authentic 15-line page as one unit. Width chooses one font
+  /// size for every ayah line; height only chooses the shared row spacing.
+  /// This is what keeps both screen edges filled on phones without creating
+  /// the independently scaled, ragged lines previously seen on real tablets.
+  Widget _buildV2GlyphLayout(MushafV2Page page, bool isDark) {
+    final ink = isDark ? AppColors.darkText : AppColors.textPrimary;
+    return LayoutBuilder(builder: (context, constraints) {
+      final lines = page.lines;
+      final rowCount = page.pageNumber <= 2 ? lines.length : 15;
+      final compactLandscape = _isLandscapeCompact(context);
+      final mediaSize = MediaQuery.of(context).size;
+      final isTablet = mediaSize.shortestSide >= 600;
+      final isOpeningPage = page.pageNumber <= 2;
+      final availableHeight = compactLandscape
+          ? constraints.maxWidth * 1.48
+          : constraints.maxHeight;
+      final contentHeight = isOpeningPage && !compactLandscape
+          ? availableHeight * (isTablet ? 0.72 : 0.80)
+          : availableHeight;
+      final usableWidth = (constraints.maxWidth - (isTablet ? 16 : 12))
+          .clamp(80.0, 2000.0);
+      final rowHeight = contentHeight / rowCount;
+
+      double measuredWidth(String text) {
+        final painter = TextPainter(
+          textDirection: TextDirection.rtl,
+          text: TextSpan(
+            text: text,
+            style: TextStyle(
+              fontFamily: page.fontFamily,
+              fontSize: 100,
+              height: 1,
+            ),
+          ),
+        )..layout();
+        return painter.width;
+      }
+
+      final ayahLines =
+          lines.where((line) => line.type == MushafV2LineType.ayah).toList();
+      final widest = ayahLines
+          .map((line) => measuredWidth(line.glyphs))
+          .fold<double>(1, (a, b) => a > b ? a : b);
+      final widthSize =
+          usableWidth * 100 / widest * (isTablet ? 0.91 : 0.94);
+      final heightSize = rowHeight * (isOpeningPage ? 0.78 : 0.88);
+      final fontSize = widthSize < heightSize ? widthSize : heightSize;
+
+      Widget lineWidget(MushafV2Line line) {
+        switch (line.type) {
+          case MushafV2LineType.surah:
+            return _buildV2HafsSurahFrame(
+                line, page, fontSize, isDark, ink);
+          case MushafV2LineType.basmala:
+            return SizedBox.expand(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: fontSize * 1.2),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    '\uFDFD',
+                    textAlign: TextAlign.center,
+                    textDirection: TextDirection.rtl,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontFamily: page.bismillahFontFamily,
+                      fontSize: fontSize * 1.65,
+                      height: 1,
+                      color: ink,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          case MushafV2LineType.ayah:
+            return _buildV2FixedLine(line, page, fontSize, isDark, ink);
+        }
+      }
+
+      final pageColumn = SizedBox(
+        height: contentHeight,
+        child: Column(
+          children: [
+            for (final line in lines)
+              SizedBox(
+                height: rowHeight,
+                width: double.infinity,
+                child: Center(child: lineWidget(line)),
+              ),
+          ],
+        ),
+      );
+      if (compactLandscape) {
+        return SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: pageColumn,
+        );
+      }
+      return isOpeningPage ? Center(child: pageColumn) : pageColumn;
+    });
+  }
+
+  Widget _buildV2HafsSurahFrame(MushafV2Line line, MushafV2Page page,
+      double fontSize, bool isDark, Color ink) {
+    final surahCode = line.surah!.toString().padLeft(3, '0');
+    final title = 'surah$surahCode surah-icon';
+    final titleSize = fontSize * 1.30;
+    return LayoutBuilder(builder: (context, constraints) {
+      final titlePainter = TextPainter(
+        textDirection: TextDirection.rtl,
+        text: TextSpan(
+          text: title,
+          style: TextStyle(
+            fontFamily: page.surahFontFamily,
+            fontSize: titleSize,
+            fontFeatures: const [FontFeature.enable('liga')],
+          ),
+        ),
+      )..layout(maxWidth: constraints.maxWidth * 0.68);
+      final inkHeight = constraints.maxHeight * 0.52;
+      final inkWidth = titlePainter.width.clamp(
+        inkHeight * 2.4,
+        constraints.maxWidth * 0.68,
+      );
+      final bannerWidth = constraints.maxWidth - 12;
+      final cartoucheWidth = math.min(
+        bannerWidth * 0.78,
+        math.max(inkWidth + inkHeight * 2.6, inkHeight * 5),
+      );
+      final titleBoxWidth = math.max(0.0, cartoucheWidth - inkHeight * 2.3);
+      final left = (constraints.maxWidth - inkWidth) / 2;
+      final top = (constraints.maxHeight - inkHeight) / 2;
+      final band = SurahHeaderBand(
+        surah: line.surah!,
+        page: 0,
+        top: top,
+        bottom: top + inkHeight,
+        left: left,
+        right: left + inkWidth,
+      );
+      return CustomPaint(
+        painter: SurahBannerPainter(
+          bands: [band],
+          scaleX: 1,
+          scaleY: 1,
+          isDark: isDark,
+          pageColor: _pageColor(isDark),
+        ),
+        child: Center(
+          child: SizedBox(
+            width: titleBoxWidth,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                textDirection: TextDirection.rtl,
+                maxLines: 1,
+                style: TextStyle(
+                  fontFamily: page.surahFontFamily,
+                  fontFeatures: const [FontFeature.enable('liga')],
+                  fontSize: titleSize,
+                  height: 1,
+                  color: ink,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _buildV2FixedLine(MushafV2Line line, MushafV2Page page,
+      double fontSize, bool isDark, Color ink) {
+    final children = <Widget>[];
+    for (var index = 0; index < line.words.length; index++) {
+      children.add(_buildV2Word(
+        line.words[index],
+        page,
+        fontSize,
+        isDark,
+        ink,
+        isJuzOpening: index == 0 && _isJuzStart(line.words[index]),
+      ));
+      if (line.centered && index + 1 < line.words.length) {
+        children.add(SizedBox(width: fontSize * 0.12));
+      }
+    }
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Row(
+        textDirection: TextDirection.rtl,
+        mainAxisSize: line.centered ? MainAxisSize.min : MainAxisSize.max,
+        mainAxisAlignment: line.centered
+            ? MainAxisAlignment.center
+            : MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: children,
+      ),
+    );
+  }
+
+  bool _isJuzStart(MushafV2Word word) {
+    const openings = <String>{
+      '1:1', '2:142', '2:253', '3:93', '4:24', '4:148', '5:82', '6:111',
+      '7:88', '8:41', '9:93', '11:6', '12:53', '15:1', '17:1', '18:75',
+      '21:1', '23:1', '25:21', '27:56', '29:46', '33:31', '36:28', '39:32',
+      '41:47', '46:1', '51:31', '58:1', '67:1', '78:1',
+    };
+    return openings.contains('${word.surah}:${word.ayah}');
+  }
+
+  Widget _buildV2Word(MushafV2Word word, MushafV2Page page, double fontSize,
+      bool isDark, Color ink, {required bool isJuzOpening}) {
+    final region = AyahHitRegion(
+      surahNumber: word.surah,
+      ayahNumber: word.ayah,
+      x: 0,
+      y: 0,
+      rings: const [],
+    );
+    final global = _regionGlobal(region);
+    final bookmark = _bookmarkFor(region);
+    final highlight = _highlightFor(region);
+    final playing = _playingGlobalAyah == global;
+
+    Color? background;
+    if (playing) {
+      background = (isDark ? AppColors.darkSecondary : AppColors.secondary)
+          .withValues(alpha: isDark ? 0.30 : 0.16);
+    } else if (bookmark != null) {
+      background = AppColors.highlight(bookmark.color)
+          .withValues(alpha: isDark ? 0.32 : 0.22);
+    } else if (highlight != null) {
+      background = AppColors.highlight(highlight.color)
+          .withValues(alpha: isDark ? 0.35 : 0.25);
+    }
+
+    Text glyphText(String glyph) => Text(
+          glyph,
+          textDirection: TextDirection.rtl,
+          maxLines: 1,
+          style: TextStyle(
+            fontFamily: page.fontFamily,
+            fontSize: fontSize,
+            height: 1,
+            color: word.isAyahEnd
+                ? (isDark ? const Color(0xFF82C8B5) : const Color(0xFF26705D))
+                : ink,
+          ),
+        );
+
+    final text = glyphText(word.glyph);
+    final codepoints = word.glyph.runes.toList();
+    final hasSplitJuzOrnament = isJuzOpening && codepoints.length > 1;
+    final content = word.isAyahEnd
+        ? SizedBox(
+            width: fontSize * 0.84,
+            height: fontSize,
+            child: FittedBox(fit: BoxFit.contain, child: text),
+          )
+        : hasSplitJuzOrnament
+            ? Directionality(
+                textDirection: TextDirection.rtl,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    glyphText(String.fromCharCode(codepoints.first)),
+                    SizedBox(width: fontSize * 0.22),
+                    glyphText(String.fromCharCodes(codepoints.skip(1))),
+                  ],
+                ),
+              )
+            : text;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPress: () => _showAyahOptions(region),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(3),
+        ),
+        child: content,
+      ),
+    );
+  }
   /// Floating top bar: back / page number / menu plus the juz-hizb and
   /// surah info strip — all overlaying the page, never resizing it.
   Widget _buildTopBar(bool isDark, Color bgColor, Color textColor) {
@@ -1484,8 +1910,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.1),
                         shape: BoxShape.circle),
-                    child: Icon(Icons.search_rounded,
-                        size: 16, color: textColor)),
+                    child:
+                        Icon(Icons.search_rounded, size: 16, color: textColor)),
                 onPressed: () {
                   // Scoped to the surah(s) shown on the CURRENT page —
                   // searching the Mushaf should search what's open, not
@@ -2312,19 +2738,16 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           ),
                         ),
                         Padding(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
                           child: Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(_formatDuration(position),
                                   style: TextStyle(
                                       fontSize: 11,
                                       color: subColor,
                                       fontFamily: '.SF Pro Text')),
-                              Text(
-                                  '-${_formatDuration(duration - position)}',
+                              Text('-${_formatDuration(duration - position)}',
                                   style: TextStyle(
                                       fontSize: 11,
                                       color: subColor,
@@ -2368,8 +2791,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   onPressed: audio.playPreviousAyah,
                 ),
                 Container(
-                  decoration: BoxDecoration(
-                      color: accent, shape: BoxShape.circle),
+                  decoration:
+                      BoxDecoration(color: accent, shape: BoxShape.circle),
                   child: IconButton(
                     icon: Icon(
                         audio.isPlaying
@@ -2506,8 +2929,7 @@ class _AyahMarkPainter extends CustomPainter {
         final b = path.getBounds();
         final r = (size.width * 0.008).clamp(1.6, 4.0);
         final c = Offset(b.right - r, b.top + r);
-        canvas.drawCircle(
-            c, r, Paint()..color = color.withValues(alpha: 0.95));
+        canvas.drawCircle(c, r, Paint()..color = color.withValues(alpha: 0.95));
         canvas.drawCircle(
             c,
             r,

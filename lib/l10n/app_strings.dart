@@ -50,8 +50,7 @@ class L10n {
 
   bool get isArabic => code == 'ar';
 
-  String call(String key) =>
-      _data[code]?[key] ?? _data['ar']![key] ?? key;
+  String call(String key) => _data[code]?[key] ?? _data['ar']![key] ?? key;
 
   /// Arabic-Indic digits for the Arabic UI, Western digits otherwise.
   String number(int n) {
@@ -76,49 +75,121 @@ class L10n {
 
   static const Map<String, List<String>> _weekdays = {
     'ar': [
-      'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس',
-      'الجمعة', 'السبت', 'الأحد',
+      'الاثنين',
+      'الثلاثاء',
+      'الأربعاء',
+      'الخميس',
+      'الجمعة',
+      'السبت',
+      'الأحد',
     ],
     'en': [
-      'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-      'Friday', 'Saturday', 'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
     ],
     'de': [
-      'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag',
-      'Freitag', 'Samstag', 'Sonntag',
+      'Montag',
+      'Dienstag',
+      'Mittwoch',
+      'Donnerstag',
+      'Freitag',
+      'Samstag',
+      'Sonntag',
     ],
   };
 
   static const Map<String, List<String>> _gregorianMonths = {
     'ar': [
-      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+      'يناير',
+      'فبراير',
+      'مارس',
+      'أبريل',
+      'مايو',
+      'يونيو',
+      'يوليو',
+      'أغسطس',
+      'سبتمبر',
+      'أكتوبر',
+      'نوفمبر',
+      'ديسمبر',
     ],
     'en': [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ],
     'de': [
-      'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
-      'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+      'Januar',
+      'Februar',
+      'März',
+      'April',
+      'Mai',
+      'Juni',
+      'Juli',
+      'August',
+      'September',
+      'Oktober',
+      'November',
+      'Dezember',
     ],
   };
 
   static const Map<String, List<String>> _hijriMonths = {
     'ar': [
-      'محرم', 'صفر', 'ربيع الأول', 'ربيع الآخر',
-      'جمادى الأولى', 'جمادى الآخرة', 'رجب', 'شعبان',
-      'رمضان', 'شوال', 'ذو القعدة', 'ذو الحجة',
+      'محرم',
+      'صفر',
+      'ربيع الأول',
+      'ربيع الآخر',
+      'جمادى الأولى',
+      'جمادى الآخرة',
+      'رجب',
+      'شعبان',
+      'رمضان',
+      'شوال',
+      'ذو القعدة',
+      'ذو الحجة',
     ],
     'en': [
-      'Muharram', 'Safar', 'Rabi al-Awwal', 'Rabi al-Thani',
-      'Jumada al-Ula', 'Jumada al-Akhira', 'Rajab', 'Shaban',
-      'Ramadan', 'Shawwal', 'Dhul-Qadah', 'Dhul-Hijjah',
+      'Muharram',
+      'Safar',
+      'Rabi al-Awwal',
+      'Rabi al-Thani',
+      'Jumada al-Ula',
+      'Jumada al-Akhira',
+      'Rajab',
+      'Shaban',
+      'Ramadan',
+      'Shawwal',
+      'Dhul-Qadah',
+      'Dhul-Hijjah',
     ],
     'de': [
-      'Muharram', 'Safar', 'Rabi al-Auwal', 'Rabi al-Thani',
-      'Dschumada al-Ula', 'Dschumada al-Achira', 'Radschab', 'Schaban',
-      'Ramadan', 'Schauwal', 'Dhul-Qada', 'Dhul-Hiddscha',
+      'Muharram',
+      'Safar',
+      'Rabi al-Auwal',
+      'Rabi al-Thani',
+      'Dschumada al-Ula',
+      'Dschumada al-Achira',
+      'Radschab',
+      'Schaban',
+      'Ramadan',
+      'Schauwal',
+      'Dhul-Qada',
+      'Dhul-Hiddscha',
     ],
   };
 
@@ -135,6 +206,7 @@ class L10n {
       'ayahResults': 'نتائج في الآيات',
       'lastRead': 'آخر ما قرأت',
       'prayerTimes': 'مواقيت الصلاة',
+      'backToTop': 'العودة إلى الأعلى',
       'chooseCity': 'اختر مدينتك لعرض مواقيت الصلاة',
       'settingsTitle': 'الإعدادات',
       'appearance': 'المظهر',
@@ -279,8 +351,10 @@ class L10n {
       'aboutPrayer': 'مواقيت الصلاة',
       'aboutFonts': 'الخطوط وتراخيصها',
       'aboutLicenses': 'تراخيص المكتبات المفتوحة',
-      'aboutBlurb': 'تطبيق لقراءة القرآن الكريم: المصحف بصفحاته كما هو مطبوع بعدة روايات، وقراءة متجاوبة تتكيّف مع الشاشة، مع التفسير والتلاوة الصوتية وألوان التجويد والفواصل والتمييزات ومتابعة الختمة ومواقيت الصلاة.',
-      'aboutOffline': 'نصّ القرآن كامل داخل التطبيق ويعمل دون اتصال. تُحفظ صفحات المصحف وخطوطه على جهازك بعد فتحها أول مرة، وكذلك التفاسير التي تختار تحميلها.',
+      'aboutBlurb':
+          'تطبيق لقراءة القرآن الكريم: المصحف بصفحاته كما هو مطبوع بعدة روايات، وقراءة متجاوبة تتكيّف مع الشاشة، مع التفسير والتلاوة الصوتية وألوان التجويد والفواصل والتمييزات ومتابعة الختمة ومواقيت الصلاة.',
+      'aboutOffline':
+          'نصّ القرآن كامل داخل التطبيق ويعمل دون اتصال. تُحفظ صفحات المصحف وخطوطه على جهازك بعد فتحها أول مرة، وكذلك التفاسير التي تختار تحميلها.',
       'mushafBg': 'لون صفحات المصحف',
       'bgParchment': 'ورقي',
       'bgYellow': 'أصفر فاتح',
@@ -312,6 +386,7 @@ class L10n {
       'ayahResults': 'Matches in ayah text',
       'lastRead': 'Continue reading',
       'prayerTimes': 'Prayer times',
+      'backToTop': 'Back to top',
       'chooseCity': 'Choose your city for prayer times',
       'settingsTitle': 'Settings',
       'appearance': 'Appearance',
@@ -360,7 +435,8 @@ class L10n {
       'clearStudyTitle': 'Clear saved study data',
       'clearStudyBody':
           'The saved i‘rab, morphology, meaning and qira’at for every ayah you have opened will be deleted. You will need to download them again when you reopen them.',
-      'tafsirSubtitleMobile': 'Download only what you need — each tafsir separately',
+      'tafsirSubtitleMobile':
+          'Download only what you need — each tafsir separately',
       'tafsirSubtitleWebOnly': 'Download is available on the mobile app only',
       'tafsirDownloadingLbl': 'Downloading…',
       'tafsirLoadedLbl': 'Downloaded',
@@ -393,7 +469,8 @@ class L10n {
       'resetKhatmaTitle': 'Restart khatma',
       'resetKhatmaBody': 'Start over from the beginning?',
       'reset': 'Restart',
-      'khatmaCongrats': 'Congratulations! You completed a khatma of the Holy Quran',
+      'khatmaCongrats':
+          'Congratulations! You completed a khatma of the Holy Quran',
       'khatmaAccept': 'May Allah accept it from you',
       'khatmaThanks': 'May Allah reward you',
       'ofThirtyJuz': 'of 30 juz',
@@ -456,8 +533,10 @@ class L10n {
       'aboutPrayer': 'Prayer times',
       'aboutFonts': 'Typefaces and their licences',
       'aboutLicenses': 'Open-source licences',
-      'aboutBlurb': 'A Quran reader: the Mushaf page by page as it is printed, in several riwayat, alongside a reflowing view that adapts to the screen — with tafsir, recitation, tajweed colouring, bookmarks, highlights, khatma tracking and prayer times.',
-      'aboutOffline': 'The whole Quran text ships inside the app and works with no connection. Mushaf pages and their fonts are kept on your device after you first open them, as is any tafsir you choose to download.',
+      'aboutBlurb':
+          'A Quran reader: the Mushaf page by page as it is printed, in several riwayat, alongside a reflowing view that adapts to the screen — with tafsir, recitation, tajweed colouring, bookmarks, highlights, khatma tracking and prayer times.',
+      'aboutOffline':
+          'The whole Quran text ships inside the app and works with no connection. Mushaf pages and their fonts are kept on your device after you first open them, as is any tafsir you choose to download.',
       'mushafBg': 'Mushaf page colour',
       'bgParchment': 'Parchment',
       'bgYellow': 'Light yellow',
@@ -489,6 +568,7 @@ class L10n {
       'ayahResults': 'Treffer im Verstext',
       'lastRead': 'Weiterlesen',
       'prayerTimes': 'Gebetszeiten',
+      'backToTop': 'Nach oben',
       'chooseCity': 'Stadt für Gebetszeiten wählen',
       'settingsTitle': 'Einstellungen',
       'appearance': 'Darstellung',
@@ -537,14 +617,16 @@ class L10n {
       'clearStudyTitle': 'Gespeicherte Studiendaten löschen',
       'clearStudyBody':
           'Die gespeicherten I‘rāb-, Morphologie-, Bedeutungs- und Qirā’āt-Daten aller geöffneten Verse werden gelöscht. Beim erneuten Öffnen müssen sie neu geladen werden.',
-      'tafsirSubtitleMobile': 'Lade nur, was du brauchst — jeden Tafsir einzeln',
+      'tafsirSubtitleMobile':
+          'Lade nur, was du brauchst — jeden Tafsir einzeln',
       'tafsirSubtitleWebOnly': 'Download nur in der Mobil-App verfügbar',
       'tafsirDownloadingLbl': 'Wird geladen…',
       'tafsirLoadedLbl': 'Geladen',
       'tafsirIncomplete': 'Unvollständiger Download — zum Fortsetzen tippen',
       'tafsirNotLoaded': 'Nicht geladen',
       'deletedTafsir': 'Tafsir gelöscht',
-      'tafsirDownloadError': 'Tafsir konnte nicht geladen werden, prüfe deine Verbindung',
+      'tafsirDownloadError':
+          'Tafsir konnte nicht geladen werden, prüfe deine Verbindung',
       'retry': 'Erneut versuchen',
       'stop': 'Stopp',
       'delete': 'Löschen',
@@ -557,10 +639,12 @@ class L10n {
       'clearBookmarksTitle': 'Lesezeichen löschen',
       'clearBookmarksBody': 'Alle Lesezeichen löschen?',
       'noBookmarks': 'Noch keine Lesezeichen',
-      'noBookmarksHint': 'Halte einen Vers beim Lesen gedrückt, um ein Lesezeichen zu speichern',
+      'noBookmarksHint':
+          'Halte einen Vers beim Lesen gedrückt, um ein Lesezeichen zu speichern',
       'deletedHighlight': 'Markierung gelöscht',
       'noHighlights': 'Noch keine Markierungen',
-      'noHighlightsHint': 'Halte einen Vers beim Lesen gedrückt, um ihn zu markieren',
+      'noHighlightsHint':
+          'Halte einen Vers beim Lesen gedrückt, um ihn zu markieren',
       'all': 'Alle',
       'colYellow': 'Gelb',
       'colGreen': 'Grün',
@@ -570,7 +654,8 @@ class L10n {
       'resetKhatmaTitle': 'Khatma neu starten',
       'resetKhatmaBody': 'Von vorne beginnen?',
       'reset': 'Neu starten',
-      'khatmaCongrats': 'Glückwunsch! Du hast eine Khatma des edlen Korans vollendet',
+      'khatmaCongrats':
+          'Glückwunsch! Du hast eine Khatma des edlen Korans vollendet',
       'khatmaAccept': 'Möge Allah es von dir annehmen',
       'khatmaThanks': 'Möge Allah dich belohnen',
       'ofThirtyJuz': 'von 30 Dschus',
@@ -633,8 +718,10 @@ class L10n {
       'aboutPrayer': 'Gebetszeiten',
       'aboutFonts': 'Schriften und ihre Lizenzen',
       'aboutLicenses': 'Open-Source-Lizenzen',
-      'aboutBlurb': 'Ein Koran-Leser: der Mushaf Seite für Seite wie gedruckt, in mehreren Riwayat, dazu eine mitfließende Ansicht, die sich dem Bildschirm anpasst — mit Tafsir, Rezitation, Tajweed-Farben, Lesezeichen, Markierungen, Khatma-Verfolgung und Gebetszeiten.',
-      'aboutOffline': 'Der gesamte Korantext ist in der App enthalten und funktioniert ohne Verbindung. Mushaf-Seiten und ihre Schriften bleiben nach dem ersten Öffnen auf dem Gerät, ebenso jeder Tafsir, den Sie herunterladen.',
+      'aboutBlurb':
+          'Ein Koran-Leser: der Mushaf Seite für Seite wie gedruckt, in mehreren Riwayat, dazu eine mitfließende Ansicht, die sich dem Bildschirm anpasst — mit Tafsir, Rezitation, Tajweed-Farben, Lesezeichen, Markierungen, Khatma-Verfolgung und Gebetszeiten.',
+      'aboutOffline':
+          'Der gesamte Korantext ist in der App enthalten und funktioniert ohne Verbindung. Mushaf-Seiten und ihre Schriften bleiben nach dem ersten Öffnen auf dem Gerät, ebenso jeder Tafsir, den Sie herunterladen.',
       'mushafBg': 'Farbe der Mushaf-Seiten',
       'bgParchment': 'Pergament',
       'bgYellow': 'Hellgelb',

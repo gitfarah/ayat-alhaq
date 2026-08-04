@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:quran_app_v1/services/mushaf_svg_service.dart';
 import 'package:quran_app_v1/services/quran_service.dart';
@@ -30,8 +33,8 @@ void main() {
 
     test('the Basmala is stripped from an opening ayah', () async {
       final page = await QuranService.ayahsOnPage(604);
-      final ikhlas = page.firstWhere(
-          (a) => a.surahNumber == 112 && a.numberInSurah == 1);
+      final ikhlas =
+          page.firstWhere((a) => a.surahNumber == 112 && a.numberInSurah == 1);
       expect(ikhlas.text, isNot(contains('بِسْمِ')));
       // ...but Al-Fatiha's first ayah IS the Basmala, so it stays.
       final fatiha = (await QuranService.ayahsOnPage(1)).first;
@@ -55,6 +58,35 @@ void main() {
       expect(MushafSvgService.edition.isText, isFalse);
     });
 
+    test('the 1421H Madinah edition is a live printed-page view', () {
+      MushafSvgService.setEdition('madinah1421');
+      expect(MushafSvgService.edition.isGlyph, isTrue);
+      expect(MushafSvgService.edition.isArtwork, isFalse);
+      expect(MushafSvgService.edition.isPrintedPage, isTrue);
+      expect(MushafSvgService.supportsFullOfflineDownload, isFalse);
+      MushafSvgService.setEdition('hafs');
+    });
+
+    test('the bundled QUL V2 layout contains all 604 pages', () async {
+      final raw = await rootBundle
+          .loadString('assets/quran/mushaf_v2_1421h_layout.json');
+      final pages = (jsonDecode(raw) as Map<String, dynamic>)['pages'] as List;
+      expect(pages.length, 604);
+      for (var index = 0; index < pages.length; index++) {
+        final page = pages[index] as Map<String, dynamic>;
+        expect(page['p'], index + 1);
+        final lines = page['l'] as List;
+        expect(lines, isNotEmpty, reason: 'page ${index + 1}');
+        expect(lines.length, lessThanOrEqualTo(15),
+            reason: 'page ${index + 1}');
+      }
+    });
+    test('the QUL surah-name ligature font is bundled', () async {
+      final font = await rootBundle.load('assets/fonts/qul_surah_name_v4.ttf');
+      expect(font.lengthInBytes, greaterThan(10000));
+      final basmala = await rootBundle.load('assets/fonts/qul_bismillah.ttf');
+      expect(basmala.lengthInBytes, greaterThan(3000));
+    });
     test('an unknown edition id falls back to Hafs', () {
       MushafSvgService.setEdition('nope');
       expect(MushafSvgService.edition.id, 'hafs');

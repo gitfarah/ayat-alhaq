@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Your location is used only to calculate accurate prayer times for your area. يُستخدم موقعك لحساب مواقيت الصلاة في منطقتك فقط.</string>
+	<string>Your location is used to calculate accurate prayer times and the Qiblah direction for your area. يُستخدم موقعك لحساب مواقيت الصلاة واتجاه القبلة في منطقتك.</string>
 	<!-- The app only ever asks for location while it is in use; this key
 	     exists because the location library also references the
 	     "always" API, which App Store validation requires a string for. -->
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Your location is used only while you are using the app, to calculate accurate prayer times for your area. It is never tracked in the background. يُستخدم موقعك أثناء استخدامك للتطبيق فقط لحساب مواقيت الصلاة في منطقتك، ولا يُتتبَّع في الخلفية.</string>
+	<string>Your location is used only while you are using the app, to calculate prayer times and the Qiblah direction. It is never tracked in the background. يُستخدم موقعك أثناء استخدام التطبيق فقط لحساب مواقيت الصلاة واتجاه القبلة، ولا يُتتبَّع في الخلفية.</string>
 	<!-- The app never records audio. This string is required because the
 	     audio-playback framework used for recitation references the
 	     microphone APIs of AVAudioSession. -->

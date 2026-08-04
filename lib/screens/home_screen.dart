@@ -8,10 +8,13 @@ import '../services/library_events.dart';
 import '../services/prayer_service.dart';
 import '../services/quran_service.dart';
 import '../services/settings_service.dart';
+import '../services/adhan_notification_service.dart';
 import '../theme.dart';
+import '../widgets/prayer_visuals.dart';
 import 'reader_screen.dart';
 import 'settings_screen.dart';
 import 'mushaf_svg_screen.dart';
+import 'prayer_tools_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,17 +33,37 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   String? _error;
   final _search = TextEditingController();
+  final _scrollController = ScrollController();
+  bool _showScrollToTop = false;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _load();
+  }
+
+  void _onScroll() {
+    final show = _scrollController.hasClients && _scrollController.offset > 360;
+    if (show != _showScrollToTop && mounted) {
+      setState(() => _showScrollToTop = show);
+    }
+  }
+
+  Future<void> _scrollToTop() async {
+    if (!_scrollController.hasClients) return;
+    await _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 480),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
     _search.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -340,13 +363,58 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      body: _loading
-          ? Center(
-              child:
-                  CircularProgressIndicator(color: theme.colorScheme.primary))
-          : _error != null
-              ? _buildError(theme)
-              : _buildScrollBody(s, isDark, theme),
+      body: Stack(children: [
+        Positioned.fill(
+          child: _loading
+              ? Center(
+                  child: CircularProgressIndicator(
+                      color: theme.colorScheme.primary))
+              : _error != null
+                  ? _buildError(theme)
+                  : _buildScrollBody(s, isDark, theme),
+        ),
+        PositionedDirectional(
+          end: 16,
+          bottom: 16,
+          child: IgnorePointer(
+            ignoring: !_showScrollToTop,
+            child: AnimatedScale(
+              scale: _showScrollToTop ? 1 : 0.72,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutBack,
+              child: AnimatedOpacity(
+                opacity: _showScrollToTop ? 1 : 0,
+                duration: const Duration(milliseconds: 180),
+                child: Semantics(
+                  key: const ValueKey('scrollToTopButton'),
+                  button: true,
+                  label: L10n.of(context)('backToTop'),
+                  child: Material(
+                    type: MaterialType.circle,
+                    color: AppColors.gold,
+                    elevation: 5,
+                    shadowColor:
+                        theme.colorScheme.primary.withValues(alpha: 0.24),
+                    child: InkWell(
+                      onTap: _scrollToTop,
+                      customBorder: const CircleBorder(),
+                      child: const SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: Icon(
+                          Icons.keyboard_arrow_up_rounded,
+                          size: 30,
+                          color: AppColors.primaryDark,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ]),
     );
   }
 
@@ -369,7 +437,7 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: _buildLastRead(s, isDark),
         ),
-      _PrayerTimesBanner(isDark: isDark),
+      _PrayerTimesWithTools(isDark: isDark),
       _buildSearch(isDark),
       Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
@@ -394,6 +462,7 @@ class _HomeScreenState extends State<HomeScreen> {
       color: theme.colorScheme.primary,
       onRefresh: _load,
       child: ListView.builder(
+        controller: _scrollController,
         padding: const EdgeInsets.only(bottom: 8),
         itemCount: headers.length + _filtered.length + ayahSection,
         itemBuilder: (_, i) {
@@ -761,13 +830,67 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: _load,
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             label: const Text('إعادة المحاولة',
-                style: TextStyle(fontFamily: '.SF Pro Text', color: Colors.white))),
+                style: TextStyle(
+                    fontFamily: '.SF Pro Text', color: Colors.white))),
       ]));
 }
 
 /// Today's five prayer times for the configured city, with the next
 /// upcoming prayer highlighted. Until a city is chosen it shows a
 /// one-tap prompt that opens the settings screen.
+class _PrayerTimesWithTools extends StatelessWidget {
+  final bool isDark;
+  const _PrayerTimesWithTools({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    return Stack(children: [
+      _PrayerTimesBanner(isDark: isDark),
+      Positioned(
+        left: 0,
+        top: 0,
+        bottom: 0,
+        child: Center(
+          child: Semantics(
+            button: true,
+            label: 'Prayer tools',
+            child: Material(
+              color: accent,
+              borderRadius:
+                  const BorderRadius.horizontal(right: Radius.circular(20)),
+              clipBehavior: Clip.antiAlias,
+              elevation: 2,
+              child: InkWell(
+                onTap: () => showPrayerTools(context),
+                child: SizedBox(
+                  width: 28,
+                  height: 72,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      3,
+                      (_) => Container(
+                        width: 7,
+                        height: 7,
+                        margin: const EdgeInsets.symmetric(vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ]);
+  }
+}
+
 class _PrayerTimesBanner extends StatefulWidget {
   final bool isDark;
   const _PrayerTimesBanner({required this.isDark});
@@ -781,22 +904,6 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
   String? _label;
   bool _loaded = false;
   String _lang = 'ar';
-
-  /// Sun-status colours per prayer (dawn → night), used for the icons.
-  static const List<IconData> _prayerIcons = [
-    Icons.wb_twilight_rounded, // Fajr — dawn
-    Icons.wb_sunny_rounded, // Dhuhr — high sun
-    Icons.wb_sunny_outlined, // Asr — afternoon sun
-    Icons.wb_twilight_rounded, // Maghrib — sunset (sun at the horizon)
-    Icons.nightlight_round, // Isha — night
-  ];
-  static const List<Color> _prayerColors = [
-    Color(0xFFEBA23B),
-    Color(0xFFF2B705),
-    Color(0xFFE08D2F),
-    Color(0xFFC85C2E),
-    Color(0xFF5B79A8),
-  ];
 
   @override
   void initState() {
@@ -832,6 +939,9 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
         _times = times;
         _loaded = true;
       });
+      if (times != null) {
+        await AdhanNotificationService.syncToday(times, _lang);
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() => _loaded = true); // Offline — hide quietly.
@@ -945,11 +1055,11 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
                           ? Border.all(color: accent.withValues(alpha: 0.35))
                           : null),
                   child: Column(children: [
-                    Icon(_prayerIcons[i],
+                    Icon(PrayerVisuals.icons[i],
                         size: 20,
                         color: i == next
                             ? accent
-                            : _prayerColors[i]
+                            : PrayerVisuals.colors[i]
                                 .withValues(alpha: isDark ? 0.9 : 1)),
                     const SizedBox(height: 5),
                     Text(_prayerName(l, i),

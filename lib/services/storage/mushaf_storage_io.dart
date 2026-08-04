@@ -87,7 +87,7 @@ class MushafFileStorage {
   static const bool supportsFullOfflineDownload = true;
 }
 
-/// Page-font bytes for the glyph-rendered editions (KFGQPC V1). Each
+/// Page-font bytes for the glyph-rendered KFGQPC V2 edition. Each
 /// page has its own font, so these are cached exactly like page
 /// artwork — fetched once, then read from disk.
 class MushafFontStorage {
@@ -100,7 +100,7 @@ class MushafFontStorage {
 
   static Future<Uint8List?> read(int page) async {
     try {
-      final f = File('${(await _dir()).path}/p$page.ttf');
+      final f = File('${(await _dir()).path}/v2_p$page.ttf');
       if (!await f.exists()) return null;
       return f.readAsBytes();
     } catch (_) {
@@ -110,7 +110,7 @@ class MushafFontStorage {
 
   static Future<void> write(int page, Uint8List bytes) async {
     try {
-      final f = File('${(await _dir()).path}/p$page.ttf');
+      final f = File('${(await _dir()).path}/v2_p$page.ttf');
       await f.writeAsBytes(bytes, flush: true);
     } catch (_) {
       // Caching is opportunistic; the font is already in memory.
@@ -121,7 +121,7 @@ class MushafFontStorage {
   /// truncated or otherwise unusable, so the next attempt refetches it.
   static Future<void> remove(int page) async {
     try {
-      final f = File('${(await _dir()).path}/p$page.ttf');
+      final f = File('${(await _dir()).path}/v2_p$page.ttf');
       if (await f.exists()) await f.delete();
     } catch (_) {}
   }

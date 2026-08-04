@@ -123,12 +123,20 @@ class MushafEdition {
   /// Nothing about it is downloadable or page-image based.
   final bool isText;
 
+  /// True for the live KFGQPC V2 1421H glyph layout.
+  final bool isGlyph;
+
   /// Whether this edition is fetched as SVG page artwork — the five
   /// riwayat. Guards every path that assumes page images.
-  bool get isArtwork => !isText;
+  bool get isArtwork => !isText && !isGlyph;
+
+  bool get isPrintedPage => isArtwork || isGlyph;
 
   const MushafEdition(this.id, this.nameAr, this.nameEn,
-      {this.hintAr = '', this.hintEn = '', this.isText = false});
+      {this.hintAr = '',
+      this.hintEn = '',
+      this.isText = false,
+      this.isGlyph = false});
 }
 
 class MushafSvgService {
@@ -147,6 +155,11 @@ class MushafSvgService {
     MushafEdition('douri', 'مصحف الدوري', 'Ad-Duri',
         hintAr: 'رواية الدوري عن أبي عمرو',
         hintEn: 'Riwayat ad-Dūrī ʿan Abī ʿAmr'),
+    MushafEdition(
+        'madinah1421', 'مصحف المدينة ١٤٢١ هـ', 'Midinah Musahf 1421 H',
+        hintAr: 'مصحف المدينة النبوية — طبعة ١٤٢١ هـ',
+        hintEn: 'Madinah page layout — 1421H print',
+        isGlyph: true),
     MushafEdition('text', 'نص متجاوب', 'Reflowing text',
         hintAr: 'يتكيّف مع التكبير وحجم الشاشة',
         hintEn: 'Reflows to the zoom level and screen size',
