@@ -53,4 +53,38 @@ void main() {
       expect(await QuranService.searchAyahs('زقزقزق'), isEmpty);
     });
   });
+
+  group('Ayah search scoped to a surah (Mushaf search)', () {
+    test('a word shared by many surahs only returns the scoped one',
+        () async {
+      // "الله" appears all over the Quran — unscoped it must span many
+      // surahs, scoped to Al-Fatiha it must not leave it.
+      final unscoped = await QuranService.searchAyahs('الله');
+      expect(unscoped.map((r) => r.surahNumber).toSet().length,
+          greaterThan(1));
+
+      final scoped =
+          await QuranService.searchAyahs('الله', surahNumbers: {1});
+      expect(scoped, isNotEmpty);
+      expect(scoped.map((r) => r.surahNumber).toSet(), {1});
+    });
+
+    test('a phrase from another surah is not found when scoped away',
+        () async {
+      // "الحمد لله رب العالمين" is Al-Fatiha 1:2 — searching only within
+      // Al-Baqara (surah 2) must not surface it.
+      final hits = await QuranService.searchAyahs('الحمد لله رب العالمين',
+          surahNumbers: {2});
+      expect(hits.any((r) => r.surahNumber == 1), isFalse);
+    });
+
+    test('a page spanning two short surahs scopes to both', () async {
+      final hits =
+          await QuranService.searchAyahs('قل', surahNumbers: {113, 114});
+      expect(hits, isNotEmpty);
+      for (final r in hits) {
+        expect({113, 114}, contains(r.surahNumber));
+      }
+    });
+  });
 }

@@ -1478,7 +1478,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                         size: 16, color: textColor)),
                 onPressed: () => Navigator.pop(context)),
             IconButton(
-                tooltip: 'البحث في الآيات',
+                tooltip: 'البحث في السورة',
                 icon: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
@@ -1486,8 +1486,21 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                         shape: BoxShape.circle),
                     child: Icon(Icons.search_rounded,
                         size: 16, color: textColor)),
-                onPressed: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const AyahSearchScreen()))),
+                onPressed: () {
+                  // Scoped to the surah(s) shown on the CURRENT page —
+                  // searching the Mushaf should search what's open, not
+                  // jump the reader out to an unrelated surah.
+                  final surahs = QuranPageMeta.surahsOnPage(_pageNum);
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => AyahSearchScreen(
+                                surahNumbers: surahs.toSet(),
+                                scopeLabel: surahs
+                                    .map((s) => QuranPageMeta.surahName(s))
+                                    .join(' — '),
+                              )));
+                }),
             Expanded(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -2337,8 +2350,20 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       color: audio.autoAdvance ? accent : subColor, size: 22),
                   onPressed: audio.toggleAutoAdvance,
                 ),
+                // This row sits in an RTL layout, so the FIRST child
+                // below lands on screen-RIGHT and the LAST on
+                // screen-LEFT — "previous" ends up right of the play
+                // button and "next" left of it, mirroring an LTR
+                // player's [prev][play][next] the way Arabic transport
+                // controls (and every RTL media app) present them. The
+                // chevrons must be mirrored too, or an icon pointing one
+                // way sits on the button that moves the OTHER way:
+                // "previous" (right side, going back toward where
+                // reading starts) shows the RIGHT-pointing chevrons, and
+                // "next" (left side, continuing onward) shows the
+                // LEFT-pointing ones.
                 IconButton(
-                  icon: Icon(Icons.fast_rewind_rounded,
+                  icon: Icon(Icons.fast_forward_rounded,
                       color: textColor, size: 30),
                   onPressed: audio.playPreviousAyah,
                 ),
@@ -2360,7 +2385,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.fast_forward_rounded,
+                  icon: Icon(Icons.fast_rewind_rounded,
                       color: textColor, size: 30),
                   onPressed: audio.playNextAyah,
                 ),

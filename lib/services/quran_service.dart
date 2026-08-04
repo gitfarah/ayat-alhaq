@@ -427,7 +427,12 @@ class QuranService {
   /// Full-text ayah search over the BUNDLED text — works offline.
   /// Both the query and the ayah text are reduced to bare letters, so
   /// plain keyboard input like "الرحمن" matches the vocalized text.
-  static Future<List<AyahSearchResult>> searchAyahs(String query) async {
+  ///
+  /// [surahNumbers], when given, restricts matches to just those surahs
+  /// (1-based) — used to scope the search to the surah(s) open in the
+  /// Mushaf instead of the whole Quran.
+  static Future<List<AyahSearchResult>> searchAyahs(String query,
+      {Set<int>? surahNumbers}) async {
     await _ensureLoaded();
     final normQuery =
         query.trim().split(RegExp(r'\s+')).map(_bareLetters).join(' ');
@@ -450,6 +455,7 @@ class QuranService {
 
     void collect(bool Function(String) matches) {
       for (var s = 0; s < _searchIndex!.length; s++) {
+        if (surahNumbers != null && !surahNumbers.contains(s + 1)) continue;
         final texts = _searchIndex![s];
         for (var i = 0; i < texts.length; i++) {
           final key = s * 1000 + i;

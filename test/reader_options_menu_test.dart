@@ -97,4 +97,36 @@ void main() {
     expect(find.textContaining('تلاوة'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+      'the options sheet lists actions in the same order as the Mushaf: '
+      'recitation, tafsir, bookmark, highlight, note (copy is a Reader-'
+      'only extra at the end)', (tester) async {
+    await tester.pumpWidget(host());
+    await settle(tester);
+
+    await tester.longPress(ayahLongPressFinder.first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final tiles = tester
+        .widgetList<ListTile>(find.descendant(
+            of: find.byType(BottomSheet), matching: find.byType(ListTile)))
+        .toList();
+    final titles = tiles.map((t) => (t.title as Text).data).toList();
+
+    expect(
+        titles,
+        [
+          'تشغيل التلاوة',
+          'التفسير',
+          'الفاصل',
+          'تمييز الآية',
+          'إضافة ملاحظة',
+          'نسخ الآية',
+        ],
+        reason: 'must match the Mushaf sheet\'s order — a reader jumping '
+            'between the two modes should find the same action in the '
+            'same place');
+  });
 }

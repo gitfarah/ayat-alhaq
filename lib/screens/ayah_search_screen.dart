@@ -10,9 +10,23 @@ import 'reader_screen.dart';
 /// Full-text search across all ayahs. Opened from the home screen's
 /// search box; tapping a result jumps straight to that ayah in the
 /// reader.
+///
+/// When opened from the Mushaf, [surahNumbers] scopes both the query
+/// and the results to the surah(s) shown on the current page — a page
+/// almost always holds one surah, but a few short surahs share a page,
+/// so this is a set rather than a single number. Surah-name matching is
+/// skipped in that mode: the reader is already inside a surah, and
+/// "find me this surah" makes no sense there.
 class AyahSearchScreen extends StatefulWidget {
   final String initialQuery;
-  const AyahSearchScreen({super.key, this.initialQuery = ''});
+  final Set<int>? surahNumbers;
+  final String? scopeLabel;
+  const AyahSearchScreen({
+    super.key,
+    this.initialQuery = '',
+    this.surahNumbers,
+    this.scopeLabel,
+  });
 
   @override
   State<AyahSearchScreen> createState() => _AyahSearchScreenState();
@@ -62,11 +76,16 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
       _error = null;
     });
     try {
+      final scoped = widget.surahNumbers;
       // Surah-name matches surface FIRST — typing a surah's name should
       // find the surah itself, not just ayahs containing those words.
+      // Skipped entirely when scoped to a surah already open in the
+      // Mushaf: there is nothing to "find" outside it.
       final results = await Future.wait([
-        QuranService.searchSurahs(q),
-        QuranService.searchAyahs(q),
+        scoped == null
+            ? QuranService.searchSurahs(q)
+            : Future.value(<Surah>[]),
+        QuranService.searchAyahs(q, surahNumbers: scoped),
       ]);
       if (!mounted || _controller.text.trim() != q) return;
       setState(() {
@@ -148,8 +167,12 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
     final isDark = context.watch<SettingsService>().isDarkIn(context);
     final subColor = isDark ? AppColors.darkTextSec : AppColors.textSecondary;
 
+    final scoped = widget.surahNumbers != null;
     return Scaffold(
-      appBar: AppBar(title: const Text('البحث في الآيات')),
+      appBar: AppBar(
+          title: Text(scoped
+              ? 'البحث في ${widget.scopeLabel ?? "السورة"}'
+              : 'البحث في الآيات')),
       body: Column(children: [
         Container(
           margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -183,7 +206,9 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                             isDark ? AppColors.darkText : AppColors.textPrimary,
                         fontFamily: '.SF Pro Text'),
                     decoration: InputDecoration(
-                        hintText: 'اكتب كلمة أو جزءاً من آية...',
+                        hintText: scoped
+                            ? 'اكتب كلمة أو جزءاً من آية في هذه السورة...'
+                            : 'اكتب كلمة أو جزءاً من آية...',
                         hintTextDirection: TextDirection.rtl,
                         hintStyle: TextStyle(
                             color: isDark

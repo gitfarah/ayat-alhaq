@@ -309,6 +309,83 @@ class _ReaderScreenState extends State<ReaderScreen>
     );
   }
 
+  /// Highlight-colour picker, opened behind its own "تمييز الآية" list
+  /// item — matching the Mushaf screen, which never shows the colour
+  /// row inline in the main options sheet.
+  void _showHighlightPicker(int ayahNumber) {
+    final isDark = context.read<SettingsService>().isDarkIn(context);
+    final l = L10n.of(context);
+    final existing = _getHL(ayahNumber);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(l('chooseHighlightColor'),
+                style: TextStyle(
+                    fontFamily: '.SF Pro Text',
+                    fontWeight: FontWeight.bold,
+                    color:
+                        isDark ? AppColors.darkText : AppColors.textPrimary)),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 50,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (existing != null)
+                    _Dot(
+                      name: 'none',
+                      color: Colors.grey.shade300,
+                      selected: false,
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await HighlightService.deleteHighlight(
+                            widget.surah.number, ayahNumber);
+                        await _refreshBookmarkAndHighlights();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(l('removedHighlight'))),
+                          );
+                        }
+                      },
+                    ),
+                  ...AppColors.highlights.entries.map(
+                    (e) => _Dot(
+                      name: e.key,
+                      color: e.value,
+                      selected: existing?.color == e.key,
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await HighlightService.addHighlight(Highlight(
+                          surahNumber: widget.surah.number,
+                          ayahNumber: ayahNumber,
+                          surahName: widget.surah.name,
+                          color: e.key,
+                          createdAt: DateTime.now(),
+                        ));
+                        await _refreshBookmarkAndHighlights();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(l('highlighted'))),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   Future<void> _copyAyah(String text, int n) async {
     await Clipboard.setData(
       ClipboardData(text: '${widget.surah.name} (${_ar(n)})\n$text'),
@@ -369,56 +446,6 @@ class _ReaderScreenState extends State<ReaderScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-              // Highlight color row
-              SizedBox(
-                height: 50,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    if (existing != null)
-                      _Dot(
-                        name: 'none',
-                        color: Colors.grey.shade300,
-                        selected: false,
-                        onTap: () async {
-                          Navigator.pop(context);
-                          await HighlightService.deleteHighlight(
-                              widget.surah.number, ayah.numberInSurah);
-                          await _refreshBookmarkAndHighlights();
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(l('removedHighlight'))),
-                            );
-                          }
-                        },
-                      ),
-                    ...AppColors.highlights.entries.map(
-                      (e) => _Dot(
-                        name: e.key,
-                        color: e.value,
-                        selected: existing?.color == e.key,
-                        onTap: () async {
-                          Navigator.pop(context);
-                          await HighlightService.addHighlight(Highlight(
-                            surahNumber: widget.surah.number,
-                            ayahNumber: ayah.numberInSurah,
-                            surahName: widget.surah.name,
-                            color: e.key,
-                            createdAt: DateTime.now(),
-                          ));
-                          await _refreshBookmarkAndHighlights();
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(l('highlighted'))),
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 8),
               // Play / pause recitation
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -451,6 +478,50 @@ class _ReaderScreenState extends State<ReaderScreen>
                   }
                 },
               ),
+              // Tafsir — same position as the Mushaf sheet: right after
+              // recitation, before the marking options.
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.menu_book_rounded,
+                    color: AppColors.primary),
+                title: Text(l('tafsir'),
+                    style: const TextStyle(fontFamily: '.SF Pro Text')),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showTafsir(ayah.numberInSurah, ayah.text);
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(
+                    _bookmarkFor(ayah.numberInSurah) != null
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_add_rounded,
+                    color: _bookmarkFor(ayah.numberInSurah) != null
+                        ? AppColors.highlight(
+                            _bookmarkFor(ayah.numberInSurah)!.color)
+                        : AppColors.primary),
+                title: Text(l('bookmark'),
+                    style: const TextStyle(fontFamily: '.SF Pro Text')),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showBookmarkPicker(ayah.numberInSurah);
+                },
+              ),
+              // Highlight ayah — opens its own colour picker, same as
+              // the bookmark tile above and as the Mushaf screen; the
+              // colours never show inline in this sheet.
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.draw_rounded,
+                    color: AppColors.secondary),
+                title: Text(l('highlightAyah'),
+                    style: const TextStyle(fontFamily: '.SF Pro Text')),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showHighlightPicker(ayah.numberInSurah);
+                },
+              ),
               // Note on this ayah — lives on the colour mark, so writing
               // one on an unmarked ayah marks it too.
               ListTile(
@@ -477,34 +548,6 @@ class _ReaderScreenState extends State<ReaderScreen>
                 onTap: () async {
                   Navigator.pop(context);
                   await _editNote(ayah);
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                    _bookmarkFor(ayah.numberInSurah) != null
-                        ? Icons.bookmark_rounded
-                        : Icons.bookmark_add_rounded,
-                    color: _bookmarkFor(ayah.numberInSurah) != null
-                        ? AppColors.highlight(
-                            _bookmarkFor(ayah.numberInSurah)!.color)
-                        : AppColors.primary),
-                title: Text(l('bookmark'),
-                    style: const TextStyle(fontFamily: '.SF Pro Text')),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showBookmarkPicker(ayah.numberInSurah);
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.menu_book_rounded,
-                    color: AppColors.primary),
-                title: Text(l('tafsir'),
-                    style: const TextStyle(fontFamily: '.SF Pro Text')),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showTafsir(ayah.numberInSurah, ayah.text);
                 },
               ),
               ListTile(

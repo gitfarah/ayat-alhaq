@@ -55,8 +55,17 @@ class AyahSheetHeader extends StatelessWidget {
           if (text != null && text.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
+              // Ornate Quranic brackets (﴿ ... ﴾) around the quoted
+              // verse — the convention printed Mushafs and tafsir pages
+              // use to set an ayah off from surrounding text. The bidi
+              // algorithm does not mirror these (they are already
+              // direction-correct glyphs), so source order is display
+              // order: written ﴿ first, ﴾ last, so that with RTL text
+              // direction ﴿ (the OPENING bracket, despite its Unicode
+              // name "ornate RIGHT parenthesis") lands on the right —
+              // where Arabic reading starts — and ﴾ closes on the left.
               child: Text(
-                text,
+                '﴿$text﴾',
                 textAlign: TextAlign.center,
                 textDirection: TextDirection.rtl,
                 // A few ayahs run for a whole page; the sheet shows the
