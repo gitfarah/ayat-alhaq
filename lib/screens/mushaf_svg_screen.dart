@@ -89,6 +89,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   List<Highlight> _highlights = [];
   QuranAudioService? _audioService;
   int? _lastFollowedAyah;
+  int? _searchTargetGlobalAyah;
 
   /// Whether the whole Mushaf is stored offline. Download itself is
   /// owned by MushafSvgService and survives leaving this screen.
@@ -194,12 +195,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     // offline by definition.
     if (MushafSvgService.edition.isGlyph) {
       final step = _wide ? 2 : 1;
-      MushafV2Service.preload(basePage + step);
-      MushafV2Service.preload(basePage + step + 1);
-      MushafV2Service.preload(basePage - 1);
+      final editionId = MushafSvgService.edition.id;
+      MushafV2Service.preload(basePage + step, editionId: editionId);
+      MushafV2Service.preload(basePage + step + 1, editionId: editionId);
+      MushafV2Service.preload(basePage - 1, editionId: editionId);
       final center = _indexForPage(basePage);
       _v2Futures.removeWhere((k, _) => (k - center).abs() > 3);
-      final cached = await MushafV2Service.isCached(basePage);
+      final cached =
+          await MushafV2Service.isCached(basePage, editionId: editionId);
       if (mounted) setState(() => _isCachedOffline = cached);
       return;
     }
@@ -662,10 +665,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// A small book icon standing for each edition, so the dropdown reads
   /// at a glance instead of by name alone.
   IconData _editionIcon(String id) => switch (id) {
+        'hafs' => Icons.auto_stories_rounded,
         'warsh' => Icons.import_contacts_rounded,
         'qalon' => Icons.collections_bookmark_rounded,
         'text' => Icons.format_size_rounded,
         'madinah1421' => Icons.auto_stories_rounded,
+        'madinah1405' => Icons.auto_stories_outlined,
         _ => Icons.menu_book_rounded,
       };
 
@@ -874,136 +879,136 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-              ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                      playingThis
-                          ? Icons.pause_circle_rounded
-                          : Icons.play_circle_rounded,
+                  ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                          playingThis
+                              ? Icons.pause_circle_rounded
+                              : Icons.play_circle_rounded,
                           color: isDark
                               ? AppColors.darkPrimary
                               : AppColors.primary),
-                  title: Text(
+                      title: Text(
                           playingThis
                               ? l('pauseRecitation')
                               : l('playRecitation'),
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                          fontFamily: '.SF Pro Text',
-                          color: isDark
-                              ? AppColors.darkText
-                              : AppColors.textPrimary)),
-                  onTap: () async {
-                    Navigator.pop(context);
-                    // First-ever playback: pick a reciter once; the
-                    // choice then sticks until changed on purpose.
-                    if (!mounted) return;
-                    final ok =
-                        await ensureReciterChosen(context, audio, isDark);
-                    if (!ok) return;
-                    await audio.togglePlayPause(globalAyah);
-                    // Playback failures only set audio.error — surface it.
-                    if (mounted && audio.error != null) {
+                          textDirection: TextDirection.rtl,
+                          style: TextStyle(
+                              fontFamily: '.SF Pro Text',
+                              color: isDark
+                                  ? AppColors.darkText
+                                  : AppColors.textPrimary)),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        // First-ever playback: pick a reciter once; the
+                        // choice then sticks until changed on purpose.
+                        if (!mounted) return;
+                        final ok =
+                            await ensureReciterChosen(context, audio, isDark);
+                        if (!ok) return;
+                        await audio.togglePlayPause(globalAyah);
+                        // Playback failures only set audio.error — surface it.
+                        if (mounted && audio.error != null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(audio.error!)));
-                    }
-                  }),
-              ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.menu_book_rounded,
+                        }
+                      }),
+                  ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.menu_book_rounded,
                           color: isDark
                               ? AppColors.darkPrimary
                               : AppColors.primary),
-                  title: Text(l('tafsir'),
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                          fontFamily: '.SF Pro Text',
-                          color: isDark
-                              ? AppColors.darkText
-                              : AppColors.textPrimary)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => TafsirScreen(
-                                  surahNumber: region.surahNumber,
-                                  surahName: _surahName(region.surahNumber),
-                                  ayahNumber: region.ayahNumber,
-                                )));
-                  }),
-              ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                      bookmark != null
-                          ? Icons.bookmark_rounded
-                          : Icons.bookmark_add_rounded,
-                      color: bookmark != null
-                          ? AppColors.highlight(bookmark.color)
-                          : (isDark
-                              ? AppColors.darkPrimary
-                              : AppColors.primary)),
-                  title: Text(l('bookmark'),
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                          fontFamily: '.SF Pro Text',
-                          color: isDark
-                              ? AppColors.darkText
-                              : AppColors.textPrimary)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showBookmarkPicker(region);
-                  }),
-              ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.draw_rounded,
-                      color: AppColors.secondary),
-                  title: Text(l('highlightAyah'),
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                          fontFamily: '.SF Pro Text',
-                          color: isDark
-                              ? AppColors.darkText
-                              : AppColors.textPrimary)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showHighlightPicker(region);
-                  }),
-              // Note on this ayah — lives on the colour mark, so writing
-              // one on an unmarked ayah marks it too.
-              ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                      existingHighlight?.hasNote == true
-                          ? Icons.sticky_note_2_rounded
-                          : Icons.note_add_outlined,
-                      color: AppColors.secondary),
-                  title: Text(
-                      existingHighlight?.hasNote == true
-                          ? l('editNote')
-                          : l('addNote'),
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                          fontFamily: '.SF Pro Text',
-                          color: isDark
-                              ? AppColors.darkText
-                              : AppColors.textPrimary)),
-                  subtitle: existingHighlight?.hasNote == true
-                      ? Text(existingHighlight!.note!,
+                      title: Text(l('tafsir'),
                           textDirection: TextDirection.rtl,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                               fontFamily: '.SF Pro Text',
-                              fontSize: 12,
                               color: isDark
-                                  ? AppColors.darkTextSec
-                                  : AppColors.textSecondary))
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _editNote(region);
-                  }),
+                                  ? AppColors.darkText
+                                  : AppColors.textPrimary)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => TafsirScreen(
+                                      surahNumber: region.surahNumber,
+                                      surahName: _surahName(region.surahNumber),
+                                      ayahNumber: region.ayahNumber,
+                                    )));
+                      }),
+                  ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                          bookmark != null
+                              ? Icons.bookmark_rounded
+                              : Icons.bookmark_add_rounded,
+                          color: bookmark != null
+                              ? AppColors.highlight(bookmark.color)
+                              : (isDark
+                                  ? AppColors.darkPrimary
+                                  : AppColors.primary)),
+                      title: Text(l('bookmark'),
+                          textDirection: TextDirection.rtl,
+                          style: TextStyle(
+                              fontFamily: '.SF Pro Text',
+                              color: isDark
+                                  ? AppColors.darkText
+                                  : AppColors.textPrimary)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showBookmarkPicker(region);
+                      }),
+                  ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.draw_rounded,
+                          color: AppColors.secondary),
+                      title: Text(l('highlightAyah'),
+                          textDirection: TextDirection.rtl,
+                          style: TextStyle(
+                              fontFamily: '.SF Pro Text',
+                              color: isDark
+                                  ? AppColors.darkText
+                                  : AppColors.textPrimary)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showHighlightPicker(region);
+                      }),
+                  // Note on this ayah — lives on the colour mark, so writing
+                  // one on an unmarked ayah marks it too.
+                  ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                          existingHighlight?.hasNote == true
+                              ? Icons.sticky_note_2_rounded
+                              : Icons.note_add_outlined,
+                          color: AppColors.secondary),
+                      title: Text(
+                          existingHighlight?.hasNote == true
+                              ? l('editNote')
+                              : l('addNote'),
+                          textDirection: TextDirection.rtl,
+                          style: TextStyle(
+                              fontFamily: '.SF Pro Text',
+                              color: isDark
+                                  ? AppColors.darkText
+                                  : AppColors.textPrimary)),
+                      subtitle: existingHighlight?.hasNote == true
+                          ? Text(existingHighlight!.note!,
+                              textDirection: TextDirection.rtl,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontFamily: '.SF Pro Text',
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? AppColors.darkTextSec
+                                      : AppColors.textSecondary))
+                          : null,
+                      onTap: () {
+                        Navigator.pop(context);
+                        _editNote(region);
+                      }),
                 ],
               ),
             ),
@@ -1473,10 +1478,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   }
 
   Widget _buildV2PageItem(int index, int base, bool isDark) {
+    final editionId = MushafSvgService.edition.id;
     final future = _v2Futures[index] ??= () async {
-      final first = await MushafV2Service.getPage(base);
+      final first = await MushafV2Service.getPage(base, editionId: editionId);
       if (!_wide || base + 1 > 604) return [first];
-      return [first, await MushafV2Service.getPage(base + 1)];
+      return [
+        first,
+        await MushafV2Service.getPage(base + 1, editionId: editionId),
+      ];
     }();
 
     return GestureDetector(
@@ -1512,9 +1521,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     const SizedBox(height: 14),
                     ElevatedButton.icon(
                       onPressed: () {
-                        MushafV2Service.getPage(base, retry: true);
+                        MushafV2Service.getPage(base,
+                            retry: true, editionId: editionId);
                         if (_wide && base + 1 <= 604) {
-                          MushafV2Service.getPage(base + 1, retry: true);
+                          MushafV2Service.getPage(base + 1,
+                              retry: true, editionId: editionId);
                         }
                         setState(() => _v2Futures.remove(index));
                       },
@@ -1584,6 +1595,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       );
     });
   }
+
   /// Fits the authentic 15-line page as one unit. Width chooses one font
   /// size for every ayah line; height only chooses the shared row spacing.
   /// This is what keeps both screen edges filled on phones without creating
@@ -1603,8 +1615,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       final contentHeight = isOpeningPage && !compactLandscape
           ? availableHeight * (isTablet ? 0.72 : 0.80)
           : availableHeight;
-      final usableWidth = (constraints.maxWidth - (isTablet ? 16 : 12))
-          .clamp(80.0, 2000.0);
+      final usableWidth =
+          (constraints.maxWidth - (isTablet ? 16 : 12)).clamp(80.0, 2000.0);
       final rowHeight = contentHeight / rowCount;
 
       double measuredWidth(String text) {
@@ -1627,16 +1639,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       final widest = ayahLines
           .map((line) => measuredWidth(line.glyphs))
           .fold<double>(1, (a, b) => a > b ? a : b);
-      final widthSize =
-          usableWidth * 100 / widest * (isTablet ? 0.91 : 0.94);
+      final widthSize = usableWidth * 100 / widest * (isTablet ? 0.91 : 0.94);
       final heightSize = rowHeight * (isOpeningPage ? 0.78 : 0.88);
       final fontSize = widthSize < heightSize ? widthSize : heightSize;
 
       Widget lineWidget(MushafV2Line line) {
         switch (line.type) {
           case MushafV2LineType.surah:
-            return _buildV2HafsSurahFrame(
-                line, page, fontSize, isDark, ink);
+            return _buildV2HafsSurahFrame(line, page, fontSize, isDark, ink);
           case MushafV2LineType.basmala:
             return SizedBox.expand(
               child: Padding(
@@ -1790,16 +1800,43 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
   bool _isJuzStart(MushafV2Word word) {
     const openings = <String>{
-      '1:1', '2:142', '2:253', '3:93', '4:24', '4:148', '5:82', '6:111',
-      '7:88', '8:41', '9:93', '11:6', '12:53', '15:1', '17:1', '18:75',
-      '21:1', '23:1', '25:21', '27:56', '29:46', '33:31', '36:28', '39:32',
-      '41:47', '46:1', '51:31', '58:1', '67:1', '78:1',
+      '1:1',
+      '2:142',
+      '2:253',
+      '3:93',
+      '4:24',
+      '4:148',
+      '5:82',
+      '6:111',
+      '7:88',
+      '8:41',
+      '9:93',
+      '11:6',
+      '12:53',
+      '15:1',
+      '17:1',
+      '18:75',
+      '21:1',
+      '23:1',
+      '25:21',
+      '27:56',
+      '29:46',
+      '33:31',
+      '36:28',
+      '39:32',
+      '41:47',
+      '46:1',
+      '51:31',
+      '58:1',
+      '67:1',
+      '78:1',
     };
     return openings.contains('${word.surah}:${word.ayah}');
   }
 
   Widget _buildV2Word(MushafV2Word word, MushafV2Page page, double fontSize,
-      bool isDark, Color ink, {required bool isJuzOpening}) {
+      bool isDark, Color ink,
+      {required bool isJuzOpening}) {
     final region = AyahHitRegion(
       surahNumber: word.surah,
       ayahNumber: word.ayah,
@@ -1811,9 +1848,10 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     final bookmark = _bookmarkFor(region);
     final highlight = _highlightFor(region);
     final playing = _playingGlobalAyah == global;
+    final searchTarget = _searchTargetGlobalAyah == global;
 
     Color? background;
-    if (playing) {
+    if (playing || searchTarget) {
       background = (isDark ? AppColors.darkSecondary : AppColors.secondary)
           .withValues(alpha: isDark ? 0.30 : 0.16);
     } else if (bookmark != null) {
@@ -1824,7 +1862,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           .withValues(alpha: isDark ? 0.35 : 0.25);
     }
 
-    Text glyphText(String glyph) => Text(
+    Text rawGlyph(String glyph) => Text(
           glyph,
           textDirection: TextDirection.rtl,
           maxLines: 1,
@@ -1837,6 +1875,49 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 : ink,
           ),
         );
+
+    Widget glyphText(String glyph) {
+      final text = rawGlyph(glyph);
+      if (!isDark || !page.usesColorFont) return text;
+
+      // KFGQPC V4 is a COLR font: its embedded black palette ignores
+      // TextStyle.color. Lay the original Tajweed colors over a white glyph
+      // silhouette, making black pixels transparent in the colored layer.
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          ColorFiltered(
+            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+            child: rawGlyph(glyph),
+          ),
+          ColorFiltered(
+            colorFilter: const ColorFilter.matrix(<double>[
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              1,
+              1,
+              1,
+              0,
+              0,
+            ]),
+            child: text,
+          ),
+        ],
+      );
+    }
 
     final text = glyphText(word.glyph);
     final codepoints = word.glyph.runes.toList();
@@ -1872,6 +1953,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       ),
     );
   }
+
   /// Floating top bar: back / page number / menu plus the juz-hizb and
   /// surah info strip — all overlaying the page, never resizing it.
   Widget _buildTopBar(bool isDark, Color bgColor, Color textColor) {
@@ -1912,12 +1994,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                         shape: BoxShape.circle),
                     child:
                         Icon(Icons.search_rounded, size: 16, color: textColor)),
-                onPressed: () {
-                  // Scoped to the surah(s) shown on the CURRENT page —
-                  // searching the Mushaf should search what's open, not
-                  // jump the reader out to an unrelated surah.
+                onPressed: () async {
+                  // Mushaf search returns its result to this page view. It
+                  // must never open ReaderScreen or change the chosen edition.
                   final surahs = QuranPageMeta.surahsOnPage(_pageNum);
-                  Navigator.push(
+                  final result = await Navigator.push<AyahSearchResult>(
                       context,
                       MaterialPageRoute(
                           builder: (_) => AyahSearchScreen(
@@ -1925,7 +2006,16 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                                 scopeLabel: surahs
                                     .map((s) => QuranPageMeta.surahName(s))
                                     .join(' — '),
+                                returnResultToCaller: true,
                               )));
+                  if (!mounted || result == null) return;
+                  final global = await QuranService.globalAyahNumber(
+                      result.surahNumber, result.numberInSurah);
+                  if (global == 0) return;
+                  final page = await QuranService.pageOfGlobalAyah(global);
+                  if (!mounted) return;
+                  setState(() => _searchTargetGlobalAyah = global);
+                  _loadPage(page);
                 }),
             Expanded(
               child: Row(
@@ -2339,9 +2429,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     final highlight = _highlightFor(region);
     final playing = _playingGlobalAyah != null &&
         _regionGlobal(region) == _playingGlobalAyah;
+    final searchTarget = _searchTargetGlobalAyah != null &&
+        _regionGlobal(region) == _searchTargetGlobalAyah;
 
     Color? bg;
-    if (playing) {
+    if (playing || searchTarget) {
       bg = (isDark ? AppColors.darkSecondary : AppColors.secondary)
           .withValues(alpha: isDark ? 0.30 : 0.16);
     } else if (bookmark != null) {
@@ -2583,6 +2675,13 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         if (r.ayahNumber > 0 && r.surahNumber > 0)
           if (identical(r, _flashRegion))
             (r, lit.withValues(alpha: (1 - _flashCtrl.value) * 0.40), false)
+          else if (_searchTargetGlobalAyah != null &&
+              _regionGlobal(r) == _searchTargetGlobalAyah)
+            (
+              r,
+              AppColors.gold.withValues(alpha: isDark ? 0.34 : 0.22),
+              _highlightFor(r)?.hasNote ?? false
+            )
           else if (_playingGlobalAyah != null &&
               _regionGlobal(r) == _playingGlobalAyah)
             (

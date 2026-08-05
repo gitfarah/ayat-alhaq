@@ -123,7 +123,7 @@ class MushafEdition {
   /// Nothing about it is downloadable or page-image based.
   final bool isText;
 
-  /// True for the live KFGQPC V2 1421H glyph layout.
+  /// True for a live KFGQPC page-glyph layout.
   final bool isGlyph;
 
   /// Whether this edition is fetched as SVG page artwork — the five
@@ -143,9 +143,21 @@ class MushafSvgService {
   /// The editions offered in the app. The three riwayat share the
   /// `kfqc` page layout; `text` is not artwork at all (see [isText]).
   static const List<MushafEdition> editions = [
-    MushafEdition('hafs', 'مصحف حفص', 'Hafs',
-        hintAr: 'الرسم العثماني — التخطيط الأصلي',
-        hintEn: 'Uthmani script — original page layout'),
+    MushafEdition(
+        'hafs', 'مصحف المدينة حفص ١٤٤١ هـ', 'Midinah Hafs Musahf 1441 H',
+        hintAr: 'مصحف المدينة النبوية — طبعة ١٤٤١ هـ',
+        hintEn: 'KFGQPC V4 page layout — 1441H print',
+        isGlyph: true),
+    MushafEdition(
+        'madinah1421', 'مصحف المدينة ١٤٢١ هـ', 'Midinah Musahf 1421 H',
+        hintAr: 'مصحف المدينة النبوية — طبعة ١٤٢١ هـ',
+        hintEn: 'KFGQPC V2 page layout — 1421H print',
+        isGlyph: true),
+    MushafEdition(
+        'madinah1405', 'مصحف المدينة حفص ١٤٠٥ هـ', 'Midinah Hafs Musahf 1405 H',
+        hintAr: 'مصحف المدينة النبوية — طبعة ١٤٠٥ هـ',
+        hintEn: 'KFGQPC V1 page layout — 1405H print',
+        isGlyph: true),
     MushafEdition('warsh', 'مصحف ورش', 'Warsh',
         hintAr: 'رواية ورش عن نافع', hintEn: 'Riwayat Warsh ʿan Nāfiʿ'),
     MushafEdition('qalon', 'مصحف قالون', 'Qalon',
@@ -155,17 +167,11 @@ class MushafSvgService {
     MushafEdition('douri', 'مصحف الدوري', 'Ad-Duri',
         hintAr: 'رواية الدوري عن أبي عمرو',
         hintEn: 'Riwayat ad-Dūrī ʿan Abī ʿAmr'),
-    MushafEdition(
-        'madinah1421', 'مصحف المدينة ١٤٢١ هـ', 'Midinah Musahf 1421 H',
-        hintAr: 'مصحف المدينة النبوية — طبعة ١٤٢١ هـ',
-        hintEn: 'Madinah page layout — 1421H print',
-        isGlyph: true),
     MushafEdition('text', 'نص متجاوب', 'Reflowing text',
         hintAr: 'يتكيّف مع التكبير وحجم الشاشة',
         hintEn: 'Reflows to the zoom level and screen size',
         isText: true),
   ];
-
   static const String _repo =
       'https://raw.githubusercontent.com/quranpedia/quran-svg/main/mushafs';
 

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/surah.dart';
@@ -21,11 +21,13 @@ class AyahSearchScreen extends StatefulWidget {
   final String initialQuery;
   final Set<int>? surahNumbers;
   final String? scopeLabel;
+  final bool returnResultToCaller;
   const AyahSearchScreen({
     super.key,
     this.initialQuery = '',
     this.surahNumbers,
     this.scopeLabel,
+    this.returnResultToCaller = false,
   });
 
   @override
@@ -82,9 +84,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
       // Skipped entirely when scoped to a surah already open in the
       // Mushaf: there is nothing to "find" outside it.
       final results = await Future.wait([
-        scoped == null
-            ? QuranService.searchSurahs(q)
-            : Future.value(<Surah>[]),
+        scoped == null ? QuranService.searchSurahs(q) : Future.value(<Surah>[]),
         QuranService.searchAyahs(q, surahNumbers: scoped),
       ]);
       if (!mounted || _controller.text.trim() != q) return;
@@ -105,6 +105,10 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
   }
 
   Future<void> _open(AyahSearchResult r) async {
+    if (widget.returnResultToCaller) {
+      Navigator.pop(context, r);
+      return;
+    }
     try {
       final surahs = await QuranService.getAllSurahs();
       final surah = surahs.firstWhere((s) => s.number == r.surahNumber);
@@ -133,10 +137,9 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: primary.withValues(alpha: 0.55))),
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => ReaderScreen(surah: s))),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        onTap: () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => ReaderScreen(surah: s))),
         leading: Icon(Icons.menu_book_rounded, color: primary, size: 22),
         title: Text(s.name,
             textAlign: TextAlign.right,
@@ -189,11 +192,9 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                     height: 18,
                     child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: isDark
-                            ? AppColors.darkPrimary
-                            : AppColors.primary))
-                : Icon(Icons.search_rounded,
-                    color: Colors.grey[400], size: 20),
+                        color:
+                            isDark ? AppColors.darkPrimary : AppColors.primary))
+                : Icon(Icons.search_rounded, color: Colors.grey[400], size: 20),
             const SizedBox(width: 10),
             Expanded(
                 child: TextField(
@@ -238,7 +239,8 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
           child: _error != null
               ? Center(
                   child: Text(_error!,
-                      style: TextStyle(color: subColor, fontFamily: '.SF Pro Text')))
+                      style: TextStyle(
+                          color: subColor, fontFamily: '.SF Pro Text')))
               : (_searchedOnce &&
                       _results.isEmpty &&
                       _surahResults.isEmpty &&
@@ -260,9 +262,8 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                         return Container(
                           margin: const EdgeInsets.only(bottom: 10),
                           decoration: BoxDecoration(
-                              color: isDark
-                                  ? AppColors.darkSurface
-                                  : Colors.white,
+                              color:
+                                  isDark ? AppColors.darkSurface : Colors.white,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
                                   color: isDark

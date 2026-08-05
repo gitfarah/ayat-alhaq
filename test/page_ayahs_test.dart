@@ -58,6 +58,16 @@ void main() {
       expect(MushafSvgService.edition.isText, isFalse);
     });
 
+    test('V4 Hafs, V2 1421H and V1 1405H lead the menu', () {
+      expect(MushafSvgService.editions[0].id, 'hafs');
+      expect(MushafSvgService.editions[0].nameEn, 'Midinah Hafs Musahf 1441 H');
+      expect(MushafSvgService.editions[0].isGlyph, isTrue);
+      expect(MushafSvgService.editions[1].id, 'madinah1421');
+      expect(MushafSvgService.editions[1].isGlyph, isTrue);
+      expect(MushafSvgService.editions[2].id, 'madinah1405');
+      expect(MushafSvgService.editions[2].nameEn, 'Midinah Hafs Musahf 1405 H');
+      expect(MushafSvgService.editions[2].isGlyph, isTrue);
+    });
     test('the 1421H Madinah edition is a live printed-page view', () {
       MushafSvgService.setEdition('madinah1421');
       expect(MushafSvgService.edition.isGlyph, isTrue);
@@ -67,6 +77,37 @@ void main() {
       MushafSvgService.setEdition('hafs');
     });
 
+    test('the 1405H Madinah edition is a live printed-page view', () {
+      MushafSvgService.setEdition('madinah1405');
+      expect(MushafSvgService.edition.isGlyph, isTrue);
+      expect(MushafSvgService.edition.isArtwork, isFalse);
+      expect(MushafSvgService.edition.isPrintedPage, isTrue);
+      expect(MushafSvgService.supportsFullOfflineDownload, isFalse);
+      MushafSvgService.setEdition('hafs');
+    });
+    test('the bundled QUL V4 layout contains all 604 pages and ayah ends',
+        () async {
+      final raw = await rootBundle
+          .loadString('assets/quran/mushaf_v4_1441h_layout.json');
+      final pages = (jsonDecode(raw) as Map<String, dynamic>)['pages'] as List;
+      expect(pages.length, 604);
+      var ayahEnds = 0;
+      for (var index = 0; index < pages.length; index++) {
+        final page = pages[index] as Map<String, dynamic>;
+        expect(page['p'], index + 1);
+        final lines = page['l'] as List;
+        expect(lines, isNotEmpty, reason: 'page ${index + 1}');
+        expect(lines.length, lessThanOrEqualTo(15),
+            reason: 'page ${index + 1}');
+        for (final line in lines.cast<Map<String, dynamic>>()) {
+          for (final word in (line['w'] as List? ?? const [])) {
+            final values = word as List;
+            if (values.length > 2 && values[2] == 1) ayahEnds++;
+          }
+        }
+      }
+      expect(ayahEnds, 6236);
+    });
     test('the bundled QUL V2 layout contains all 604 pages', () async {
       final raw = await rootBundle
           .loadString('assets/quran/mushaf_v2_1421h_layout.json');
@@ -80,6 +121,29 @@ void main() {
         expect(lines.length, lessThanOrEqualTo(15),
             reason: 'page ${index + 1}');
       }
+    });
+    test('the bundled QUL V1 layout contains all 604 pages and ayah ends',
+        () async {
+      final raw = await rootBundle
+          .loadString('assets/quran/mushaf_v1_1405h_layout.json');
+      final pages = (jsonDecode(raw) as Map<String, dynamic>)['pages'] as List;
+      expect(pages.length, 604);
+      var ayahEnds = 0;
+      for (var index = 0; index < pages.length; index++) {
+        final page = pages[index] as Map<String, dynamic>;
+        expect(page['p'], index + 1);
+        final lines = page['l'] as List;
+        expect(lines, isNotEmpty, reason: 'page ${index + 1}');
+        expect(lines.length, lessThanOrEqualTo(15),
+            reason: 'page ${index + 1}');
+        for (final line in lines.cast<Map<String, dynamic>>()) {
+          for (final word in (line['w'] as List? ?? const [])) {
+            final values = word as List;
+            if (values.length > 2 && values[2] == 1) ayahEnds++;
+          }
+        }
+      }
+      expect(ayahEnds, 6236);
     });
     test('the QUL surah-name ligature font is bundled', () async {
       final font = await rootBundle.load('assets/fonts/qul_surah_name_v4.ttf');

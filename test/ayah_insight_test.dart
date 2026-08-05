@@ -75,6 +75,15 @@ void main() {
       expect(parts.single.text, 'قرأ ابن كثير بالتشديد');
     });
 
+    test('source @ record separators become clean line breaks', () {
+      final parts = AyahInsightService.qiraatSegments(
+        '@reader one/reading one.@reader two/reading two.',
+      );
+      expect(parts, hasLength(1));
+      expect(parts.single.text,
+          'reader one/reading one.\nreader two/reading two.');
+      expect(parts.single.text, isNot(contains('@')));
+    });
     test('a marker with nothing after it adds no empty segment', () {
       final parts =
           AyahInsightService.qiraatSegments('نص\n---{عند الوصل}---\n   ');

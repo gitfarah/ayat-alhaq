@@ -33,44 +33,43 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: Directionality(
         textDirection: TextDirection.ltr,
         child: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.navBar,
-          border: Border(
-              top: BorderSide(color: AppColors.gold, width: 1.2)),
+          decoration: const BoxDecoration(
+            color: AppColors.navBar,
+            border: Border(top: BorderSide(color: AppColors.gold, width: 1.2)),
+          ),
+          child: BottomNavigationBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            type: BottomNavigationBarType.fixed,
+            selectedItemColor: AppColors.gold,
+            unselectedItemColor: const Color(0xFFB6C7BC),
+            selectedLabelStyle: const TextStyle(
+                fontFamily: '.SF Pro Text',
+                fontWeight: FontWeight.bold,
+                fontSize: 13),
+            unselectedLabelStyle:
+                const TextStyle(fontFamily: '.SF Pro Text', fontSize: 12),
+            currentIndex: _idx,
+            onTap: (i) => setState(() => _idx = i),
+            items: [
+              BottomNavigationBarItem(
+                  icon: const Icon(Icons.draw_rounded),
+                  label: t('tabHighlights')),
+              BottomNavigationBarItem(
+                  icon: const Icon(Icons.bookmark_border_rounded),
+                  activeIcon: const Icon(Icons.bookmark_rounded),
+                  label: t('tabBookmarks')),
+              BottomNavigationBarItem(
+                  icon: const Icon(Icons.check_circle_outline_rounded),
+                  activeIcon: const Icon(Icons.check_circle_rounded),
+                  label: t('tabKhatma')),
+              BottomNavigationBarItem(
+                  icon: const Icon(Icons.menu_book_outlined),
+                  activeIcon: const Icon(Icons.menu_book_rounded),
+                  label: t('tabIndex')),
+            ],
+          ),
         ),
-        child: BottomNavigationBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: AppColors.gold,
-          unselectedItemColor: const Color(0xFFB6C7BC),
-          selectedLabelStyle: const TextStyle(
-              fontFamily: '.SF Pro Text',
-              fontWeight: FontWeight.bold,
-              fontSize: 13),
-          unselectedLabelStyle: const TextStyle(
-              fontFamily: '.SF Pro Text', fontSize: 12),
-          currentIndex: _idx,
-          onTap: (i) => setState(() => _idx = i),
-          items: [
-            BottomNavigationBarItem(
-                icon: const Icon(Icons.highlight_rounded),
-                label: t('tabHighlights')),
-            BottomNavigationBarItem(
-                icon: const Icon(Icons.bookmark_border_rounded),
-                activeIcon: const Icon(Icons.bookmark_rounded),
-                label: t('tabBookmarks')),
-            BottomNavigationBarItem(
-                icon: const Icon(Icons.check_circle_outline_rounded),
-                activeIcon: const Icon(Icons.check_circle_rounded),
-                label: t('tabKhatma')),
-            BottomNavigationBarItem(
-                icon: const Icon(Icons.menu_book_outlined),
-                activeIcon: const Icon(Icons.menu_book_rounded),
-                label: t('tabIndex')),
-          ],
-        ),
-      ),
       ),
     );
   }

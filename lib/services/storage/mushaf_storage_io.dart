@@ -87,7 +87,7 @@ class MushafFileStorage {
   static const bool supportsFullOfflineDownload = true;
 }
 
-/// Page-font bytes for the glyph-rendered KFGQPC V2 edition. Each
+/// Page-font bytes for the glyph-rendered KFGQPC editions. Each
 /// page has its own font, so these are cached exactly like page
 /// artwork — fetched once, then read from disk.
 class MushafFontStorage {
@@ -98,9 +98,9 @@ class MushafFontStorage {
     return dir;
   }
 
-  static Future<Uint8List?> read(int page) async {
+  static Future<Uint8List?> read(String edition, int page) async {
     try {
-      final f = File('${(await _dir()).path}/v2_p$page.ttf');
+      final f = File('${(await _dir()).path}/${edition}_p$page.ttf');
       if (!await f.exists()) return null;
       return f.readAsBytes();
     } catch (_) {
@@ -108,9 +108,9 @@ class MushafFontStorage {
     }
   }
 
-  static Future<void> write(int page, Uint8List bytes) async {
+  static Future<void> write(String edition, int page, Uint8List bytes) async {
     try {
-      final f = File('${(await _dir()).path}/v2_p$page.ttf');
+      final f = File('${(await _dir()).path}/${edition}_p$page.ttf');
       await f.writeAsBytes(bytes, flush: true);
     } catch (_) {
       // Caching is opportunistic; the font is already in memory.
@@ -119,9 +119,9 @@ class MushafFontStorage {
 
   /// Drops one page's cached font — used when the file turns out to be
   /// truncated or otherwise unusable, so the next attempt refetches it.
-  static Future<void> remove(int page) async {
+  static Future<void> remove(String edition, int page) async {
     try {
-      final f = File('${(await _dir()).path}/v2_p$page.ttf');
+      final f = File('${(await _dir()).path}/${edition}_p$page.ttf');
       if (await f.exists()) await f.delete();
     } catch (_) {}
   }

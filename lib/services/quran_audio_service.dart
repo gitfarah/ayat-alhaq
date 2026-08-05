@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -22,10 +23,31 @@ import '../models/quran_page_meta.dart';
 /// pulled down in the background — so auto-advance is gapless and
 /// replays work offline. Playback continues when the screen locks or
 /// the app is backgrounded, with a system now-playing control.
+class _QulAyahClip {
+  final String audioUrl;
+  final Duration start;
+  final Duration end;
+
+  const _QulAyahClip({
+    required this.audioUrl,
+    required this.start,
+    required this.end,
+  });
+}
+
+class _QulSurahAudio {
+  final String audioUrl;
+  final Map<int, (int startMs, int endMs)> ayahs;
+
+  const _QulSurahAudio({required this.audioUrl, required this.ayahs});
+}
+
 class QuranAudioService extends ChangeNotifier {
   final AudioPlayer _player = AudioPlayer();
 
   static const Map<String, String> reciters = {
+    'qul.mansouralsalimi': 'منصور السالمي',
+    'qul.abdurrashidsufi.kisai': 'عبد الرشيد صوفي',
     'ar.mahermuaiqly': 'ماهر المعيقلي',
     'ar.husary': 'محمود خليل الحصري',
     'ar.abdulsamad': 'عبدالباسط عبدالصمد',
@@ -54,7 +76,15 @@ class QuranAudioService extends ChangeNotifier {
     'ar.mahmoudalbanna': 'mahmoud_ali_al_banna_32kbps',
   };
 
+  static const String _mansourReciter = 'qul.mansouralsalimi';
+  static const String _abdurRashidReciter = 'qul.abdurrashidsufi.kisai';
   static const String _defaultReciter = 'ar.mahermuaiqly';
+  static final Map<int, Future<_QulSurahAudio?>> _mansourSurahFutures = {};
+  static Future<(Map<String, dynamic>, Map<String, dynamic>)>?
+      _mansourDataFuture;
+  final Map<int, Future<File?>> _mansourDownloadFutures = {};
+  static Future<Map<String, dynamic>>? _abdurRashidDataFuture;
+  final Map<int, Future<File?>> _abdurRashidDownloadFutures = {};
 
   String _reciter = _defaultReciter;
   String get reciter => _reciter;
@@ -103,11 +133,56 @@ class QuranAudioService extends ChangeNotifier {
   /// Exposed as a STREAM rather than as ChangeNotifier state on purpose:
   /// it fires many times a second, and only the word-highlight cares. A
   /// notifyListeners() at that rate would rebuild every reading screen.
-  Stream<Duration> get positionStream => _player.positionStream;
+  Duration? _manualClipStart;
+  Duration? _manualClipEnd;
+  StreamSubscription<Duration>? _manualClipSubscription;
+
+  Stream<Duration> get positionStream => _player.positionStream.map((position) {
+        final start = _manualClipStart;
+        if (start == null || position <= start) return Duration.zero;
+        return position - start;
+      });
 
   /// Length of the current ayah's clip, once known.
-  Duration? get trackDuration => _player.duration;
-  Stream<Duration?> get durationStream => _player.durationStream;
+  Duration? get trackDuration {
+    final start = _manualClipStart;
+    final end = _manualClipEnd;
+    return start != null && end != null ? end - start : _player.duration;
+  }
+
+  Stream<Duration?> get durationStream =>
+      _player.durationStream.map((duration) {
+        final start = _manualClipStart;
+        final end = _manualClipEnd;
+        return start != null && end != null ? end - start : duration;
+      });
+
+  void _clearManualClip() {
+    _manualClipSubscription?.cancel();
+    _manualClipSubscription = null;
+    _manualClipStart = null;
+    _manualClipEnd = null;
+  }
+
+  Future<void> _finishManualClip(Duration start, Duration end) async {
+    if (_manualClipStart != start || _manualClipEnd != end) return;
+    await _manualClipSubscription?.cancel();
+    _manualClipSubscription = null;
+    await _player.pause();
+    await _player.seek(start);
+    await _handleComplete();
+  }
+
+  Future<void> _setManualWebClip(Duration start, Duration end) async {
+    _manualClipStart = start;
+    _manualClipEnd = end;
+    await _player.seek(start);
+    _manualClipSubscription = _player.positionStream.listen((position) {
+      if (position >= end && _manualClipSubscription != null) {
+        unawaited(_finishManualClip(start, end));
+      }
+    });
+  }
 
   QuranAudioService() {
     _player.playerStateStream.listen((state) {
@@ -161,14 +236,191 @@ class QuranAudioService extends ChangeNotifier {
     ];
   }
 
+  static Future<(Map<String, dynamic>, Map<String, dynamic>)>
+      _loadMansourData() => _mansourDataFuture ??= Future.wait<String>([
+            rootBundle.loadString('assets/quran/mansour_al_salimi_surahs.json'),
+            rootBundle
+                .loadString('assets/quran/mansour_al_salimi_segments.json'),
+          ]).then((files) => (
+                jsonDecode(files[0]) as Map<String, dynamic>,
+                jsonDecode(files[1]) as Map<String, dynamic>,
+              ));
+
+  Future<_QulSurahAudio?> _loadMansourSurahFromApi(int surah) async {
+    try {
+      final ayahCount = QuranPageMeta.ayahCounts[surah - 1];
+      String? audioUrl;
+      final ayahs = <int, (int, int)>{};
+      for (var from = 1; from <= ayahCount; from += 20) {
+        final candidateEnd = from + 19;
+        final to = candidateEnd < ayahCount ? candidateEnd : ayahCount;
+        final uri = Uri.parse(
+          'https://qul.tarteel.ai/api/v1/audio/surah_segments/179'
+          '?surah=$surah&from=$from&to=$to',
+        );
+        final response =
+            await http.get(uri).timeout(const Duration(seconds: 30));
+        if (response.statusCode != 200) return null;
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        final audio = json['audio'] as Map<String, dynamic>?;
+        final segments = json['segments'] as Map<String, dynamic>?;
+        audioUrl ??= audio?['url'] as String?;
+        if (segments == null) return null;
+        for (var ayah = from; ayah <= to; ayah++) {
+          final data = segments['$surah:$ayah'] as Map<String, dynamic>?;
+          final start = (data?['time_from'] as num?)?.round();
+          final end = (data?['time_to'] as num?)?.round();
+          if (start != null && end != null && end > start) {
+            ayahs[ayah] = (start, end);
+          }
+        }
+      }
+      if (audioUrl == null || ayahs.length != ayahCount) return null;
+      return _QulSurahAudio(audioUrl: audioUrl, ayahs: ayahs);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<_QulSurahAudio?> _loadMansourSurah(int surah) =>
+      _mansourSurahFutures[surah] ??= () async {
+        try {
+          final (surahs, segments) = await _loadMansourData();
+          final surahData = surahs['$surah'] as Map<String, dynamic>?;
+          final audioUrl = surahData?['audio_url'] as String?;
+          if (audioUrl == null) throw const FormatException();
+          final ayahs = <int, (int, int)>{};
+          final ayahCount = QuranPageMeta.ayahCounts[surah - 1];
+          for (var ayah = 1; ayah <= ayahCount; ayah++) {
+            final data = segments['$surah:$ayah'] as Map<String, dynamic>?;
+            final start = (data?['timestamp_from'] as num?)?.round();
+            final end = (data?['timestamp_to'] as num?)?.round();
+            if (start != null && end != null && end > start) {
+              ayahs[ayah] = (start, end);
+            }
+          }
+          if (ayahs.length != ayahCount) throw const FormatException();
+          return _QulSurahAudio(audioUrl: audioUrl, ayahs: ayahs);
+        } catch (_) {
+          return _loadMansourSurahFromApi(surah);
+        }
+      }();
+  Future<_QulAyahClip?> _mansourClip(int globalAyah) async {
+    final (surah, first, _) = surahRangeOf(globalAyah);
+    final audio = await _loadMansourSurah(surah);
+    final times = audio?.ayahs[globalAyah - first + 1];
+    if (audio == null || times == null) return null;
+    return _QulAyahClip(
+      audioUrl: audio.audioUrl,
+      start: Duration(milliseconds: times.$1),
+      end: Duration(milliseconds: times.$2),
+    );
+  }
+
+  Future<File> _mansourSurahFile(int surah) async {
+    _docsDir ??= await getApplicationDocumentsDirectory();
+    return File(
+      '${_docsDir!.path}${Platform.pathSeparator}audio'
+      '${Platform.pathSeparator}$_mansourReciter'
+      '${Platform.pathSeparator}surah_$surah.mp3',
+    );
+  }
+
+  Future<File?> _ensureMansourSurahLocal(int surah, String audioUrl) {
+    final pending = _mansourDownloadFutures[surah];
+    if (pending != null) return pending;
+    final download = _downloadMansourSurah(surah, audioUrl);
+    _mansourDownloadFutures[surah] = download;
+    download.whenComplete(() => _mansourDownloadFutures.remove(surah));
+    return download;
+  }
+
+  Future<File?> _downloadMansourSurah(int surah, String audioUrl) async {
+    final file = await _mansourSurahFile(surah);
+    if (await file.exists() && (await file.length()) > 0) return file;
+    try {
+      final response = await http
+          .get(Uri.parse(audioUrl))
+          .timeout(const Duration(minutes: 5));
+      if (response.statusCode != 200 || response.bodyBytes.isEmpty) return null;
+      await file.parent.create(recursive: true);
+      final tmp = File('${file.path}.part');
+      await tmp.writeAsBytes(response.bodyBytes, flush: true);
+      await tmp.rename(file.path);
+      return file;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>> _loadAbdurRashidData() =>
+      _abdurRashidDataFuture ??= rootBundle
+          .loadString('assets/quran/abdur_rashid_sufi_surahs.json')
+          .then((raw) => jsonDecode(raw) as Map<String, dynamic>);
+
+  Future<String?> _abdurRashidSurahUrl(int surah) async {
+    try {
+      final data = await _loadAbdurRashidData();
+      final surahData = data['$surah'] as Map<String, dynamic>?;
+      final audioUrl = surahData?['audio_url'] as String?;
+      if (audioUrl != null) return audioUrl;
+    } catch (_) {
+      // A running Flutter session may not have rebuilt its asset manifest yet.
+    }
+    final number = surah.toString().padLeft(3, '0');
+    return 'https://download.quranicaudio.com/quran/'
+        'abdurrashid_sufi_abi_al7arith/$number.mp3';
+  }
+
+  Future<File> _abdurRashidSurahFile(int surah) async {
+    _docsDir ??= await getApplicationDocumentsDirectory();
+    return File(
+      '${_docsDir!.path}${Platform.pathSeparator}audio'
+      '${Platform.pathSeparator}$_abdurRashidReciter'
+      '${Platform.pathSeparator}surah_$surah.mp3',
+    );
+  }
+
+  Future<File?> _ensureAbdurRashidSurahLocal(
+    int surah,
+    String audioUrl,
+  ) {
+    final pending = _abdurRashidDownloadFutures[surah];
+    if (pending != null) return pending;
+    final download = _downloadAbdurRashidSurah(surah, audioUrl);
+    _abdurRashidDownloadFutures[surah] = download;
+    download.whenComplete(() => _abdurRashidDownloadFutures.remove(surah));
+    return download;
+  }
+
+  Future<File?> _downloadAbdurRashidSurah(
+    int surah,
+    String audioUrl,
+  ) async {
+    final file = await _abdurRashidSurahFile(surah);
+    if (await file.exists() && (await file.length()) > 0) return file;
+    try {
+      final response = await http
+          .get(Uri.parse(audioUrl))
+          .timeout(const Duration(minutes: 5));
+      if (response.statusCode != 200 || response.bodyBytes.isEmpty) return null;
+      await file.parent.create(recursive: true);
+      final tmp = File('${file.path}.part');
+      await tmp.writeAsBytes(response.bodyBytes, flush: true);
+      await tmp.rename(file.path);
+      return file;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<File?> _ensureLocal(String reciter, int globalAyah) async {
     final file = await _localFile(reciter, globalAyah);
     if (await file.exists() && (await file.length()) > 0) return file;
     for (final url in _urlsFor(reciter, globalAyah)) {
       try {
-        final res = await http
-            .get(Uri.parse(url))
-            .timeout(const Duration(seconds: 30));
+        final res =
+            await http.get(Uri.parse(url)).timeout(const Duration(seconds: 30));
         if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
           await file.parent.create(recursive: true);
           final tmp = File('${file.path}.part');
@@ -278,7 +530,74 @@ class QuranAudioService extends ChangeNotifier {
     );
   }
 
+  Future<bool> _playMansourAyah(
+    int globalAyah,
+    MediaItem media,
+  ) async {
+    final clip = await _mansourClip(globalAyah);
+    if (clip == null) return false;
+    try {
+      Uri audioUri = Uri.parse(clip.audioUrl);
+      if (!kIsWeb) {
+        final (surah, _, _) = surahRangeOf(globalAyah);
+        final file = await _mansourSurahFile(surah);
+        if (await file.exists() && (await file.length()) > 0) {
+          audioUri = Uri.file(file.path);
+        } else {
+          unawaited(_ensureMansourSurahLocal(surah, clip.audioUrl));
+        }
+      }
+      if (kIsWeb) {
+        await _player.setAudioSource(AudioSource.uri(audioUri, tag: media));
+        await _setManualWebClip(clip.start, clip.end);
+      } else {
+        await _player.setAudioSource(
+          ClippingAudioSource(
+            child: AudioSource.uri(audioUri),
+            start: clip.start,
+            end: clip.end,
+            tag: media,
+          ),
+        );
+      }
+      _player.play();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _playAbdurRashidSurah(
+    int globalAyah,
+    MediaItem media,
+  ) async {
+    final (surah, _, _) = surahRangeOf(globalAyah);
+    final audioUrl = await _abdurRashidSurahUrl(surah);
+    if (audioUrl == null) return false;
+    try {
+      Uri audioUri = Uri.parse(audioUrl);
+      if (!kIsWeb) {
+        final file = await _abdurRashidSurahFile(surah);
+        if (await file.exists() && (await file.length()) > 0) {
+          audioUri = Uri.file(file.path);
+        } else {
+          unawaited(_ensureAbdurRashidSurahLocal(surah, audioUrl));
+        }
+      }
+      await _player.setAudioSource(AudioSource.uri(audioUri, tag: media));
+      _player.play();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> playAyah(int globalAyahNumber) async {
+    _clearManualClip();
+    if (_reciter == _abdurRashidReciter) {
+      final (_, first, _) = surahRangeOf(globalAyahNumber);
+      globalAyahNumber = first;
+    }
     _isLoading = true;
     _error = null;
     _currentGlobalAyah = globalAyahNumber;
@@ -288,12 +607,21 @@ class QuranAudioService extends ChangeNotifier {
     final media = _mediaItemFor(globalAyahNumber, await _appArtUri());
     var started = false;
 
-    if (!kIsWeb) {
+    if (reciter == _mansourReciter) {
+      started = await _playMansourAyah(globalAyahNumber, media);
+    } else if (reciter == _abdurRashidReciter) {
+      started = await _playAbdurRashidSurah(globalAyahNumber, media);
+    }
+
+    if (!started &&
+        reciter != _mansourReciter &&
+        reciter != _abdurRashidReciter &&
+        !kIsWeb) {
       final file = await _ensureLocal(reciter, globalAyahNumber);
       if (file != null) {
         try {
-          await _player.setAudioSource(
-              AudioSource.uri(Uri.file(file.path), tag: media));
+          await _player
+              .setAudioSource(AudioSource.uri(Uri.file(file.path), tag: media));
           _player.play();
           started = true;
         } catch (_) {
@@ -303,11 +631,13 @@ class QuranAudioService extends ChangeNotifier {
       unawaited(_downloadSurahAround(globalAyahNumber));
     }
 
-    if (!started) {
+    if (!started &&
+        reciter != _mansourReciter &&
+        reciter != _abdurRashidReciter) {
       for (final url in _urlsFor(reciter, globalAyahNumber)) {
         try {
-          await _player.setAudioSource(
-              AudioSource.uri(Uri.parse(url), tag: media));
+          await _player
+              .setAudioSource(AudioSource.uri(Uri.parse(url), tag: media));
           _player.play();
           started = true;
           break;
@@ -330,6 +660,10 @@ class QuranAudioService extends ChangeNotifier {
   }
 
   Future<void> togglePlayPause(int globalAyahNumber) async {
+    if (_reciter == _abdurRashidReciter) {
+      final (_, first, _) = surahRangeOf(globalAyahNumber);
+      globalAyahNumber = first;
+    }
     if (_currentGlobalAyah == globalAyahNumber && _isPlaying) {
       await _player.pause();
     } else if (_currentGlobalAyah == globalAyahNumber && !_isPlaying) {
@@ -341,7 +675,10 @@ class QuranAudioService extends ChangeNotifier {
 
   /// Seeks within the CURRENT ayah's clip (the player bar's scrubber) —
   /// this never crosses into a neighbouring ayah's file.
-  Future<void> seek(Duration position) => _player.seek(position);
+  Future<void> seek(Duration position) {
+    final start = _manualClipStart;
+    return _player.seek(start == null ? position : start + position);
+  }
 
   double _speed = 1.0;
   double get speed => _speed;
@@ -371,12 +708,18 @@ class QuranAudioService extends ChangeNotifier {
   Future<void> playNextAyah() async {
     final current = _currentGlobalAyah;
     if (current == null) return;
+    if (_reciter == _abdurRashidReciter) {
+      final (_, _, last) = surahRangeOf(current);
+      if (last < 6236) await playAyah(last + 1);
+      return;
+    }
     final next = nextAyahResolver?.call(current) ??
         (current < 6236 ? current + 1 : null);
     if (next != null) await playAyah(next);
   }
 
   Future<void> stop() async {
+    _clearManualClip();
     // Keep the surah download running — the user asked for the whole
     // surah, so let it finish for offline replays.
     await _player.stop();
@@ -391,6 +734,15 @@ class QuranAudioService extends ChangeNotifier {
   }
 
   Future<void> _handleComplete() async {
+    if (_autoAdvance &&
+        _reciter == _abdurRashidReciter &&
+        _currentGlobalAyah != null) {
+      final (_, _, last) = surahRangeOf(_currentGlobalAyah!);
+      if (last < 6236) {
+        await playAyah(last + 1);
+        return;
+      }
+    }
     if (_autoAdvance &&
         nextAyahResolver != null &&
         _currentGlobalAyah != null) {
@@ -407,6 +759,7 @@ class QuranAudioService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _clearManualClip();
     _cancelSurahDownload();
     _player.dispose();
     super.dispose();

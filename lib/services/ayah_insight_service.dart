@@ -43,8 +43,7 @@ extension InsightKindInfo on InsightKind {
   /// Ayah-level project slug, or null when the work is word-only.
   /// Only the i'rab has a whole-ayah parse (the others are inherently
   /// per-word), so it is the one kind with a summary section on top.
-  String? get _ayahSlug =>
-      this == InsightKind.eerab ? 'eerab-aya' : null;
+  String? get _ayahSlug => this == InsightKind.eerab ? 'eerab-aya' : null;
 }
 
 /// On-device store for the study layers, filled as the reader reads.
@@ -91,8 +90,7 @@ class InsightCache {
   /// `(found, payload)`. [found] distinguishes "this ayah is stored and
   /// the book has nothing for it" from "never fetched", so a known gap
   /// isn't retried on every open.
-  static Future<(bool, dynamic)> read(
-      String slug, int surah, int ayah) async {
+  static Future<(bool, dynamic)> read(String slug, int surah, int ayah) async {
     final doc = await _doc(slug, surah);
     if (!doc.containsKey('$ayah')) return (false, null);
     return (true, doc['$ayah']);
@@ -207,14 +205,14 @@ class AyahInsightService {
     // The callback body must NOT return the removed entry: whenComplete
     // awaits a returned future, and that entry IS this future — it
     // would wait on itself forever.
-    return _ayahPending[key] ??= _fetchAyahText(kind, slug, key, surah, ayah)
-        .whenComplete(() {
+    return _ayahPending[key] ??=
+        _fetchAyahText(kind, slug, key, surah, ayah).whenComplete(() {
       _ayahPending.remove(key);
     });
   }
 
-  static Future<String?> _fetchAyahText(InsightKind kind, String slug,
-      String key, int surah, int ayah) async {
+  static Future<String?> _fetchAyahText(
+      InsightKind kind, String slug, String key, int surah, int ayah) async {
     final (onDisk, stored) = await InsightCache.read(slug, surah, ayah);
     if (onDisk) return _ayahCache[key] = stored as String?;
 
@@ -252,20 +250,19 @@ class AyahInsightService {
     if (cached != null) return Future.value(cached);
 
     // Block body, not an arrow — see the note in [ayahText].
-    return _wordPending[key] ??= _fetchWords(kind, slug, key, surah, ayah)
-        .whenComplete(() {
+    return _wordPending[key] ??=
+        _fetchWords(kind, slug, key, surah, ayah).whenComplete(() {
       _wordPending.remove(key);
     });
   }
 
-  static Future<List<WordInsight>> _fetchWords(InsightKind kind, String slug,
-      String key, int surah, int ayah) async {
+  static Future<List<WordInsight>> _fetchWords(
+      InsightKind kind, String slug, String key, int surah, int ayah) async {
     final (onDisk, stored) = await InsightCache.read(slug, surah, ayah);
     if (onDisk) return _wordCache[key] = _parseWords(stored);
 
     final r = await http
-        .get(Uri.parse(
-            '$_base/word/$slug/$surah/$ayah/1/$_maxWordsPerAyah'))
+        .get(Uri.parse('$_base/word/$slug/$surah/$ayah/1/$_maxWordsPerAyah'))
         .timeout(_timeout);
     if (r.statusCode != 200) {
       if (r.statusCode == 404) {
@@ -328,8 +325,7 @@ class AyahInsightService {
   static Future<List<String>> wordTokens(int surah, int ayah) async {
     final fetched = await Future.wait([
       for (final kind in InsightKind.values)
-        words(kind, surah, ayah)
-            .onError((_, __) => const <WordInsight>[]),
+        words(kind, surah, ayah).onError((_, __) => const <WordInsight>[]),
     ]);
     // Earlier books win a position: InsightKind.values leads with the
     // i'rab, the most complete word-level work.
@@ -349,9 +345,8 @@ class AyahInsightService {
 
   /// Word entries usually repeat the word as a `{كلمة}:` prefix. The
   /// card already shows it as a heading, so it is dropped.
-  static String stripWordPrefix(String content) => content
-      .replaceFirst(RegExp(r'^\s*[{﴿][^}﴾]*[}﴾]\s*:\s*'), '')
-      .trim();
+  static String stripWordPrefix(String content) =>
+      content.replaceFirst(RegExp(r'^\s*[{﴿][^}﴾]*[}﴾]\s*:\s*'), '').trim();
 
   /// The i'rab volume opens each ayah with the ayah itself wrapped in
   /// braces, then one `word: parse` line per word. The ayah card
@@ -368,20 +363,24 @@ class AyahInsightService {
   }
 
   /// Splits a qira'at entry on its `---{عند الوصل}---` markers.
+  /// The source uses `@` as a record separator between reader groups.
+  /// It is metadata punctuation, not part of the published Arabic prose.
+  static String _cleanQiraatText(String text) =>
+      text.replaceAll(RegExp(r'\s*@+\s*'), '\n').trim();
   static List<QiraatSegment> qiraatSegments(String content) {
     final parts = <QiraatSegment>[];
     final re = RegExp(r'-{2,}\{([^}]*)\}-{2,}');
     var last = 0;
     String? pendingLabel;
     for (final m in re.allMatches(content)) {
-      final chunk = content.substring(last, m.start).trim();
+      final chunk = _cleanQiraatText(content.substring(last, m.start));
       if (chunk.isNotEmpty) {
         parts.add(QiraatSegment(label: pendingLabel, text: chunk));
       }
       pendingLabel = m.group(1)!.trim();
       last = m.end;
     }
-    final tail = content.substring(last).trim();
+    final tail = _cleanQiraatText(content.substring(last));
     if (tail.isNotEmpty) {
       parts.add(QiraatSegment(label: pendingLabel, text: tail));
     }
