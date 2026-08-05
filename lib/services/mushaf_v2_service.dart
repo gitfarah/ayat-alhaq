@@ -112,6 +112,8 @@ class _MushafGlyphConfig {
 /// in separate V1/V2/V4 namespaces so switching editions can never mix glyphs.
 class MushafV2Service {
   static const int totalPages = 604;
+  static const bool supportsFullOfflineDownload =
+      MushafFileStorage.supportsFullOfflineDownload;
   static const String surahNameFontFamily = 'QUL_Surah_Name_V4';
   static const String bismillahNameFontFamily = 'QUL_Bismillah';
   static const _configs = <String, _MushafGlyphConfig>{
@@ -145,6 +147,14 @@ class MushafV2Service {
   static Future<void>? _surahFontFuture;
   static final Map<String, Future<MushafV2Page>> _pageFutures = {};
   static final Map<String, String> _loadedFamilies = {};
+  static final ValueNotifier<({String editionId, int done, int total})?>
+      bulkProgress = ValueNotifier(null);
+  static bool _bulkCancelled = false;
+
+  static bool bulkRunningFor(String editionId) =>
+      bulkProgress.value?.editionId == editionId;
+
+  static void cancelBulkDownload() => _bulkCancelled = true;
 
   static _MushafGlyphConfig _config(String editionId) =>
       _configs[editionId] ?? _configs['hafs']!;
@@ -330,6 +340,56 @@ class MushafV2Service {
     } catch (_) {
       // The visible page owns error reporting and retry UI.
     }
+  }
+
+  /// Downloads every page-specific font for one QUL edition. Fonts are
+  /// written straight to disk without registering all 604 families, keeping
+  /// memory flat while making the complete Mushaf available offline.
+  static Future<void> startBulkDownload(String editionId) async {
+    if (!supportsFullOfflineDownload || bulkProgress.value != null) return;
+    final config = _config(editionId);
+    _bulkCancelled = false;
+    final cached =
+        (await MushafFontStorage.cachedPages(config.cacheKey)).toSet();
+    final missing = <int>[
+      for (var page = 1; page <= totalPages; page++)
+        if (!cached.contains(page)) page,
+    ];
+    var done = totalPages - missing.length;
+    bulkProgress.value = (editionId: editionId, done: done, total: totalPages);
+    if (missing.isEmpty) {
+      bulkProgress.value = null;
+      return;
+    }
+
+    try {
+      final queue = List<int>.of(missing);
+      Future<void> worker() async {
+        while (queue.isNotEmpty && !_bulkCancelled) {
+          final page = queue.removeLast();
+          try {
+            final bytes = await _downloadFont(page, config);
+            if (_bulkCancelled) break;
+            await MushafFontStorage.write(config.cacheKey, page, bytes);
+          } catch (_) {
+            // Leave failed pages missing so the next run resumes them.
+          }
+          done++;
+          bulkProgress.value =
+              (editionId: editionId, done: done, total: totalPages);
+        }
+      }
+
+      await Future.wait(List.generate(4, (_) => worker()));
+    } finally {
+      bulkProgress.value = null;
+    }
+  }
+
+  static Future<bool> isFullyDownloaded(String editionId) async {
+    final config = _config(editionId);
+    return (await MushafFontStorage.cachedPages(config.cacheKey)).length >=
+        totalPages;
   }
 
   @visibleForTesting

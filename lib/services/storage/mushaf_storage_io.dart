@@ -126,6 +126,25 @@ class MushafFontStorage {
     } catch (_) {}
   }
 
+  static Future<List<int>> cachedPages(String edition) async {
+    try {
+      final dir = await _dir();
+      final prefix = '${edition}_p';
+      final pages = <int>[];
+      await for (final entry in dir.list()) {
+        if (entry is! File) continue;
+        final name = entry.uri.pathSegments.last;
+        if (!name.startsWith(prefix) || !name.endsWith('.ttf')) continue;
+        final page = int.tryParse(
+            name.substring(prefix.length, name.length - '.ttf'.length));
+        if (page != null) pages.add(page);
+      }
+      return pages..sort();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   static Future<int> cachedCount() async {
     try {
       final dir = await _dir();

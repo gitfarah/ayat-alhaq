@@ -173,6 +173,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       _maybeShowGestureHint();
     });
     MushafSvgService.bulkProgress.addListener(_onBulkProgress);
+    MushafV2Service.bulkProgress.addListener(_onBulkProgress);
   }
 
   // ── PageView index mapping (wide screens page by 2-page spreads) ──
@@ -231,10 +232,51 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   void _onBulkProgress() {
     if (!mounted) return;
     setState(() {});
-    if (MushafSvgService.bulkProgress.value == null) {
-      MushafSvgService.isFullyDownloaded().then((v) {
+    if (_currentBulkProgress == null) {
+      _isCurrentEditionFullyDownloaded().then((v) {
         if (mounted) setState(() => _fullyDownloaded = v);
       });
+    }
+  }
+
+  bool get _supportsFullOfflineDownload => MushafSvgService.edition.isGlyph
+      ? MushafV2Service.supportsFullOfflineDownload
+      : !MushafSvgService.edition.isText &&
+          MushafSvgService.supportsFullOfflineDownload;
+
+  (int, int)? get _currentBulkProgress {
+    if (!MushafSvgService.edition.isGlyph) {
+      return MushafSvgService.bulkProgress.value;
+    }
+    final progress = MushafV2Service.bulkProgress.value;
+    if (progress == null || progress.editionId != MushafSvgService.edition.id) {
+      return null;
+    }
+    return (progress.done, progress.total);
+  }
+
+  bool get _currentBulkRunning => MushafSvgService.edition.isGlyph
+      ? MushafV2Service.bulkRunningFor(MushafSvgService.edition.id)
+      : MushafSvgService.bulkRunning;
+
+  Future<bool> _isCurrentEditionFullyDownloaded() =>
+      MushafSvgService.edition.isGlyph
+          ? MushafV2Service.isFullyDownloaded(MushafSvgService.edition.id)
+          : MushafSvgService.isFullyDownloaded();
+
+  void _startCurrentBulkDownload() {
+    if (MushafSvgService.edition.isGlyph) {
+      MushafV2Service.startBulkDownload(MushafSvgService.edition.id);
+    } else {
+      MushafSvgService.startBulkDownload();
+    }
+  }
+
+  void _cancelCurrentBulkDownload() {
+    if (MushafSvgService.edition.isGlyph) {
+      MushafV2Service.cancelBulkDownload();
+    } else {
+      MushafSvgService.cancelBulkDownload();
     }
   }
 
@@ -272,18 +314,19 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// RESUMES automatically every time the Mushaf is opened, without
   /// asking again; it can also always be started from the menu.
   Future<void> _maybeOfferFullDownload() async {
-    if (!MushafSvgService.supportsFullOfflineDownload) return;
-    _fullyDownloaded = await MushafSvgService.isFullyDownloaded();
+    if (!_supportsFullOfflineDownload) return;
+    _fullyDownloaded = await _isCurrentEditionFullyDownloaded();
     if (mounted) setState(() {});
     if (_fullyDownloaded || !mounted) return;
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('mushafDlAccepted') ?? false) {
+    final editionKey = MushafSvgService.edition.id;
+    if (prefs.getBool('mushafDlAccepted_$editionKey') ?? false) {
       // User already said yes earlier — silently continue the download.
-      MushafSvgService.startBulkDownload();
+      _startCurrentBulkDownload();
       return;
     }
-    if (prefs.getBool('mushafDlPrompted') ?? false) return;
-    await prefs.setBool('mushafDlPrompted', true);
+    if (prefs.getBool('mushafDlPrompted_$editionKey') ?? false) return;
+    await prefs.setBool('mushafDlPrompted_$editionKey', true);
     if (!mounted) return;
     final isDark = context.read<SettingsService>().isDarkIn(context);
     final go = await showDialog<bool>(
@@ -328,8 +371,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       ),
     );
     if (go == true) {
-      await prefs.setBool('mushafDlAccepted', true);
-      MushafSvgService.startBulkDownload();
+      await prefs.setBool('mushafDlAccepted_$editionKey', true);
+      _startCurrentBulkDownload();
     }
   }
 
@@ -337,6 +380,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   void dispose() {
     // The bulk download deliberately keeps running — it belongs to the
     // service, not this screen.
+    MushafV2Service.bulkProgress.removeListener(_onBulkProgress);
     MushafSvgService.bulkProgress.removeListener(_onBulkProgress);
     // Never leave the app stuck in immersive mode after this screen.
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -624,9 +668,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     onChanged: (v) => s.setTajweed(v),
                   );
                 }),
-              if (MushafSvgService.supportsFullOfflineDownload)
+              if (_supportsFullOfflineDownload)
                 Builder(builder: (_) {
-                  final prog = MushafSvgService.bulkProgress.value;
+                  final prog = _currentBulkProgress;
                   return ListTile(
                       leading: Icon(
                           _fullyDownloaded
@@ -647,10 +691,10 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       onTap: () {
                         Navigator.pop(context);
                         if (_fullyDownloaded) return;
-                        if (MushafSvgService.bulkRunning) {
-                          MushafSvgService.cancelBulkDownload();
+                        if (_currentBulkRunning) {
+                          _cancelCurrentBulkDownload();
                         } else {
-                          MushafSvgService.startBulkDownload();
+                          _startCurrentBulkDownload();
                         }
                       });
                 }),
@@ -1878,6 +1922,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
     Widget glyphText(String glyph) {
       final text = rawGlyph(glyph);
+      // V4's COLR font already paints the cream medallion and its black
+      // numeral correctly. Keep it untouched in both themes; applying the
+      // dark-mode white silhouette makes that numeral disappear.
+      if (word.isAyahEnd && page.usesColorFont) return text;
+
       if (!isDark || !page.usesColorFont) return text;
 
       // KFGQPC V4 is a COLR font: its embedded black palette ignores
