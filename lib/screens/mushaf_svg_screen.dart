@@ -30,6 +30,46 @@ import '../widgets/surah_frame.dart';
 import 'ayah_search_screen.dart';
 import 'tafsir_screen.dart';
 
+/// The V2 glyph leaf's width for the given content-area size. Pulled
+/// out of `_buildV2Leaf` as a pure function so its device-dimension
+/// arithmetic can be unit-tested without pumping a widget tree.
+///
+/// Keeps the familiar printed-page proportion on tablets in both
+/// orientations; phones retain their native full-width layout.
+///
+/// Portrait used to multiply height by 0.72, but a real iPad's own
+/// portrait aspect ratio (width/height ≈ 0.68-0.70) already sits above
+/// that, so `maxHeight * 0.72` was never less than `maxWidth` on any
+/// current iPad and the clamp was silently a no-op — the leaf sat at
+/// full screen width, and the words filling each line via spaceBetween
+/// stretched across the whole screen instead of a book-like column.
+/// Landscape's 0.58 DOES reliably bind (checked against the 11", mini
+/// and 10th-gen iPad content areas), so both orientations now use it.
+/// See [[quran-mushaf-line-spread]].
+double mushafV2LeafWidth({
+  required double maxWidth,
+  required double maxHeight,
+  required bool isTablet,
+}) =>
+    !isTablet ? maxWidth : math.min(maxWidth, maxHeight * 0.58);
+
+/// Fraction of a row's height the glyph is allowed to fill. Pulled out
+/// of `_buildV2GlyphLayout` for the same reason as [mushafV2LeafWidth].
+///
+/// A phone's own aspect ratio (much taller than wide) keeps WIDTH the
+/// binding constraint on the font-size choice there, so the rendered
+/// font sits comfortably under this row-height budget with slack left
+/// over between lines for free. A tablet's much wider aspect ratio
+/// flips that: HEIGHT becomes the binding constraint, so without a
+/// smaller fraction here the font fills the row almost edge to edge
+/// and adjacent lines' diacritics crowd together. See
+/// [[quran-mushaf-line-spread]].
+double mushafV2HeightFraction({
+  required bool isTablet,
+  required bool isOpeningPage,
+}) =>
+    isOpeningPage ? 0.78 : (isTablet ? 0.80 : 0.88);
+
 class MushafSvgScreen extends StatefulWidget {
   final int? startPage;
   const MushafSvgScreen({super.key, this.startPage});
@@ -1617,15 +1657,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   Widget _buildV2Leaf(MushafV2Page page, bool isDark) {
     final size = MediaQuery.of(context).size;
     final isTablet = size.shortestSide >= 600;
-    final isTabletLandscape = isTablet && size.width > size.height;
     return LayoutBuilder(builder: (context, constraints) {
-      // Keep the familiar printed-page proportion on tablets in both
-      // orientations; phones retain their native full-width layout.
-      final leafWidth = !isTablet
-          ? constraints.maxWidth
-          : isTabletLandscape
-              ? math.min(constraints.maxWidth, constraints.maxHeight * 0.58)
-              : math.min(constraints.maxWidth, constraints.maxHeight * 0.72);
+      final leafWidth = mushafV2LeafWidth(
+        maxWidth: constraints.maxWidth,
+        maxHeight: constraints.maxHeight,
+        isTablet: isTablet,
+      );
       final layout = Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         child: _buildV2GlyphLayout(page, isDark),
@@ -1684,7 +1721,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           .map((line) => measuredWidth(line.glyphs))
           .fold<double>(1, (a, b) => a > b ? a : b);
       final widthSize = usableWidth * 100 / widest * (isTablet ? 0.91 : 0.94);
-      final heightSize = rowHeight * (isOpeningPage ? 0.78 : 0.88);
+      final heightSize = rowHeight *
+          mushafV2HeightFraction(
+              isTablet: isTablet, isOpeningPage: isOpeningPage);
       final fontSize = widthSize < heightSize ? widthSize : heightSize;
 
       Widget lineWidget(MushafV2Line line) {
