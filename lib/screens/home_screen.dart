@@ -252,6 +252,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final isDark = context.read<SettingsService>().isDarkIn(context);
     showModalBottomSheet(
       context: context,
+      // Without this the sheet is capped at 9/16 of the screen — on a
+      // tall phone that window is shorter than this content, so the
+      // cards ended up half off the bottom edge. Scroll-controlled, the
+      // sheet takes the height its content actually needs; useSafeArea
+      // keeps it clear of the status and navigation bars.
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),

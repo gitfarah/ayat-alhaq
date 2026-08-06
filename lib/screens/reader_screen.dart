@@ -426,6 +426,11 @@ class _ReaderScreenState extends State<ReaderScreen>
 
     showModalBottomSheet(
       context: context,
+      // The default cap is 9/16 of the screen; the ayah panel plus the
+      // option rows are taller than that on a tall phone, which pushed
+      // the last rows off the bottom edge.
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
