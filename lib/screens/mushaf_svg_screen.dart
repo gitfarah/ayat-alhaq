@@ -709,35 +709,91 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   );
                 }),
               if (_supportsFullOfflineDownload)
-                Builder(builder: (_) {
-                  final prog = _currentBulkProgress;
-                  return ListTile(
-                      leading: Icon(
-                          _fullyDownloaded
-                              ? Icons.offline_pin_rounded
-                              : (prog != null
-                                  ? Icons.downloading_rounded
-                                  : Icons.download_rounded),
-                          color: iconColor),
-                      title: Text(
-                          _fullyDownloaded
-                              ? 'المصحف كامل محفوظ دون اتصال ✓'
-                              : (prog != null
-                                  ? 'جارٍ التنزيل (${_ar(prog.$1)}/${_ar(prog.$2)}) — اضغط للإيقاف'
-                                  : 'تنزيل المصحف كاملاً دون اتصال'),
-                          textDirection: TextDirection.rtl,
-                          style: TextStyle(
-                              fontFamily: '.SF Pro Text', color: textColor)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        if (_fullyDownloaded) return;
-                        if (_currentBulkRunning) {
-                          _cancelCurrentBulkDownload();
-                        } else {
-                          _startCurrentBulkDownload();
-                        }
-                      });
-                }),
+                // AnimatedBuilder rather than the plain Builder this
+                // used to be: a showModalBottomSheet's builder runs ONCE
+                // when the sheet opens, so a bare Builder only ever
+                // showed the download's progress at the instant the
+                // menu was tapped — a number that never moved while you
+                // watched it, hence "just a static count". Listening to
+                // the progress notifiers directly keeps this row live
+                // for as long as the sheet stays open.
+                AnimatedBuilder(
+                  animation: Listenable.merge(
+                      [MushafSvgService.bulkProgress, MushafV2Service.bulkProgress]),
+                  builder: (_, __) {
+                    final prog = _currentBulkProgress;
+                    final subColor = isDark
+                        ? AppColors.darkTextSec
+                        : AppColors.textSecondary;
+                    final fraction =
+                        prog != null && prog.$2 > 0 ? prog.$1 / prog.$2 : 0.0;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ListTile(
+                            leading: Icon(
+                                _fullyDownloaded
+                                    ? Icons.offline_pin_rounded
+                                    : (prog != null
+                                        ? Icons.downloading_rounded
+                                        : Icons.download_rounded),
+                                color: iconColor),
+                            title: Text(
+                                _fullyDownloaded
+                                    ? 'المصحف كامل محفوظ دون اتصال ✓'
+                                    : (prog != null
+                                        ? 'جارٍ تنزيل المصحف — ${_ar((fraction * 100).round())}٪'
+                                        : 'تنزيل المصحف كاملاً دون اتصال'),
+                                textDirection: TextDirection.rtl,
+                                style: TextStyle(
+                                    fontFamily: '.SF Pro Text', color: textColor)),
+                            subtitle: prog != null
+                                ? Text(
+                                    '${_ar(prog.$1)} من ${_ar(prog.$2)} صفحة — اضغط للإيقاف',
+                                    textDirection: TextDirection.rtl,
+                                    style: TextStyle(
+                                        fontFamily: '.SF Pro Text',
+                                        fontSize: 11.5,
+                                        color: subColor))
+                                : null,
+                            onTap: () {
+                              Navigator.pop(context);
+                              if (_fullyDownloaded) return;
+                              if (_currentBulkRunning) {
+                                _cancelCurrentBulkDownload();
+                              } else {
+                                _startCurrentBulkDownload();
+                              }
+                            }),
+                        if (prog != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              // Eases toward each new fraction instead of
+                              // jumping — a plain LinearProgressIndicator
+                              // snaps straight to its value, which read
+                              // as choppy against page-by-page updates.
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0, end: fraction),
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeOut,
+                                builder: (_, value, __) =>
+                                    LinearProgressIndicator(
+                                  value: value,
+                                  minHeight: 6,
+                                  backgroundColor:
+                                      iconColor.withValues(alpha: 0.15),
+                                  valueColor:
+                                      AlwaysStoppedAnimation(iconColor),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
               const SizedBox(height: 8),
             ],
           ),
