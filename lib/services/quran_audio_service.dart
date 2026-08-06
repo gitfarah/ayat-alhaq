@@ -627,8 +627,14 @@ class QuranAudioService extends ChangeNotifier {
         // The clip is on disk: whatever fails now is not the network.
         gotAudio = true;
         try {
+          // Bounded rather than a bare await: a broken binding between
+          // the player and the background-audio service can leave this
+          // call simply never resolving — no exception, no timeout of
+          // its own — which used to leave the bar reading "جارٍ
+          // التحميل..." forever instead of ever reporting a problem.
           await _player
-              .setAudioSource(AudioSource.uri(Uri.file(file.path), tag: media));
+              .setAudioSource(AudioSource.uri(Uri.file(file.path), tag: media))
+              .timeout(const Duration(seconds: 20));
           _player.play();
           started = true;
         } catch (e) {
@@ -645,7 +651,8 @@ class QuranAudioService extends ChangeNotifier {
       for (final url in _urlsFor(reciter, globalAyahNumber)) {
         try {
           await _player
-              .setAudioSource(AudioSource.uri(Uri.parse(url), tag: media));
+              .setAudioSource(AudioSource.uri(Uri.parse(url), tag: media))
+              .timeout(const Duration(seconds: 20));
           _player.play();
           started = true;
           break;
