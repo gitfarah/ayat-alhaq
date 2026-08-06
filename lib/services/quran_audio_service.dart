@@ -606,6 +606,11 @@ class QuranAudioService extends ChangeNotifier {
     final reciter = _reciter;
     final media = _mediaItemFor(globalAyahNumber, await _appArtUri());
     var started = false;
+    // Kept so a failure can say what actually went wrong. Reporting every
+    // failure as a connection problem once cost a long hunt: the audio was
+    // downloading fine and the PLAYER was the thing that was broken.
+    Object? failure;
+    var gotAudio = false;
 
     if (reciter == _mansourReciter) {
       started = await _playMansourAyah(globalAyahNumber, media);
@@ -619,12 +624,15 @@ class QuranAudioService extends ChangeNotifier {
         !kIsWeb) {
       final file = await _ensureLocal(reciter, globalAyahNumber);
       if (file != null) {
+        // The clip is on disk: whatever fails now is not the network.
+        gotAudio = true;
         try {
           await _player
               .setAudioSource(AudioSource.uri(Uri.file(file.path), tag: media));
           _player.play();
           started = true;
-        } catch (_) {
+        } catch (e) {
+          failure ??= e;
           started = false;
         }
       }
@@ -641,8 +649,8 @@ class QuranAudioService extends ChangeNotifier {
           _player.play();
           started = true;
           break;
-        } catch (_) {
-          // Try the next source.
+        } catch (e) {
+          failure ??= e; // Try the next source.
         }
       }
     }
@@ -650,7 +658,12 @@ class QuranAudioService extends ChangeNotifier {
     if (!started) {
       _isLoading = false;
       _currentGlobalAyah = null;
-      _error = 'تعذّر تشغيل التلاوة، تحقق من اتصالك بالإنترنت';
+      // Only blame the connection when the audio never arrived. If it
+      // downloaded and still would not play, say so — that is a different
+      // problem, and the old message sent the reader to the wrong place.
+      _error = gotAudio && failure != null
+          ? 'تعذّر تشغيل التلاوة: $failure'
+          : 'تعذّر تشغيل التلاوة، تحقق من اتصالك بالإنترنت';
       notifyListeners();
       return;
     }

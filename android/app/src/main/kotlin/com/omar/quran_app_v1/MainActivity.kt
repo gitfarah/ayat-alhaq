@@ -1,11 +1,21 @@
 package com.omar.quran_app_v1
 
 import android.view.WindowManager
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+/// Extends AudioServiceActivity, NOT FlutterActivity.
+///
+/// just_audio_background requires it: its README says the activity must
+/// be com.ryanheise.audioservice.AudioServiceActivity, or a custom
+/// activity must subclass it, because the playback service and the
+/// activity have to share one Flutter engine. On FlutterActivity every
+/// attempt to set an audio source fails, which the app could only
+/// report as "check your internet connection" — even with a perfectly
+/// good connection. iOS has no equivalent requirement, which is why
+/// recitation always worked there.
+class MainActivity : AudioServiceActivity() {
     private val screenAwakeChannel = "com.omar.quran_app_v1/screen_awake"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
