@@ -145,11 +145,29 @@ class QuranAudioService extends ChangeNotifier {
   Duration? _manualClipEnd;
   StreamSubscription<Duration>? _manualClipSubscription;
 
-  Stream<Duration> get positionStream => _player.positionStream.map((position) {
-        final start = _manualClipStart;
-        if (start == null || position <= start) return Duration.zero;
-        return position - start;
-      });
+  Stream<Duration> get positionStream =>
+      _player.positionStream.map((p) => clipRelative(p, _manualClipStart));
+
+  /// Playback position expressed relative to the ayah being recited.
+  ///
+  /// [clipStart] is set only when a whole-surah recording is being
+  /// clipped BY HAND to one ayah, which happens on web alone: on mobile
+  /// a ClippingAudioSource already reports clip-relative positions, and
+  /// every per-ayah reciter plays a file that is the ayah entire. So on
+  /// a phone this is null for every reciter, and the position must pass
+  /// straight through.
+  ///
+  /// Collapsing that null case together with "before the clip starts"
+  /// into one `||` returned zero for BOTH — which pinned the scrubber,
+  /// the elapsed time and the word-by-word highlight at zero for every
+  /// reciter on every device, from the moment clipping was introduced
+  /// for the two QUL reciters.
+  @visibleForTesting
+  static Duration clipRelative(Duration position, Duration? clipStart) {
+    if (clipStart == null) return position;
+    if (position <= clipStart) return Duration.zero;
+    return position - clipStart;
+  }
 
   /// Length of the current ayah's clip, once known.
   Duration? get trackDuration {
