@@ -22,8 +22,14 @@ void main() async {
       androidNotificationChannelName: 'تلاوة القرآن',
       androidNotificationOngoing: true,
     );
-  } catch (_) {
-    // Never let audio-session setup block app startup.
+  } catch (e) {
+    // Never let audio-session setup block app startup — but a silent
+    // catch here once hid the actual reason recitation didn't work on
+    // an Android device for an entire debugging round: nothing in the
+    // app could tell playback failure apart from this failing quietly
+    // at launch. Recorded so the FIRST play attempt can name it instead
+    // of guessing at "check your connection".
+    QuranAudioService.backgroundInitFailure = e;
   }
   try {
     await AdhanNotificationService.initialize();

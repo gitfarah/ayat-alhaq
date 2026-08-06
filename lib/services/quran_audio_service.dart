@@ -45,6 +45,14 @@ class _QulSurahAudio {
 class QuranAudioService extends ChangeNotifier {
   final AudioPlayer _player = AudioPlayer();
 
+  /// Set once in main() if JustAudioBackground.init() fails at launch.
+  /// It runs before this service — indeed before any AudioPlayer — ever
+  /// exists, so nothing else could report what went wrong. Every
+  /// AudioPlayer created afterwards is silently unbacked by the
+  /// background audio service when this is non-null, which can leave
+  /// playback simply never starting with no exception of its own.
+  static Object? backgroundInitFailure;
+
   static const Map<String, String> reciters = {
     'qul.mansouralsalimi': 'منصور السالمي',
     'qul.abdurrashidsufi.kisai': 'عبد الرشيد صوفي',
@@ -665,12 +673,19 @@ class QuranAudioService extends ChangeNotifier {
     if (!started) {
       _isLoading = false;
       _currentGlobalAyah = null;
+      // A failed background-audio-service init is checked FIRST: it is
+      // the most useful thing to report when it happened, because it
+      // explains a failure the other two messages would otherwise blame
+      // on the wrong thing entirely.
+      final bgFailure = backgroundInitFailure;
       // Only blame the connection when the audio never arrived. If it
       // downloaded and still would not play, say so — that is a different
       // problem, and the old message sent the reader to the wrong place.
-      _error = gotAudio && failure != null
-          ? 'تعذّر تشغيل التلاوة: $failure'
-          : 'تعذّر تشغيل التلاوة، تحقق من اتصالك بالإنترنت';
+      _error = bgFailure != null
+          ? 'تعذّر إعداد خدمة الصوت: $bgFailure'
+          : (gotAudio && failure != null
+              ? 'تعذّر تشغيل التلاوة: $failure'
+              : 'تعذّر تشغيل التلاوة، تحقق من اتصالك بالإنترنت');
       notifyListeners();
       return;
     }
