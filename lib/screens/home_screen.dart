@@ -92,29 +92,17 @@ class _HomeScreenState extends State<HomeScreen> {
     // Diacritic- and prefix-insensitive surah filter: the data's names
     // are fully vocalized (سُورَةُ ٱلْفَاتِحَةِ) while users type plain
     // letters — raw contains() almost never matched.
-    final norm = QuranService.searchKey(query);
-    // A surah can be reached by its number typed on either keyboard.
-    final digits = query.replaceAllMapped(RegExp('[٠-٩]'),
-        (m) => String.fromCharCode(m[0]!.codeUnitAt(0) - 0x0660 + 0x30));
-    final asNumber = int.tryParse(digits);
-    final latin = QuranService.latinKey(query);
+    //
+    // The matching itself lives in SurahQuery, shared with
+    // QuranService.searchSurahs. This screen used to carry its own copy
+    // of the rules, which is how it ended up matching every surah in
+    // the Mushaf for a query of "ال".
+    final surahQuery = SurahQuery(query);
 
     setState(() {
-      _filtered = query.isEmpty
+      _filtered = query.isEmpty || surahQuery.isEmpty
           ? _all
-          : _all.where((s) {
-              final name = QuranService.searchKey(s.name);
-              final noAl = name.replaceFirst(RegExp(r'^ل'), '');
-              return (norm.isNotEmpty &&
-                      (name.contains(norm) ||
-                          noAl.contains(
-                              norm.replaceFirst(RegExp(r'^ل'), '')))) ||
-                  (latin.isNotEmpty &&
-                      (QuranService.latinKey(s.englishName).contains(latin) ||
-                          QuranService.latinKey(s.englishNameTranslation)
-                              .contains(latin))) ||
-                  s.number == asNumber;
-            }).toList();
+          : _all.where(surahQuery.matches).toList();
     });
 
     // Ayah-text search, debounced, results shown inline below.

@@ -384,25 +384,12 @@ class QuranService {
   /// "فاتحة" all find سُورَةُ ٱلْفَاتِحَةِ.
   static Future<List<Surah>> searchSurahs(String query) async {
     await _ensureLoaded();
-    final q = searchKey(query);
+    final q = SurahQuery(query);
     if (q.isEmpty) return [];
-    // The definite article is optional: "بقرة" should find البقرة.
-    // After normalization the alef is gone, so it reads as a bare lam.
-    final qNoAl = q.replaceFirst(RegExp(r'^ل'), '');
-    final latin = latinKey(query);
-    final results = <Surah>[];
-    for (final s in _surahCache!) {
-      final name = searchKey(s.name);
-      final nameNoAl = name.replaceFirst(RegExp(r'^ل'), '');
-      if (name.contains(q) ||
-          (qNoAl.isNotEmpty && nameNoAl.contains(qNoAl)) ||
-          (latin.isNotEmpty &&
-              (latinKey(s.englishName).contains(latin) ||
-                  latinKey(s.englishNameTranslation).contains(latin)))) {
-        results.add(s);
-      }
-    }
-    return results;
+    return [
+      for (final s in _surahCache!)
+        if (q.matches(s)) s,
+    ];
   }
 
   /// A surah name reduced for matching: bare letters, with the "سورة"
@@ -438,11 +425,15 @@ class QuranService {
         query.trim().split(RegExp(r'\s+')).map(_bareLetters).join(' ');
     if (normQuery.isEmpty) return [];
 
+    // Padded with a space at each end so a word can be matched on its
+    // BOUNDARIES: ' من ' finds the word مِن, where a bare `contains`
+    // also finds it buried inside ٱلرَّحْمَٰن — an ayah that does not
+    // carry the searched word at all.
     _searchIndex ??= [
       for (final surah in _rawAyahs!)
         [
           for (final t in surah)
-            (t[5] as String).split(' ').map(_bareLetters).join(' '),
+            ' ${(t[5] as String).split(' ').map(_bareLetters).join(' ')} ',
         ],
     ];
 
@@ -472,9 +463,31 @@ class QuranService {
       }
     }
 
-    collect((t) => t.contains(normQuery));
-    final words = normQuery.split(' ').where((w) => w.length > 1).toList();
+    // Best matches first. Each tier is stricter about WHERE the query
+    // may appear, so a reader sees ayahs that carry the word before
+    // ayahs that merely contain its letters somewhere.
+    final words = normQuery.split(' ').where((w) => w.isNotEmpty).toList();
+
+    // 1. The phrase itself, as whole words.
+    collect((t) => t.contains(' $normQuery '));
+    // 2. Every word present, in any order, each a whole word.
     if (results.length < 300 && words.length > 1) {
+      collect((t) => words.every((w) => t.contains(' $w ')));
+    }
+    // 3. Every word present as the START of a word, with the definite
+    //    article optional there just as it is in a surah name — so رحم
+    //    reaches ٱلرَّحْمَٰن, whose leading ال would otherwise block the
+    //    match. (After normalising, ال reads as a bare lam.) This tier
+    //    is also what shows results while a word is still being typed.
+    if (results.length < 300) {
+      collect((t) =>
+          words.every((w) => t.contains(' $w') || t.contains(' ل$w')));
+    }
+    // 4. Letters anywhere at all, the old behaviour. Kept ONLY as a
+    //    last resort: it is what surfaced ayahs with no visible
+    //    connection to the query, so it must never dilute a tier above
+    //    it — it runs only when nothing better was found.
+    if (results.isEmpty) {
       collect((t) => words.every(t.contains));
     }
     return results;
@@ -491,6 +504,73 @@ class PageAyah {
   final String text;
 
   const PageAyah(this.surahNumber, this.numberInSurah, this.text);
+}
+
+/// A typed surah-name query, normalised once and then matched against
+/// candidates — so the home screen's live filter and [QuranService
+/// .searchSurahs] cannot drift apart, which is how the filter came to
+/// carry a bug the service did not.
+class SurahQuery {
+  /// Bare-letter form of the query, empty when it holds no Arabic.
+  final String arabic;
+
+  /// The same without a leading lam. The definite article is optional —
+  /// "بقرة" should find البقرة — and once the alef is normalised away
+  /// "ال" reads as a bare lam.
+  ///
+  /// Empty when stripping the lam would leave nothing: `contains('')`
+  /// is true of every string, so an unguarded empty value here matched
+  /// the ENTIRE list. Typing "ال", the opening of a great many surah
+  /// names, did exactly that.
+  final String arabicNoAl;
+
+  /// Transliterated form, empty below two letters: a single Latin
+  /// letter appears in almost every name and matches almost everything.
+  final String latin;
+
+  /// A surah reached by typing its number, on either keyboard.
+  final int? number;
+
+  const SurahQuery._(this.arabic, this.arabicNoAl, this.latin, this.number);
+
+  factory SurahQuery(String raw) {
+    final query = raw.trim();
+    final arabic = QuranService.searchKey(query);
+    final noAl = arabic.replaceFirst(RegExp(r'^ل'), '');
+    final latin = QuranService.latinKey(query);
+    final digits = query.replaceAllMapped(RegExp('[٠-٩]'),
+        (m) => String.fromCharCode(m[0]!.codeUnitAt(0) - 0x0660 + 0x30));
+    return SurahQuery._(
+      arabic,
+      noAl.isEmpty ? '' : noAl,
+      latin.length >= 2 ? latin : '',
+      int.tryParse(digits),
+    );
+  }
+
+  bool get isEmpty => arabic.isEmpty && latin.isEmpty && number == null;
+
+  bool matches(Surah s) {
+    if (number != null && s.number == number) return true;
+    if (arabic.isNotEmpty) {
+      final name = QuranService.searchKey(s.name);
+      final nameNoAl = name.replaceFirst(RegExp(r'^ل'), '');
+      // A single letter matches as a PREFIX only. As a substring it
+      // pulls in most of the Mushaf, which reads as random results.
+      if (arabic.length == 1) {
+        if (name.startsWith(arabic) || nameNoAl.startsWith(arabic)) return true;
+      } else {
+        if (name.contains(arabic)) return true;
+        if (arabicNoAl.isNotEmpty && nameNoAl.contains(arabicNoAl)) return true;
+      }
+    }
+    if (latin.isNotEmpty &&
+        (QuranService.latinKey(s.englishName).contains(latin) ||
+            QuranService.latinKey(s.englishNameTranslation).contains(latin))) {
+      return true;
+    }
+    return false;
+  }
 }
 
 class AyahSearchResult {
