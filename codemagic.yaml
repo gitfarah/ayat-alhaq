@@ -87,3 +87,33 @@ workflows:
 
     artifacts:
       - build/app/outputs/bundle/release/*.aab
+
+  android-apk-test:
+    name: Android test APK (sideload)
+    # A release-mode APK to install straight onto a phone, for trying a
+    # build out before it goes near the Play Store. NOT for publishing:
+    # Google Play takes the AAB from `android-release` above.
+    instance_type: linux_x2
+    max_build_duration: 30
+
+    environment:
+      flutter: stable
+      # Deliberately NO android_signing. Without key.properties the app's
+      # build.gradle.kts signs the release build with the DEBUG key (see
+      # its buildTypes block) — which installs and runs fine by
+      # sideloading, and means this workflow needs no keystore uploaded
+      # and no signing set-up to run. A debug-signed APK can never be
+      # uploaded to Play, which is exactly the separation wanted here.
+
+    scripts:
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Build release APK
+        # One fat APK covering every ABI, rather than --split-per-abi:
+        # a single file installs on any phone without having to know
+        # which architecture it has.
+        script: flutter build apk --release
+
+    artifacts:
+      - build/app/outputs/flutter-apk/app-release.apk
