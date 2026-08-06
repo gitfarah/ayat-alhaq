@@ -1,4 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Everything the app fetches — Mushaf page artwork, translations,
+         tafsir, recitation audio, prayer times — needs this.
+
+         It must be declared HERE, not only in the debug manifest that
+         Flutter creates for hot reload. Without it a release build gets
+         "Failed host lookup (errno = 7)" on every request, so downloads
+         and every online section fail silently while the app otherwise
+         looks fine. Debug builds hide the bug completely. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Checked before downloading so an offline device is told so,
+         rather than being left waiting on a request that cannot work. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Location: only used when the user picks "استخدام موقعي الحالي"
          for prayer times (never in the background). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
