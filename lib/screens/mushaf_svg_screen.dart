@@ -2923,46 +2923,57 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     final valueMs = position.inMilliseconds
                         .clamp(0, maxMs.round())
                         .toDouble();
-                    return Column(
-                      children: [
-                        SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            trackHeight: 3,
-                            thumbShape: const RoundSliderThumbShape(
-                                enabledThumbRadius: 6),
-                            overlayShape: const RoundSliderOverlayShape(
-                                overlayRadius: 12),
+                    // A media scrubber reads left-to-right everywhere —
+                    // elapsed on the left, filling rightward, remaining
+                    // counting down on the right — regardless of the
+                    // app's RTL chrome around it. Left inside the
+                    // ambient RTL Directionality this whole bar sits in,
+                    // the slider filled from the right and the elapsed/
+                    // remaining labels swapped sides.
+                    return Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Column(
+                        children: [
+                          SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              trackHeight: 3,
+                              thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 6),
+                              overlayShape: const RoundSliderOverlayShape(
+                                  overlayRadius: 12),
+                            ),
+                            child: Slider(
+                              value: valueMs,
+                              max: maxMs,
+                              activeColor: accent,
+                              inactiveColor: accent.withValues(alpha: 0.2),
+                              onChanged: duration > Duration.zero
+                                  ? (v) => audio
+                                      .seek(Duration(milliseconds: v.round()))
+                                  : null,
+                            ),
                           ),
-                          child: Slider(
-                            value: valueMs,
-                            max: maxMs,
-                            activeColor: accent,
-                            inactiveColor: accent.withValues(alpha: 0.2),
-                            onChanged: duration > Duration.zero
-                                ? (v) => audio
-                                    .seek(Duration(milliseconds: v.round()))
-                                : null,
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(_formatDuration(position),
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: subColor,
+                                        fontFamily: '.SF Pro Text')),
+                                Text(
+                                    '-${_formatDuration(duration - position)}',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: subColor,
+                                        fontFamily: '.SF Pro Text')),
+                              ],
+                            ),
                           ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(_formatDuration(position),
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: subColor,
-                                      fontFamily: '.SF Pro Text')),
-                              Text('-${_formatDuration(duration - position)}',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: subColor,
-                                      fontFamily: '.SF Pro Text')),
-                            ],
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     );
                   },
                 );
