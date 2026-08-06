@@ -255,8 +255,10 @@ class _HomeScreenState extends State<HomeScreen> {
       // Without this the sheet is capped at 9/16 of the screen — on a
       // tall phone that window is shorter than this content, so the
       // cards ended up half off the bottom edge. Scroll-controlled, the
-      // sheet takes the height its content actually needs; useSafeArea
-      // keeps it clear of the status and navigation bars.
+      // sheet takes the height its content actually needs.
+      //
+      // useSafeArea covers the top, left and right only; the navigation
+      // bar at the bottom is the SafeArea inside the builder.
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
@@ -264,7 +266,9 @@ class _HomeScreenState extends State<HomeScreen> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       // Scrollable so the sheet never overflows on short (landscape)
       // screens.
-      builder: (_) => SingleChildScrollView(
+      builder: (_) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -330,6 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ]),
             ),
           ]),
+        ),
         ),
       ),
     );

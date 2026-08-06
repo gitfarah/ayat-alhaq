@@ -437,10 +437,17 @@ class _ReaderScreenState extends State<ReaderScreen>
       ),
       // Scrollable so the sheet never overflows on short (landscape)
       // screens.
-      builder: (_) => SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      //
+      // The SafeArea is what keeps the last row off the navigation bar.
+      // useSafeArea above covers only the top, left and right — Flutter's
+      // own doc is explicit that the sheet still "extends all the way to
+      // the bottom of the screen, including any system intrusions".
+      builder: (_) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             AyahSheetHeader(
               ayahText: ayah.text,
               label: '${widget.surah.name} — آية ${_ar(ayah.numberInSurah)}',
@@ -569,7 +576,8 @@ class _ReaderScreenState extends State<ReaderScreen>
                 ],
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

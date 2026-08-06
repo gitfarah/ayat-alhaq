@@ -863,7 +863,10 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       builder: (_) => SizedBox(
         height: MediaQuery.of(context).size.height * 0.7,
         child: ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          // The list reaches the bottom of the screen, so without the
+          // inset its last surahs sit behind the navigation bar.
+          padding: EdgeInsets.only(
+              top: 12, bottom: 12 + MediaQuery.of(context).viewPadding.bottom),
           itemCount: QuranPageMeta.surahNames.length,
           itemBuilder: (ctx, i) => ListTile(
             dense: true,
@@ -957,10 +960,15 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       // Scrollable so the sheet never overflows on short (landscape)
       // screens — the content is taller than the sheet's max height there.
-      builder: (_) => SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      //
+      // The SafeArea is what keeps the last row off the navigation bar:
+      // useSafeArea above covers only the top, left and right.
+      builder: (_) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             _ayahSheetHeader(region),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
@@ -1101,7 +1109,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 ],
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1427,7 +1436,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               offset: _barsVisible ? Offset.zero : const Offset(0, 1.1),
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOut,
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
+              // Bottom inset taken here, or the player's controls sit
+              // under the system navigation bar and read as part of it.
+              // The reader's own bottom bar already does this.
+              child: SafeArea(
+                top: false,
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
                 if (audio.hasActiveTrack) _buildAudioBar(audio, isDark),
                 // The page-number bar and its two arrows are redundant
                 // once the leaf prints its own number: the number is on
@@ -1435,7 +1449,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 // printed number opens the same go-to dialog the old
                 // circle did.
                 if (!_usesPageFurniture) _buildNavBar(isDark),
-              ]),
+                ]),
+              ),
             ),
           ),
         ]),

@@ -103,7 +103,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (ctx) => SizedBox(
         height: MediaQuery.of(context).size.height * 0.7,
         child: ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          // Keeps the last cities clear of the navigation bar.
+          padding: EdgeInsets.only(
+              top: 12, bottom: 12 + MediaQuery.of(context).viewPadding.bottom),
           itemCount: PrayerService.cities.length + 1,
           itemBuilder: (_, index) {
             // First row: automatic GPS location.
