@@ -38,8 +38,15 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon/app_icon.png"
-  adaptive_icon_background: "#064D47"
-  adaptive_icon_foreground: "assets/icon/app_icon_fg_padded.png"
+  # The master icon's OWN background green, not an approximation of it.
+  # The artwork is a full-bleed tile, so any difference between the two
+  # greens draws a visible rectangle around it on the home screen.
+  adaptive_icon_background: "#064C47"
+  # The full master, NOT a pre-shrunk copy of it. This generator already
+  # insets the foreground by 16% to fit Android's safe zone; feeding it
+  # artwork that had been padded a second time is what left the icon
+  # small in the middle of its tile.
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
   remove_alpha_ios: true
   background_color_ios: "#064D47"
 

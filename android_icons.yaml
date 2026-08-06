@@ -1,0 +1,17 @@
+# Android-only launcher-icon regeneration.
+#
+# NOT named flutter_launcher_icons-android.yaml on purpose: the tool
+# reads that "-suffix" pattern as a FLAVOUR name and writes the icons
+# into android/app/src/android/ instead of src/main/.
+#
+# The same settings as the `flutter_launcher_icons:` block in
+# pubspec.yaml, with ios turned OFF so regenerating the Android icons
+# cannot touch the iOS app icon — which is correct as it is.
+#
+#   dart run flutter_launcher_icons -f android_icons.yaml
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#064C47"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
