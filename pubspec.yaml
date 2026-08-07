@@ -31,6 +31,12 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # On-device smoke test (integration_test/). Codemagic's QA stage runs
+  # `flutter test integration_test` against a simulator and fails the
+  # whole build when this dependency is missing, even though every unit
+  # test passed.
+  integration_test:
+    sdk: flutter
   flutter_lints: ^3.0.0
   flutter_launcher_icons: ^0.14.1
 

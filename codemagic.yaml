@@ -8,6 +8,12 @@
 #
 # Before the first run, in the Codemagic UI:
 #   1. Open the app → Settings → select "codemagic.yaml" as the config source.
+#      This is NOT optional. While the source is still "Workflow Editor",
+#      every workflow below is ignored — including the release-mode build
+#      the note above depends on — and the editor's own QA stage runs
+#      instead, which is what produced the "Flutter Drive run failed"
+#      build: it launches a simulator and runs `flutter test
+#      integration_test` whether or not the project has any.
 #   2. Teams/Integrations → App Store Connect: add your API key and note
 #      the integration NAME, then put that name below in
 #      `integrations.app_store_connect`.
@@ -37,6 +43,13 @@ workflows:
     scripts:
       - name: Get Flutter packages
         script: flutter pub get
+
+      - name: Run tests
+        # Unit/widget tests only. The on-device smoke test in
+        # integration_test/ deliberately stays out of the release path:
+        # it needs a booted simulator, and a release must not be
+        # blocked by CI device flakiness.
+        script: flutter test
 
       - name: Install CocoaPods dependencies
         script: find . -name "Podfile" -execdir pod install \;
@@ -81,6 +94,9 @@ workflows:
     scripts:
       - name: Get Flutter packages
         script: flutter pub get
+
+      - name: Run tests
+        script: flutter test
 
       - name: Build release AAB
         script: flutter build appbundle --release
