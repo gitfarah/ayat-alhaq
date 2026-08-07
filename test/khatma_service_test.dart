@@ -62,4 +62,24 @@ void main() {
     await KhatmaService.resetReadPages();
     expect(await KhatmaService.readPageCount(), 0);
   });
+
+  test('completing a juz arms a rating request — and reading on does not '
+      'arm anything by itself', () async {
+    SharedPreferences.setMockInitialValues({});
+    Future<bool> armed() async =>
+        (await SharedPreferences.getInstance()).getBool('review.pending') ??
+        false;
+
+    // Most of juz 30 read: an achievement in progress, not yet earned.
+    final start = QuranPageMeta.juzStartPages[29];
+    for (var page = start; page < 604; page++) {
+      await KhatmaService.markPageRead(page);
+    }
+    expect(await armed(), isFalse);
+
+    // The page that completes it.
+    await KhatmaService.markPageRead(604);
+    expect(await armed(), isTrue,
+        reason: 'a finished juz is the milestone worth asking on');
+  });
 }

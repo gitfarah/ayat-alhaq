@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_strings.dart';
+import '../services/app_review_service.dart';
 import '../theme.dart';
 import 'home_screen.dart';
 import 'bookmarks_screen.dart';
@@ -20,6 +21,25 @@ class _MainScreenState extends State<MainScreen> {
     KhatmaScreen(),
     HomeScreen()
   ];
+
+  /// Position of the khatma tracker in [_screens].
+  static const _khatmaTab = 2;
+
+  /// Opening the tracker is the quiet moment a finished juz was saved
+  /// for: the reader is looking at it newly ticked, not mid-page.
+  ///
+  /// This deliberately hangs off the TAB TAP rather than the khatma
+  /// screen's own load. Every tab in the IndexedStack is built at app
+  /// start, so a screen-level hook would have fired the prompt on
+  /// launch, over whichever tab the reader was actually on.
+  void _onTabSelected(int i) {
+    setState(() => _idx = i);
+    if (i == _khatmaTab) {
+      // Does nothing unless a milestone is armed AND every gate is
+      // clear, which is rare by design.
+      AppReviewService.maybeRequestReview();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +70,7 @@ class _MainScreenState extends State<MainScreen> {
             unselectedLabelStyle:
                 const TextStyle(fontFamily: '.SF Pro Text', fontSize: 12),
             currentIndex: _idx,
-            onTap: (i) => setState(() => _idx = i),
+            onTap: _onTabSelected,
             items: [
               BottomNavigationBarItem(
                   icon: const Icon(Icons.draw_rounded),

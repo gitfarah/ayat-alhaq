@@ -9,6 +9,7 @@ import '../services/quran_audio_service.dart';
 import '../services/tafsir_service.dart';
 import '../services/tajweed_service.dart';
 import '../theme.dart';
+import '../services/app_review_service.dart';
 import 'about_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -956,6 +957,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           : AppColors.textSecondary),
                 )),
           ),
+          // Opens the store listing rather than the native rating
+          // sheet: Apple's guideline 1.1.7 forbids wiring
+          // requestReview() to a tap, and the sheet would usually be
+          // swallowed by its quota anyway. Hidden where the listing
+          // cannot be resolved (iOS before the App Store ID is set).
+          if (AppReviewService.canOpenListing)
+            GestureDetector(
+              onTap: AppReviewService.openStoreListing,
+              child: _Tile(
+                  isDark: isDark,
+                  icon: Icons.star_rounded,
+                  title: t('rateApp'),
+                  subtitle: t('rateAppHint'),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: Icon(Icons.open_in_new_rounded,
+                        size: 18,
+                        color: isDark
+                            ? AppColors.darkTextSec
+                            : AppColors.textSecondary),
+                  )),
+            ),
         ],
       ),
     );

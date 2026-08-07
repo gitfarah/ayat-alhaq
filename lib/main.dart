@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:provider/provider.dart';
 import 'package:device_preview/device_preview.dart';
+import 'services/app_review_service.dart';
 import 'services/settings_service.dart';
 import 'services/quran_audio_service.dart';
 import 'services/adhan_notification_service.dart';
@@ -35,6 +36,13 @@ void main() async {
     await AdhanNotificationService.initialize();
   } catch (_) {
     // Notification setup must never prevent the Quran from opening.
+  }
+  try {
+    // Counts this launch toward "used on N different days", the bar a
+    // rating prompt has to clear. Shows nothing by itself.
+    await AppReviewService.recordSession();
+  } catch (_) {
+    // Bookkeeping only — never worth blocking the app for.
   }
   // All orientations are allowed — the Mushaf and reader both have
   // dedicated landscape layouts.

@@ -588,29 +588,44 @@ class _TafsirScreenState extends State<TafsirScreen>
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: accent.withValues(alpha: 0.3)),
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<int>(
-              value: _selectedTafsirId,
-              isExpanded: true,
-              icon: Icon(Icons.arrow_drop_down, color: accent),
-              dropdownColor: cardBg,
-              borderRadius: BorderRadius.circular(12),
-              style: TextStyle(
-                color: bodyText,
-                fontSize: 15,
-                fontFamily: '.SF Pro Text',
+          // The screen as a whole is pinned LTR (see the Directionality
+          // in build) so its chrome keeps a fixed layout — but this
+          // control holds nothing but Arabic tafsir names, so it reads
+          // RTL: the name starts at the right edge and the chevron sits
+          // at the left, the way an Arabic picker is drawn.
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<int>(
+                value: _selectedTafsirId,
+                isExpanded: true,
+                icon: Icon(Icons.arrow_drop_down, color: accent),
+                dropdownColor: cardBg,
+                borderRadius: BorderRadius.circular(12),
+                style: TextStyle(
+                  color: bodyText,
+                  fontSize: 15,
+                  fontFamily: '.SF Pro Text',
+                ),
+                items: _tafsirOptions.map((tafsir) {
+                  return DropdownMenuItem<int>(
+                    value: tafsir.id,
+                    // ABSOLUTE, not AlignmentDirectional: the open menu
+                    // is a route whose direction comes from the overlay
+                    // (the app's UI language), not from the wrapper
+                    // above — a directional value would pin the names
+                    // right in the closed button but flip them left in
+                    // the open list whenever the UI is English/German.
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      tafsir.name,
+                      textAlign: TextAlign.right,
+                      textDirection: TextDirection.rtl,
+                    ),
+                  );
+                }).toList(),
+                onChanged: _onTafsirChanged,
               ),
-              items: _tafsirOptions.map((tafsir) {
-                return DropdownMenuItem<int>(
-                  value: tafsir.id,
-                  child: Text(
-                    tafsir.name,
-                    textAlign: TextAlign.right,
-                    textDirection: TextDirection.rtl,
-                  ),
-                );
-              }).toList(),
-              onChanged: _onTafsirChanged,
             ),
           ),
         ),

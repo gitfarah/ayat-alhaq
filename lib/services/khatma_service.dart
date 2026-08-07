@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/quran_page_meta.dart';
+import 'app_review_service.dart';
 import 'library_events.dart';
 
 /// Automatic khatma progress: reading screens report each page the
@@ -44,6 +45,11 @@ class KhatmaService {
     await p.setString(
         _khatmaKey, jsonEncode({'done': done, 'start': start}));
     LibraryEvents.khatma.ping();
+
+    // A juz finished by actually reading its pages is the one moment
+    // worth asking for a rating on. Only ARM it here — the reader is
+    // mid-page right now; the khatma tracker spends it later.
+    await AppReviewService.noteMilestone();
   }
 
   /// Number of distinct pages read so far (for the khatma screen).

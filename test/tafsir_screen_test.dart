@@ -127,6 +127,40 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the tafsir picker reads right-to-left: name at the right '
+      'edge, chevron at the left', (tester) async {
+    await open(tester);
+
+    final picker = find.byType(DropdownButton<int>);
+    expect(picker, findsOneWidget);
+
+    // The whole screen is pinned LTR for its chrome, so this control
+    // has to carry its own RTL — without it the Arabic name hugs the
+    // left and the chevron sits on the right, which is what a reader
+    // reported seeing.
+    expect(
+        tester
+            .widget<Directionality>(find
+                .ancestor(
+                    of: picker, matching: find.byType(Directionality))
+                .first)
+            .textDirection,
+        TextDirection.rtl);
+
+    // Geometry, not just intent: the selected name must actually render
+    // to the RIGHT of the chevron.
+    final nameX = tester
+        .getCenter(find
+            .descendant(of: picker, matching: find.text('التفسير الميسر'))
+            .first)
+        .dx;
+    final chevronX =
+        tester.getCenter(find.byIcon(Icons.arrow_drop_down).first).dx;
+    expect(nameX, greaterThan(chevronX),
+        reason: 'the Arabic name should start from the right, with the '
+            'dropdown chevron to its left');
+  });
+
   testWidgets('the caller-supplied ayah text is used as-is', (tester) async {
     await tester.pumpWidget(ChangeNotifierProvider(
       create: (_) => SettingsService(),
