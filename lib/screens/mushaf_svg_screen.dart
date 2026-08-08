@@ -30,12 +30,28 @@ import '../widgets/surah_frame.dart';
 import 'ayah_search_screen.dart';
 import 'tafsir_screen.dart';
 
+/// Share of a PHONE's width the glyph leaf may use, leaving a margin
+/// down each side.
+///
+/// Lines are justified with spaceBetween, so they always reach both
+/// edges of whatever width the leaf is given. At full width that put
+/// the first and last word of every line hard against the screen
+/// edges, with nothing to separate the text from the bezel. Tablets
+/// never had this: their leaf is already narrowed to a book column by
+/// the 0.58 rule below, which leaves margin as a side effect.
+///
+/// Deliberately small. The chosen font size scales with the leaf, so
+/// every point of margin is a point off the script — this is the least
+/// that visibly clears the edges.
+const double _phoneLeafWidthFraction = 0.94;
+
 /// The V2 glyph leaf's width for the given content-area size. Pulled
 /// out of `_buildV2Leaf` as a pure function so its device-dimension
 /// arithmetic can be unit-tested without pumping a widget tree.
 ///
 /// Keeps the familiar printed-page proportion on tablets in both
-/// orientations; phones retain their native full-width layout.
+/// orientations; phones get a slim side margin instead (see
+/// [_phoneLeafWidthFraction]) so the script never touches the edges.
 ///
 /// Portrait used to multiply height by 0.72, but a real iPad's own
 /// portrait aspect ratio (width/height ≈ 0.68-0.70) already sits above
@@ -51,7 +67,9 @@ double mushafV2LeafWidth({
   required double maxHeight,
   required bool isTablet,
 }) =>
-    !isTablet ? maxWidth : math.min(maxWidth, maxHeight * 0.58);
+    !isTablet
+        ? maxWidth * _phoneLeafWidthFraction
+        : math.min(maxWidth, maxHeight * 0.58);
 
 /// Fraction of a row's height the glyph is allowed to fill. Pulled out
 /// of `_buildV2GlyphLayout` for the same reason as [mushafV2LeafWidth].

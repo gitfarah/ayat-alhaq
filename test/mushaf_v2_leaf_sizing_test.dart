@@ -49,6 +49,11 @@ void main() {
         // Not so aggressive that it looks like a phone-width column
         // floating in a sea of margin.
         expect(leaf / entry.value.width, greaterThan(0.55));
+        // The tablet rule must stay narrower than the phone one, or
+        // tablets would silently inherit the phone margin instead of
+        // their book column.
+        expect(leaf, lessThan(entry.value.width * 0.94),
+            reason: '${entry.key} is no narrower than a phone margin');
       });
     }
 
@@ -70,12 +75,51 @@ void main() {
       expect(portraitLike, closeTo(maxHeight * 0.58, 0.01));
     });
 
-    test('phones are untouched — always full width, no narrowing', () {
-      // iPhone 14-ish content area. Explicitly NOT narrowed: the user
-      // was clear phones must not change.
-      final leaf =
-          mushafV2LeafWidth(maxWidth: 390, maxHeight: 704, isTablet: false);
-      expect(leaf, 390);
+    // 2026-08-08: this requirement REVERSED. Phones were previously
+    // pinned to full width on purpose ("phones must not change" when
+    // the iPad bug was fixed); the reported problem now is that full
+    // width leaves the script hard against both screen edges, because
+    // spaceBetween justification always fills whatever width the leaf
+    // is given. Phones now get a slim margin; tablets are unaffected.
+    group('phones get a side margin', () {
+      // Portrait content areas of real phones (logical points).
+      const phones = {
+        'iPhone SE': (width: 375.0, height: 667.0 - 140),
+        'iPhone 14': (width: 390.0, height: 844.0 - 140),
+        'iPhone 14 Pro Max': (width: 430.0, height: 932.0 - 140),
+        'Pixel 7': (width: 412.0, height: 915.0 - 140),
+      };
+
+      for (final entry in phones.entries) {
+        test('${entry.key}: the leaf clears both edges', () {
+          final leaf = mushafV2LeafWidth(
+            maxWidth: entry.value.width,
+            maxHeight: entry.value.height,
+            isTablet: false,
+          );
+
+          expect(leaf, lessThan(entry.value.width),
+              reason: '${entry.key} still fills the full width — the '
+                  'script would touch both screen edges');
+
+          // Real, visible margin on each side, but not so much that it
+          // eats the script: the font size scales with the leaf.
+          final sideMargin = (entry.value.width - leaf) / 2;
+          expect(sideMargin, greaterThan(8.0),
+              reason: 'too slim to read as a margin');
+          expect(sideMargin, lessThan(20.0),
+              reason: 'so wide the text shrinks noticeably');
+        });
+      }
+
+      test('height never binds on a phone — the margin is the only '
+          'thing narrowing it', () {
+        // A phone's leaf must not pick up the tablet 0.58 rule, which
+        // on a tall phone would crush it to a narrow column.
+        final leaf =
+            mushafV2LeafWidth(maxWidth: 390, maxHeight: 2000, isTablet: false);
+        expect(leaf, closeTo(390 * 0.94, 0.01));
+      });
     });
 
     test('a very short/wide tablet window still binds', () {
