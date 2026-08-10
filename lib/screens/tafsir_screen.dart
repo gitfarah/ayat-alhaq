@@ -7,7 +7,9 @@ import '../services/mutashabihat_service.dart';
 import '../services/quran_service.dart';
 import '../services/settings_service.dart';
 import '../services/tafsir_service.dart';
+import '../l10n/app_strings.dart';
 import '../theme.dart';
+import '../widgets/ayah_share_sheet.dart';
 
 /// The ayah study screen: tafsir plus the linguistic works — الإعراب،
 /// التصريف، المعنى، القراءات — and the المتشابهات cross-references.
@@ -359,6 +361,26 @@ class _TafsirScreenState extends State<TafsirScreen>
     t = t.replaceAllMapped(
         RegExp(r'\([^)]*\)'), (m) => '<span class="r">${m[0]}</span>');
     return t;
+  }
+
+  /// The loaded tafsir as plain text, for sharing. Sources return HTML
+  /// (paragraphs, headings, the odd <br>), which must not travel into a
+  /// chat message or a rendered card as raw tags.
+  String? _plainTafsir() {
+    final raw = _tafsirText;
+    if (raw == null || raw.trim().isEmpty) return null;
+    final text = raw
+        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
+        .replaceAll(RegExp(r'</(p|div|h[1-6])>', caseSensitive: false), '\n\n')
+        .replaceAll(RegExp('<[^>]*>'), '')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .trim();
+    return text.isEmpty ? null : text;
   }
 
   // ---------------------------------------------------------------
@@ -1089,6 +1111,28 @@ class _TafsirScreenState extends State<TafsirScreen>
             ),
           ),
           centerTitle: true,
+          actions: [
+            IconButton(
+              tooltip: L10n.of(context)('shareAyah'),
+              icon: Icon(Icons.ios_share_rounded, color: accent),
+              // The tafsir on screen is passed through, so sharing it
+              // with the verse costs no second fetch — and shares the
+              // edition the reader actually chose, not the default.
+              onPressed: () => showAyahShareSheet(
+                context,
+                surahNumber: widget.surahNumber,
+                surahName: widget.surahName,
+                ayahNumber: widget.ayahNumber,
+                ayahText: _ayahText ?? '',
+                tafsirText: _plainTafsir(),
+                tafsirName: _tafsirOptions
+                    .firstWhere((t) => t.id == _selectedTafsirId,
+                        orElse: () => _tafsirOptions.first)
+                    .name,
+                tafsirId: _selectedTafsirId,
+              ),
+            ),
+          ],
         ),
         // The ayah card scrolls away under a pinned tab bar: the longest
         // ayahs (e.g. 2:282) are taller than the screen on their own, so

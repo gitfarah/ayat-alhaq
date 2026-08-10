@@ -100,8 +100,8 @@ void main() {
 
   testWidgets(
       'the options sheet lists actions in the same order as the Mushaf: '
-      'recitation, tafsir, bookmark, highlight, note (copy is a Reader-'
-      'only extra at the end)', (tester) async {
+      'recitation, tafsir, bookmark, highlight, note, then share (copy is '
+      'a Reader-only extra before it)', (tester) async {
     await tester.pumpWidget(host());
     await settle(tester);
 
@@ -124,6 +124,7 @@ void main() {
           'تمييز الآية',
           'إضافة ملاحظة',
           'نسخ الآية',
+          'مشاركة',
         ],
         reason: 'must match the Mushaf sheet\'s order — a reader jumping '
             'between the two modes should find the same action in the '

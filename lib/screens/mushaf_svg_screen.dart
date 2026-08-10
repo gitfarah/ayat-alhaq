@@ -23,6 +23,7 @@ import '../l10n/app_strings.dart';
 import '../theme.dart';
 import '../widgets/ayah_sheet_header.dart';
 import '../widgets/ayah_note_sheet.dart';
+import '../widgets/ayah_share_sheet.dart';
 import '../widgets/mushaf_page_furniture.dart';
 import '../widgets/reciter_picker.dart';
 import '../widgets/surah_banner_painter.dart';
@@ -1179,6 +1180,33 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                       onTap: () {
                         Navigator.pop(context);
                         _editNote(region);
+                      }),
+                  ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.ios_share_rounded,
+                          color: AppColors.accent),
+                      title: Text(l('shareAyah'),
+                          textDirection: TextDirection.rtl,
+                          style: TextStyle(
+                              fontFamily: '.SF Pro Text',
+                              color: isDark
+                                  ? AppColors.darkText
+                                  : AppColors.textPrimary)),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        // An SVG page carries hit polygons, not words —
+                        // the verse has to be fetched before it can be
+                        // shared.
+                        final text = await QuranService.getAyahText(
+                            region.surahNumber, region.ayahNumber);
+                        if (!mounted) return;
+                        showAyahShareSheet(
+                          context,
+                          surahNumber: region.surahNumber,
+                          surahName: _surahName(region.surahNumber),
+                          ayahNumber: region.ayahNumber,
+                          ayahText: text,
+                        );
                       }),
                 ],
               ),

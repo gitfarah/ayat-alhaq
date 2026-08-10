@@ -16,6 +16,7 @@ import '../l10n/app_strings.dart';
 import '../theme.dart';
 import '../widgets/ayah_sheet_header.dart';
 import '../widgets/ayah_note_sheet.dart';
+import '../widgets/ayah_share_sheet.dart';
 import '../widgets/reciter_picker.dart';
 import '../widgets/reciting_ayah_text.dart';
 import '../widgets/surah_frame.dart';
@@ -571,6 +572,23 @@ class _ReaderScreenState extends State<ReaderScreen>
                 onTap: () {
                   Navigator.pop(context);
                   _copyAyah(ayah.text, ayah.numberInSurah);
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading:
+                    const Icon(Icons.ios_share_rounded, color: AppColors.accent),
+                title: Text(l('shareAyah'),
+                    style: const TextStyle(fontFamily: '.SF Pro Text')),
+                onTap: () {
+                  Navigator.pop(context);
+                  showAyahShareSheet(
+                    context,
+                    surahNumber: widget.surah.number,
+                    surahName: widget.surah.name,
+                    ayahNumber: ayah.numberInSurah,
+                    ayahText: ayah.text,
+                  );
                 },
               ),
                 ],
