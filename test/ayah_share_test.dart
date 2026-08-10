@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:quran_app_v1/services/ayah_share_service.dart';
 
@@ -62,6 +63,28 @@ void main() {
         tafsirName: 'التفسير الميسر',
       );
       expect(blank.hasTafsir, isFalse);
+    });
+  });
+
+  // Regression: the first cut passed no origin rect at all, and iOS
+  // validates it on iPhone as well as iPad — the share sheet then never
+  // appeared and the plugin call returned as though it had worked, so
+  // both share buttons looked like they did nothing.
+  group('share-sheet origin', () {
+    test('a real button rect is passed through untouched', () {
+      const rect = Rect.fromLTWH(20, 640, 160, 48);
+      expect(AyahShareService.safeOrigin(rect), rect);
+    });
+
+    test('a missing rect falls back to a non-zero one', () {
+      final origin = AyahShareService.safeOrigin(null);
+      expect(origin.width, greaterThan(0));
+      expect(origin.height, greaterThan(0));
+    });
+
+    test('a zero-sized rect is never handed to the platform', () {
+      final origin = AyahShareService.safeOrigin(Rect.zero);
+      expect(origin.isEmpty, isFalse);
     });
   });
 

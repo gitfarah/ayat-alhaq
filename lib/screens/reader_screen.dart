@@ -387,16 +387,6 @@ class _ReaderScreenState extends State<ReaderScreen>
     );
   }
 
-  Future<void> _copyAyah(String text, int n) async {
-    await Clipboard.setData(
-      ClipboardData(text: '${widget.surah.name} (${_ar(n)})\n$text'),
-    );
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(L10n.of(context)('copiedAyah'))),
-      );
-    }
-  }
 
   /// Opens the note editor for [ayah] and refreshes the marks so the
   /// note badge on the ayah appears/disappears right away.
@@ -561,17 +551,6 @@ class _ReaderScreenState extends State<ReaderScreen>
                 onTap: () async {
                   Navigator.pop(context);
                   await _editNote(ayah);
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading:
-                    const Icon(Icons.copy_rounded, color: AppColors.accent),
-                title: Text(l('copyAyah'),
-                    style: const TextStyle(fontFamily: '.SF Pro Text')),
-                onTap: () {
-                  Navigator.pop(context);
-                  _copyAyah(ayah.text, ayah.numberInSurah);
                 },
               ),
               ListTile(

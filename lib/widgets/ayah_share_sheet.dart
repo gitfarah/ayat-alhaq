@@ -77,6 +77,10 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
   bool _withTafsir = false;
   bool _busy = false;
 
+  // Needed to measure each button for the iOS share-sheet origin.
+  final _textKey = GlobalKey();
+  final _imageKey = GlobalKey();
+
   String? _fetchedTafsir;
   String? _fetchedTafsirName;
 
@@ -131,8 +135,20 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
     );
   }
 
-  Future<void> _share({required bool asImage}) async {
+  /// The rect of the button that was tapped, in global coordinates.
+  ///
+  /// iOS needs a real, non-zero source rect or the share sheet never
+  /// appears — the plugin call just returns. Measured from the button's
+  /// own render box, before the sheet closes and it stops existing.
+  Rect? _originOf(GlobalKey key) {
+    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  Future<void> _share({required bool asImage, required GlobalKey from}) async {
     if (_busy) return;
+    final origin = _originOf(from);
     setState(() => _busy = true);
     final l = L10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
@@ -140,14 +156,15 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
     try {
       final payload = await _payload();
       if (asImage) {
-        await AyahShareService.shareImage(payload);
+        await AyahShareService.shareImage(payload, origin: origin);
       } else {
-        await AyahShareService.shareText(payload);
+        await AyahShareService.shareText(payload, origin: origin);
       }
       if (mounted) navigator.pop();
-    } catch (_) {
+    } catch (e) {
       if (mounted) setState(() => _busy = false);
-      messenger.showSnackBar(SnackBar(content: Text(l('shareFailed'))));
+      messenger.showSnackBar(
+          SnackBar(content: Text('${l('shareFailed')} — $e')));
     }
   }
 
@@ -209,21 +226,25 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
                       children: [
                         Expanded(
                           child: _ShareButton(
+                            key: _textKey,
                             icon: Icons.text_fields_rounded,
                             label: l('shareAsText'),
                             filled: false,
                             isDark: isDark,
-                            onTap: () => _share(asImage: false),
+                            onTap: () =>
+                                _share(asImage: false, from: _textKey),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: _ShareButton(
+                            key: _imageKey,
                             icon: Icons.image_rounded,
                             label: l('shareAsImage'),
                             filled: true,
                             isDark: isDark,
-                            onTap: () => _share(asImage: true),
+                            onTap: () =>
+                                _share(asImage: true, from: _imageKey),
                           ),
                         ),
                       ],
@@ -246,6 +267,7 @@ class _ShareButton extends StatelessWidget {
   final VoidCallback onTap;
 
   const _ShareButton({
+    super.key,
     required this.icon,
     required this.label,
     required this.filled,

@@ -63,22 +63,46 @@ class AyahShareService {
     return b.toString();
   }
 
-  static Future<void> shareText(ShareableAyah a) =>
-      Share.share(buildText(a), subject: '${a.surahName} ${_ar(a.ayahNumber)}');
+  /// Where the share sheet should appear to come from.
+  ///
+  /// iOS REQUIRES this: Apple validates the origin rect on iPhone too,
+  /// not just on iPad, and a missing or zero-sized rect makes the share
+  /// sheet fail silently — the call returns as if it worked and nothing
+  /// is ever presented. Callers pass the rect of the control that was
+  /// tapped; [_safeOrigin] is the last-resort fallback.
+  @visibleForTesting
+  static Rect safeOrigin(Rect? origin) => _safeOrigin(origin);
+
+  static Rect _safeOrigin(Rect? origin) {
+    if (origin != null && origin.width > 0 && origin.height > 0) {
+      return origin;
+    }
+    return const Rect.fromLTWH(0, 0, 1, 1);
+  }
+
+  static Future<void> shareText(ShareableAyah a, {Rect? origin}) =>
+      SharePlus.instance.share(ShareParams(
+        text: buildText(a),
+        subject: '${a.surahName} ${_ar(a.ayahNumber)}',
+        sharePositionOrigin: _safeOrigin(origin),
+      ));
 
   /// Renders the card off-screen and hands the PNG to the share sheet.
   ///
   /// Drawn straight onto a canvas rather than screenshotting a widget:
   /// the card must look the same whatever the reader's theme, font size
   /// or screen is, and nothing about it is on screen to capture.
-  static Future<void> shareImage(ShareableAyah a) async {
+  static Future<void> shareImage(ShareableAyah a, {Rect? origin}) async {
     final bytes = await renderCard(a);
     final dir = await getTemporaryDirectory();
     final file = File(
         '${dir.path}${Platform.pathSeparator}ayah_${a.surahNumber}_${a.ayahNumber}.png');
     await file.writeAsBytes(bytes, flush: true);
-    await Share.shareXFiles([XFile(file.path)],
-        text: '${a.surahName} — ${_ar(a.ayahNumber)}');
+    await SharePlus.instance.share(ShareParams(
+      files: [XFile(file.path)],
+      text: '${a.surahName} — ${_ar(a.ayahNumber)}',
+      sharePositionOrigin: _safeOrigin(origin),
+    ));
   }
 
   /// The shareable card as PNG bytes. Public so a widget test can
