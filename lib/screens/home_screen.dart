@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_strings.dart';
+import '../models/quran_page_meta.dart';
 import '../models/surah.dart';
 import '../services/library_events.dart';
 import '../services/prayer_service.dart';
@@ -598,71 +599,147 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildLastRead(SettingsService s, bool isDark) => GestureDetector(
-        onTap: () async {
-          if (s.lastSurah != null) {
-            final surah = _all.firstWhere((x) => x.number == s.lastSurah,
-                orElse: () => _all.first);
-            Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) =>
-                        ReaderScreen(surah: surah, targetAyah: s.lastAyah)));
-          } else if (s.lastPage != null) {
-            Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => MushafSvgScreen(startPage: s.lastPage)));
-          }
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: isDark ? 0.2 : 0.08),
-              borderRadius: BorderRadius.circular(14),
-              border:
-                  Border.all(color: AppColors.primary.withValues(alpha: 0.25))),
-          child: Row(children: [
-            Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                    color: (isDark ? AppColors.darkPrimary : AppColors.primary)
-                        .withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10)),
-                child: Icon(Icons.auto_stories_rounded,
-                    color: isDark ? AppColors.darkPrimary : AppColors.primary,
-                    size: 18)),
-            const SizedBox(width: 8),
-            Expanded(
+  /// "Continue reading" — the emerald card that resumes wherever the
+  /// reader left off, in EITHER surface.
+  ///
+  /// Which one it resumes follows [SettingsService.lastReadWasMushaf]:
+  /// both surfaces record their own position, and the card used to
+  /// prefer the verse-by-verse reader whenever it had one, which meant
+  /// a Mushaf reader who had once opened the reader could never be
+  /// taken back to their page.
+  Widget _buildLastRead(SettingsService s, bool isDark) {
+    final l = L10n.of(context);
+    final mushaf = s.lastReadWasMushaf;
+    final page = s.lastPage;
+    if (mushaf && page == null) return const SizedBox.shrink();
+
+    // The surah list arrives asynchronously while the saved position is
+    // read from preferences immediately, so on the first frame there can
+    // be a last-read surah with nothing to look it up in.
+    final surah = mushaf
+        ? null
+        : _all.where((x) => x.number == s.lastSurah).firstOrNull;
+    if (!mushaf && surah == null) return const SizedBox.shrink();
+
+    // The heading is the surah either way — a page number alone says
+    // little about where you were.
+    final String title;
+    final String subtitle;
+    if (mushaf) {
+      title = QuranPageMeta.headerLabelForPage(page!);
+      subtitle = '${l('pageWord')} ${l.number(page)}';
+    } else {
+      title = surah!.name;
+      subtitle = s.lastAyah != null
+          ? '${l('ayahWord')} ${l.number(s.lastAyah!)}'
+          : '${l('surahNo')} ${l.number(s.lastSurah!)}';
+    }
+
+    void resume() => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => mushaf
+                ? MushafSvgScreen(startPage: page)
+                : ReaderScreen(surah: surah!, targetAyah: s.lastAyah),
+          ),
+        );
+
+    return GestureDetector(
+      onTap: resume,
+      child: Container(
+        height: 132,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [AppColors.primaryContainer, AppColors.primary],
+          ),
+          boxShadow: [
+            BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.28),
+                blurRadius: 14,
+                offset: const Offset(0, 6)),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            children: [
+              // An outsized open book bled off the leading edge, as the
+              // decoration rather than as an icon in a box.
+              PositionedDirectional(
+                start: -18,
+                bottom: -22,
+                child: Icon(Icons.menu_book_rounded,
+                    size: 132, color: Colors.white.withValues(alpha: 0.10)),
+              ),
+              Padding(
+                padding:
+                    const EdgeInsetsDirectional.fromSTEB(96, 14, 18, 14),
                 child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text(L10n.of(context)('lastRead'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: isDark
-                              ? AppColors.darkPrimary
-                              : AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          fontFamily: '.SF Pro Text')),
-                  if (s.lastSurah != null)
-                    Text(
-                        '${L10n.of(context)('surahNo')} ${L10n.of(context).number(s.lastSurah!)}${s.lastAyah != null ? ' · ${L10n.of(context)('ayahWord')} ${L10n.of(context).number(s.lastAyah!)}' : ''}',
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(l('lastRead'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            color: isDark
-                                ? AppColors.darkTextSec
-                                : AppColors.textSecondary,
-                            fontSize: 13,
+                            color: Colors.white.withValues(alpha: 0.75),
+                            fontSize: 12.5,
                             fontFamily: '.SF Pro Text')),
-                ])),
-          ]),
+                    const SizedBox(height: 2),
+                    Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textDirection: TextDirection.rtl,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'QuranHafs')),
+                    const SizedBox(height: 2),
+                    Text(subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.75),
+                            fontSize: 12.5,
+                            fontFamily: '.SF Pro Text')),
+                    const SizedBox(height: 8),
+                    // A real affordance, not just a tappable card: the
+                    // reference design leads with this pill.
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(l('continueReading'),
+                              style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: '.SF Pro Text')),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.arrow_back_rounded,
+                              size: 15, color: AppColors.primary),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-      );
+      ),
+    );
+  }
 
   Widget _buildSearch(bool isDark) => Container(
         margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),

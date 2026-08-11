@@ -247,7 +247,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   Future<void> _onPageSettled(int basePage) async {
     if (!mounted) return;
     setState(() => _pageNum = basePage);
-    context.read<SettingsService>().saveLastRead(page: basePage);
+    context.read<SettingsService>().saveLastRead(
+        page: basePage, mode: SettingsService.modeMushaf);
     KhatmaService.markPageRead(basePage);
     if (_wide && basePage + 1 <= 604) KhatmaService.markPageRead(basePage + 1);
 

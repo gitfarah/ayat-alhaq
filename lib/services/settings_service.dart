@@ -8,6 +8,7 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
   int? _lastSurah;
   int? _lastAyah;
   int? _lastPage;
+  String? _lastMode;
   String? _translationEdition;
   String _appLanguage = 'ar';
   bool _tajweed = false;
@@ -118,6 +119,24 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
   int? get lastPage => _lastPage;
   bool get hasLastRead => _lastSurah != null || _lastPage != null;
 
+  /// Which reading surface the reader was last in.
+  ///
+  /// Both surfaces have always recorded where they were, but the
+  /// continue card had no way to tell which was the more recent and so
+  /// always preferred the verse-by-verse reader — once you had opened
+  /// it even once, the card could never take you back to the Mushaf.
+  static const String modeReader = 'reader';
+  static const String modeMushaf = 'mushaf';
+
+  /// [modeReader] or [modeMushaf]. Null for a reader who last read on a
+  /// build from before this was recorded; the continue card then falls
+  /// back to whichever position it has.
+  String? get lastMode => _lastMode;
+
+  /// Whether continuing should reopen the Mushaf rather than the reader.
+  bool get lastReadWasMushaf =>
+      _lastMode == modeMushaf || (_lastMode == null && _lastSurah == null);
+
   /// alquran.cloud edition id for the per-ayah translation shown in the
   /// reader (e.g. 'de.aburida'), or null when translation is off.
   String? get translationEdition => _translationEdition;
@@ -163,6 +182,7 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
     _lastSurah = p.getInt('lastSurah');
     _lastAyah = p.getInt('lastAyah');
     _lastPage = p.getInt('lastPage');
+    _lastMode = p.getString('lastMode');
     final edition = p.getString('translationEdition');
     _translationEdition = (edition == null || edition.isEmpty) ? null : edition;
     _appLanguage = p.getString('appLanguage') ?? 'ar';
@@ -198,11 +218,16 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  Future<void> saveLastRead({int? surah, int? ayah, int? page}) async {
+  Future<void> saveLastRead(
+      {int? surah, int? ayah, int? page, String? mode}) async {
     final p = await SharedPreferences.getInstance();
     if (surah != null) { _lastSurah = surah; p.setInt('lastSurah', surah); }
     if (ayah != null) { _lastAyah = ayah; p.setInt('lastAyah', ayah); }
     if (page != null) { _lastPage = page; p.setInt('lastPage', page); }
+    // Each surface keeps its own position, so switching back and forth
+    // never loses the other one — only which of the two to RESUME
+    // changes here.
+    if (mode != null) { _lastMode = mode; p.setString('lastMode', mode); }
     notifyListeners();
   }
 }

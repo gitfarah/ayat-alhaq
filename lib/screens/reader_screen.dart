@@ -193,6 +193,7 @@ class _ReaderScreenState extends State<ReaderScreen>
         context.read<SettingsService>().saveLastRead(
               surah: widget.surah.number,
               ayah: a.numberInSurah,
+              mode: SettingsService.modeReader,
             );
         // Khatma auto-tracking: scrolling into a page counts it as read.
         KhatmaService.markPageRead(a.page);

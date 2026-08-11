@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../theme.dart';
+import '../widgets/surah_banner_painter.dart';
 
 /// One ayah packaged for sharing — the verse, where it sits, and
 /// optionally the tafsir the reader was looking at.
@@ -200,10 +201,10 @@ class AyahShareService {
       maxWidth: contentWidth - 120,
     );
 
-    // The surah banner: a bordered plate the title sits inside, the way
-    // a printed Mushaf heads each surah — and the way both reference
-    // apps open their cards.
-    final bannerHeight = surahTitle.height + 36;
+    // The surah banner: the SAME ornamental band the Mushaf pages are
+    // headed with — cartouche, doubled keyline and end florets — rather
+    // than a plainer plate that only half-matched it.
+    final bannerHeight = surahTitle.height * 2.0;
 
     const gapAfterBanner = 52.0;
     const gapAfterVerse = 30.0;
@@ -258,19 +259,32 @@ class AyahShareService {
     var y = margin;
 
     // ── Surah banner
-    final bannerRect = RRect.fromRectAndRadius(
-        Rect.fromLTWH(margin, y, contentWidth, bannerHeight),
-        const Radius.circular(18));
-    canvas.drawRRect(
-        bannerRect, Paint()..color = Colors.white.withValues(alpha: 0.06));
-    canvas.drawRRect(
-      bannerRect,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = AppColors.gold.withValues(alpha: 0.7),
+    //
+    // The ornament is sized around the NAME's own ink, exactly as it is
+    // on a page: maxIntrinsicWidth is the name's true drawn width, not
+    // the full column the paragraph was laid out in.
+    final nameWidth = surahTitle.maxIntrinsicWidth;
+    final bandRect = Rect.fromLTWH(margin, y, contentWidth, bannerHeight);
+    paintSurahBand(
+      canvas,
+      band: bandRect,
+      ink: Rect.fromCenter(
+        center: bandRect.center,
+        width: nameWidth,
+        height: bannerTitleSize,
+      ),
+      // The card's own deep-emerald ground stands in for the page
+      // colour, so the band belongs to the card the way it belongs to
+      // a leaf.
+      palette: const SurahBandPalette(
+        bandFill: Color(0xFF16342A),
+        innerFill: AppColors.primary,
+        rule: Color(0xFFB99239),
+        gold: AppColors.gold,
+      ),
     );
-    canvas.drawParagraph(surahTitle, Offset(margin, y + 18));
+    canvas.drawParagraph(
+        surahTitle, Offset(margin, y + (bannerHeight - surahTitle.height) / 2));
     y += bannerHeight + gapAfterBanner;
 
     canvas.drawParagraph(verse, Offset(margin, y));
