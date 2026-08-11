@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -105,28 +106,62 @@ class AyahShareService {
     ));
   }
 
+  /// Writes the card straight into the device's photo library, under an
+  /// album of the app's own — for a reader who wants to keep the verse
+  /// rather than send it on.
+  ///
+  /// Throws [GalException] when the user denies photo access, which the
+  /// caller turns into a message rather than a silent no-op.
+  static Future<void> saveImageToGallery(ShareableAyah a) async {
+    final bytes = await renderCard(a);
+    final dir = await getTemporaryDirectory();
+    final file = File(
+        '${dir.path}${Platform.pathSeparator}ayah_${a.surahNumber}_${a.ayahNumber}.png');
+    await file.writeAsBytes(bytes, flush: true);
+    await Gal.putImage(file.path, album: _appName);
+  }
+
   /// The shareable card as PNG bytes. Public so a widget test can
   /// assert it renders without touching the platform share sheet.
   static Future<Uint8List> renderCard(ShareableAyah a) async {
     const width = 1080.0;
-    const margin = 72.0;
+    const margin = 64.0;
     const contentWidth = width - margin * 2;
+
+    // Type is sized for a card read at thumbnail size in a chat, not on
+    // a page — the first cut was laid out at reading sizes and came out
+    // unreadably small once the image was scaled to fit a message.
+    const bannerTitleSize = 46.0;
+    const verseSize = 74.0;
+    const tafsirTitleSize = 40.0;
+    const tafsirBodySize = 42.0;
 
     // Lay every text block out first: the card's height follows its
     // content, so a long tafsir grows the image instead of being cut.
+    final surahTitle = _paragraph(
+      a.surahName,
+      fontFamily: 'QuranHafs',
+      fontSize: bannerTitleSize,
+      height: 1.5,
+      color: AppColors.gold,
+      align: TextAlign.center,
+      maxWidth: contentWidth - 80,
+    );
     final verse = _paragraph(
       '﴿${a.ayahText}﴾',
       fontFamily: 'QuranHafs',
-      fontSize: 54,
+      fontSize: verseSize,
       height: 2.0,
       color: Colors.white,
       align: TextAlign.center,
       maxWidth: contentWidth,
     );
+    // Just the ayah number — the surah is already named in the banner
+    // above, and printing it twice on one card reads as a mistake.
     final reference = _paragraph(
-      '${a.surahName} — ${_ar(a.ayahNumber)}',
+      'الآية ${_ar(a.ayahNumber)}',
       fontFamily: 'QuranHafs',
-      fontSize: 34,
+      fontSize: 38,
       height: 1.4,
       color: AppColors.gold,
       align: TextAlign.center,
@@ -136,7 +171,7 @@ class AyahShareService {
         ? _paragraph(
             a.tafsirName ?? 'التفسير',
             fontFamily: '.SF Pro Text',
-            fontSize: 30,
+            fontSize: tafsirTitleSize,
             height: 1.4,
             color: AppColors.gold,
             align: TextAlign.center,
@@ -148,9 +183,9 @@ class AyahShareService {
         ? _paragraph(
             a.tafsirText!.trim(),
             fontFamily: '.SF Pro Text',
-            fontSize: 30,
-            height: 1.75,
-            color: Colors.white.withValues(alpha: 0.92),
+            fontSize: tafsirBodySize,
+            height: 1.8,
+            color: Colors.white.withValues(alpha: 0.94),
             align: TextAlign.right,
             maxWidth: contentWidth,
           )
@@ -158,20 +193,31 @@ class AyahShareService {
     final brand = _paragraph(
       _appName,
       fontFamily: 'QuranHafs',
-      fontSize: 36,
+      fontSize: 42,
       height: 1.3,
       color: Colors.white,
       align: TextAlign.left,
-      maxWidth: contentWidth - 110,
+      maxWidth: contentWidth - 120,
     );
 
-    const gapAfterVerse = 28.0;
-    const gapBeforeRule = 44.0;
-    const gapAfterRule = 40.0;
-    const gapTafsirTitle = 20.0;
-    const footerHeight = 96.0;
+    // The surah banner: a bordered plate the title sits inside, the way
+    // a printed Mushaf heads each surah — and the way both reference
+    // apps open their cards.
+    final bannerHeight = surahTitle.height + 36;
 
-    var height = margin + verse.height + gapAfterVerse + reference.height;
+    const gapAfterBanner = 52.0;
+    const gapAfterVerse = 30.0;
+    const gapBeforeRule = 48.0;
+    const gapAfterRule = 42.0;
+    const gapTafsirTitle = 22.0;
+    const footerHeight = 104.0;
+
+    var height = margin +
+        bannerHeight +
+        gapAfterBanner +
+        verse.height +
+        gapAfterVerse +
+        reference.height;
     if (tafsirBody != null) {
       height += gapBeforeRule +
           1 +
@@ -210,6 +256,23 @@ class AyahShareService {
     );
 
     var y = margin;
+
+    // ── Surah banner
+    final bannerRect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(margin, y, contentWidth, bannerHeight),
+        const Radius.circular(18));
+    canvas.drawRRect(
+        bannerRect, Paint()..color = Colors.white.withValues(alpha: 0.06));
+    canvas.drawRRect(
+      bannerRect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = AppColors.gold.withValues(alpha: 0.7),
+    );
+    canvas.drawParagraph(surahTitle, Offset(margin, y + 18));
+    y += bannerHeight + gapAfterBanner;
+
     canvas.drawParagraph(verse, Offset(margin, y));
     y += verse.height + gapAfterVerse;
     canvas.drawParagraph(reference, Offset(margin, y));
@@ -233,10 +296,10 @@ class AyahShareService {
     final logo = await _loadLogo();
     final footerTop = y;
     if (logo != null) {
-      const logoSize = 72.0;
+      const logoSize = 84.0;
       final rrect = RRect.fromRectAndRadius(
           Rect.fromLTWH(margin, footerTop, logoSize, logoSize),
-          const Radius.circular(16));
+          const Radius.circular(18));
       canvas.save();
       canvas.clipRRect(rrect);
       canvas.drawImageRect(

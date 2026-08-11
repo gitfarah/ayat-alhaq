@@ -103,5 +103,18 @@ void main() {
       // Same width, more content — so the file must grow.
       expect(tall.length, greaterThan(short.length));
     });
+
+    // The first cut laid the card out at on-page reading sizes, which
+    // came out unreadable once the image was scaled down into a chat.
+    test('type is sized for a card, not a page', () async {
+      final bytes = await AyahShareService.renderCard(ayahOnly);
+      final image = await decodeImageFromList(bytes);
+      addTearDown(image.dispose);
+      expect(image.width, 1080);
+      // A short verse with a banner, reference and footer still needs
+      // real vertical room at these sizes; a collapsed card means the
+      // paragraphs laid out far smaller than intended.
+      expect(image.height, greaterThan(600));
+    });
   });
 }

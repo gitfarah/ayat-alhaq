@@ -14,6 +14,11 @@
 	     microphone APIs of AVAudioSession. -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app does not record audio. This permission is only referenced by the audio playback framework used for Quran recitation. لا يسجّل هذا التطبيق أي صوت؛ هذا الإذن مطلوب فقط من مكتبة تشغيل التلاوة.</string>
+	<!-- Only ever "add", never "read": the app saves a shared ayah card
+	     to the photo library on request and never looks at existing
+	     photos, so the add-only key is the one that applies. -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save the ayah card you chose to share into your photo library. لحفظ بطاقة الآية التي اخترت مشاركتها في معرض الصور.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

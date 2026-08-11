@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gal/gal.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/app_strings.dart';
@@ -168,6 +169,33 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
     }
   }
 
+  /// Keeps the card in the reader's own photo library instead of
+  /// sending it anywhere.
+  Future<void> _saveToPhotos() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final l = L10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await AyahShareService.saveImageToGallery(await _payload());
+      if (mounted) navigator.pop();
+      messenger.showSnackBar(SnackBar(content: Text(l('savedToPhotos'))));
+    } on GalException catch (e) {
+      if (mounted) setState(() => _busy = false);
+      // A refused photo-library prompt is the ordinary case here, and
+      // deserves plain wording rather than an exception dump.
+      messenger.showSnackBar(SnackBar(
+          content: Text(e.type == GalExceptionType.accessDenied
+              ? l('savePhotoDenied')
+              : '${l('shareFailed')} — ${e.type.name}')));
+    } catch (e) {
+      if (mounted) setState(() => _busy = false);
+      messenger.showSnackBar(
+          SnackBar(content: Text('${l('shareFailed')} — $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = L10n.of(context);
@@ -249,6 +277,16 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
                         ),
                       ],
                     ),
+                  if (!_busy) ...[
+                    const SizedBox(height: 10),
+                    _ShareButton(
+                      icon: Icons.download_rounded,
+                      label: l('saveToPhotos'),
+                      filled: false,
+                      isDark: isDark,
+                      onTap: _saveToPhotos,
+                    ),
+                  ],
                 ],
               ),
             ),
