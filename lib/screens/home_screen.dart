@@ -647,7 +647,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: resume,
       child: Container(
-        height: 132,
+        // No fixed height: the pill was being clipped off the bottom
+        // whenever the type ran a little taller than the 132 assumed.
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           gradient: const LinearGradient(
@@ -662,80 +664,81 @@ class _HomeScreenState extends State<HomeScreen> {
                 offset: const Offset(0, 6)),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            children: [
-              // An outsized open book bled off the leading edge, as the
-              // decoration rather than as an icon in a box.
-              PositionedDirectional(
-                start: -18,
-                bottom: -22,
-                child: Icon(Icons.menu_book_rounded,
-                    size: 132, color: Colors.white.withValues(alpha: 0.10)),
-              ),
-              Padding(
-                padding:
-                    const EdgeInsetsDirectional.fromSTEB(96, 14, 18, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(l('lastRead'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.75),
-                            fontSize: 12.5,
-                            fontFamily: '.SF Pro Text')),
-                    const SizedBox(height: 2),
-                    Text(title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textDirection: TextDirection.rtl,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'QuranHafs')),
-                    const SizedBox(height: 2),
-                    Text(subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.75),
-                            fontSize: 12.5,
-                            fontFamily: '.SF Pro Text')),
-                    const SizedBox(height: 8),
-                    // A real affordance, not just a tappable card: the
-                    // reference design leads with this pill.
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(l('continueReading'),
-                              style: const TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: '.SF Pro Text')),
-                          const SizedBox(width: 6),
-                          const Icon(Icons.arrow_back_rounded,
-                              size: 15, color: AppColors.primary),
-                        ],
-                      ),
+        // A plain Row, deliberately: it lays out start-to-end, so the
+        // words sit on the reading edge and the illustration opposite
+        // them — right/left in Arabic, left/right in English and
+        // German — with no per-language special-casing.
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(l('lastRead'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.75),
+                          fontSize: 12.5,
+                          fontFamily: '.SF Pro Text')),
+                  const SizedBox(height: 2),
+                  Text(title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textDirection: TextDirection.rtl,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'QuranHafs')),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.75),
+                          fontSize: 12.5,
+                          fontFamily: '.SF Pro Text')),
+                  const SizedBox(height: 10),
+                  // A real affordance, not just a tappable card.
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(l('continueReading'),
+                            style: const TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: '.SF Pro Text')),
+                        const SizedBox(width: 6),
+                        // Points the way the reader is going, which is
+                        // the opposite arrow in a left-to-right UI.
+                        Icon(
+                            Directionality.of(context) == TextDirection.rtl
+                                ? Icons.arrow_back_rounded
+                                : Icons.arrow_forward_rounded,
+                            size: 15,
+                            color: AppColors.primary),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 10),
+            Image.asset('assets/icon/mushaf_illustration.png',
+                height: 104,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const SizedBox(width: 0)),
+          ],
         ),
       ),
     );

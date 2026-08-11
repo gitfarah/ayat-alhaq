@@ -8,6 +8,7 @@ import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../models/quran_page_meta.dart';
 import '../theme.dart';
 import '../widgets/surah_banner_painter.dart';
 
@@ -139,14 +140,22 @@ class AyahShareService {
 
     // Lay every text block out first: the card's height follows its
     // content, so a long tafsir grows the image instead of being cut.
+    // The band is read as calligraphy, so it takes the fully voweled
+    // name the Mushaf's own title bands use — not the bare navigation
+    // label the caller happens to hold, which is what made the card's
+    // header look like a different typeface from the page's.
+    //
+    // Laid out across the FULL content width so the paragraph's centre
+    // coincides with the band's; at a narrower width it was centred
+    // inside its own box and sat off-centre in the cartouche.
     final surahTitle = _paragraph(
-      a.surahName,
+      QuranPageMeta.voweledSurahName(a.surahNumber),
       fontFamily: 'QuranHafs',
       fontSize: bannerTitleSize,
       height: 1.5,
       color: AppColors.gold,
       align: TextAlign.center,
-      maxWidth: contentWidth - 80,
+      maxWidth: contentWidth,
     );
     final verse = _paragraph(
       '﴿${a.ayahText}﴾',
