@@ -1,7 +1,7 @@
 name: quran_app_v1
 description: A Quran reading app for Android and iOS.
 publish_to: 'none'
-version: 1.7.2+67
+version: 1.7.2+68
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -76,6 +76,13 @@ flutter:
     # resolves to Apple's on-device San Francisco font, never bundled —
     # its licence doesn't allow redistribution, and "SF Arabic" isn't a
     # nameable font third-party apps can look up directly.
+    # Surah TITLES only — QUL's "Surah name v2", a ligature font in
+    # which the string "surah005" becomes the calligraphic
+    # "سُورَةُ المَائِدَة" as a printed Mushaf sets it. Nothing else
+    # renders: it carries the 114 names and no ordinary letters.
+    - family: SurahNameV2
+      fonts:
+        - asset: assets/fonts/SurahNameV2.ttf
     # Quran VERSES ONLY — the Uthmanic Hafs typeface of the printed Mushaf.
     - family: QuranHafs
       fonts:

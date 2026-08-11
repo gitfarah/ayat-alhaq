@@ -8,7 +8,6 @@ import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../models/quran_page_meta.dart';
 import '../theme.dart';
 import '../widgets/surah_banner_painter.dart';
 
@@ -41,6 +40,12 @@ class ShareableAyah {
 /// plain text, or a rendered card image with the app's name and logo.
 class AyahShareService {
   static const String _appName = 'آيات الحق';
+
+  /// The lookup string the surah-name font turns into surah [n]'s
+  /// calligraphic title. Nothing else in that font renders, so getting
+  /// this wrong leaves the band silently empty rather than wrong.
+  static String surahNameGlyph(int n) =>
+      'surah${n.toString().padLeft(3, '0')}';
 
   static String _ar(int n) {
     const d = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
@@ -133,29 +138,33 @@ class AyahShareService {
     // Type is sized for a card read at thumbnail size in a chat, not on
     // a page — the first cut was laid out at reading sizes and came out
     // unreadably small once the image was scaled to fit a message.
-    const bannerTitleSize = 46.0;
+    // The name font's ink sits well inside its em box, so it needs a
+    // far larger size than a text face to read at the same weight.
+    const bannerTitleSize = 96.0;
     const verseSize = 74.0;
     const tafsirTitleSize = 40.0;
     const tafsirBodySize = 42.0;
 
     // Lay every text block out first: the card's height follows its
     // content, so a long tafsir grows the image instead of being cut.
-    // The band is read as calligraphy, so it takes the fully voweled
-    // name the Mushaf's own title bands use — not the bare navigation
-    // label the caller happens to hold, which is what made the card's
-    // header look like a different typeface from the page's.
+    // The name is SET, not typed: "surah005" is a ligature in the
+    // surah-name font and comes out as the calligraphic
+    // "سُورَةُ المَائِدَة" a printed Mushaf heads its pages with.
+    // Spelling the name in an ordinary text face — which is what this
+    // did before — could never look like the page it is quoting.
     //
     // Laid out across the FULL content width so the paragraph's centre
     // coincides with the band's; at a narrower width it was centred
     // inside its own box and sat off-centre in the cartouche.
     final surahTitle = _paragraph(
-      QuranPageMeta.voweledSurahName(a.surahNumber),
-      fontFamily: 'QuranHafs',
+      surahNameGlyph(a.surahNumber),
+      fontFamily: 'SurahNameV2',
       fontSize: bannerTitleSize,
-      height: 1.5,
+      height: 1.0,
       color: AppColors.gold,
       align: TextAlign.center,
       maxWidth: contentWidth,
+      fontFeatures: const [ui.FontFeature.enable('liga')],
     );
     final verse = _paragraph(
       '﴿${a.ayahText}﴾',
@@ -374,6 +383,7 @@ class AyahShareService {
     required TextAlign align,
     required double maxWidth,
     bool bold = false,
+    List<ui.FontFeature>? fontFeatures,
   }) {
     final builder = ui.ParagraphBuilder(ui.ParagraphStyle(
       textAlign: align,
@@ -389,6 +399,7 @@ class AyahShareService {
         fontSize: fontSize,
         height: height,
         fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+        fontFeatures: fontFeatures,
       ))
       ..addText(text);
     return builder.build()

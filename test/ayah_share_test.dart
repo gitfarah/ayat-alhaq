@@ -88,6 +88,18 @@ void main() {
     });
   });
 
+  // The surah-name font is a LIGATURE font: it carries the 114 names
+  // and no ordinary letters, so the wrong lookup string renders as
+  // nothing at all rather than as wrong-looking text. "005" alone draws
+  // an empty band; only "surah005" resolves.
+  group('surah-name lookup string', () {
+    test('is the zero-padded surah number behind a "surah" prefix', () {
+      expect(AyahShareService.surahNameGlyph(5), 'surah005');
+      expect(AyahShareService.surahNameGlyph(1), 'surah001');
+      expect(AyahShareService.surahNameGlyph(114), 'surah114');
+    });
+  });
+
   group('shared card', () {
     test('renders a PNG for a verse on its own', () async {
       final bytes = await AyahShareService.renderCard(ayahOnly);
