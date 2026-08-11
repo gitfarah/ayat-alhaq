@@ -7,26 +7,23 @@ import '../services/settings_service.dart';
 import '../theme.dart';
 import 'reader_screen.dart';
 
-/// Full-text search across all ayahs. Opened from the home screen's
-/// search box; tapping a result jumps straight to that ayah in the
-/// reader.
+/// Full-text search across all ayahs and surah names — the WHOLE
+/// Quran, every time. Used identically from the home screen, the
+/// Mushaf and the reader, so a search means the same thing and reaches
+/// the same results no matter which screen it was opened from.
 ///
-/// When opened from the Mushaf, [surahNumbers] scopes both the query
-/// and the results to the surah(s) shown on the current page — a page
-/// almost always holds one surah, but a few short surahs share a page,
-/// so this is a set rather than a single number. Surah-name matching is
-/// skipped in that mode: the reader is already inside a surah, and
-/// "find me this surah" makes no sense there.
+/// By default tapping a result opens it in [ReaderScreen]. Pass
+/// [returnResultToCaller] to instead pop the picked [AyahSearchResult]
+/// back to the caller — what the Mushaf and the reader both do, so
+/// picking a result can jump to it IN PLACE (the same page, the same
+/// edition, the same open surah) instead of always leaving for the
+/// reader.
 class AyahSearchScreen extends StatefulWidget {
   final String initialQuery;
-  final Set<int>? surahNumbers;
-  final String? scopeLabel;
   final bool returnResultToCaller;
   const AyahSearchScreen({
     super.key,
     this.initialQuery = '',
-    this.surahNumbers,
-    this.scopeLabel,
     this.returnResultToCaller = false,
   });
 
@@ -78,14 +75,11 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
       _error = null;
     });
     try {
-      final scoped = widget.surahNumbers;
       // Surah-name matches surface FIRST — typing a surah's name should
       // find the surah itself, not just ayahs containing those words.
-      // Skipped entirely when scoped to a surah already open in the
-      // Mushaf: there is nothing to "find" outside it.
       final results = await Future.wait([
-        scoped == null ? QuranService.searchSurahs(q) : Future.value(<Surah>[]),
-        QuranService.searchAyahs(q, surahNumbers: scoped),
+        QuranService.searchSurahs(q),
+        QuranService.searchAyahs(q),
       ]);
       if (!mounted || _controller.text.trim() != q) return;
       setState(() {
@@ -132,35 +126,63 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
     final primary = isDark ? AppColors.darkPrimary : AppColors.primary;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: primary.withValues(alpha: 0.55))),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-        onTap: () => Navigator.push(
-            context, MaterialPageRoute(builder: (_) => ReaderScreen(surah: s))),
-        leading: Icon(Icons.menu_book_rounded, color: primary, size: 22),
-        title: Text(s.name,
-            textAlign: TextAlign.right,
-            textDirection: TextDirection.rtl,
-            style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'QuranHafs',
-                color: isDark ? AppColors.darkText : AppColors.textPrimary)),
-        subtitle: Text(
-            '${s.revelationType == 'Meccan' ? 'مكية' : 'مدنية'} • ${_ar(s.numberOfAyahs)} آية',
-            textAlign: TextAlign.right,
-            textDirection: TextDirection.rtl,
-            style: TextStyle(
-                fontFamily: '.SF Pro Text',
-                fontSize: 13,
-                color:
-                    isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
-        trailing: Icon(Icons.chevron_left_rounded,
-            color: isDark ? AppColors.darkTextSec : AppColors.textSecondary,
-            size: 18),
+      // Material, not a plain Container+BoxDecoration: ListTile paints
+      // its background tint and tap ripple on the nearest Material
+      // ancestor, so a colour sitting on a Container ABOVE it (as this
+      // used to) makes both invisible — caught by Flutter's own debug
+      // assertion once a widget test actually rendered this tile.
+      child: Material(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: primary.withValues(alpha: 0.55))),
+        child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+          onTap: () {
+            // Same contract as an ayah result: a caller that asked for
+            // the result back (the Mushaf, the reader) gets it back —
+            // opening ReaderScreen directly here would silently break
+            // out of whichever mode the search was opened from. Ayah 1
+            // stands in for "the surah itself", the same as tapping its
+            // home-screen card would land on.
+            if (widget.returnResultToCaller) {
+              Navigator.pop(
+                  context,
+                  AyahSearchResult(
+                      surahNumber: s.number,
+                      surahName: s.name,
+                      numberInSurah: 1,
+                      text: ''));
+              return;
+            }
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => ReaderScreen(surah: s)));
+          },
+          leading: Icon(Icons.menu_book_rounded, color: primary, size: 22),
+          title: Text(s.name,
+              textAlign: TextAlign.right,
+              textDirection: TextDirection.rtl,
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'QuranHafs',
+                  color: isDark ? AppColors.darkText : AppColors.textPrimary)),
+          subtitle: Text(
+              '${s.revelationType == 'Meccan' ? 'مكية' : 'مدنية'} • ${_ar(s.numberOfAyahs)} آية',
+              textAlign: TextAlign.right,
+              textDirection: TextDirection.rtl,
+              style: TextStyle(
+                  fontFamily: '.SF Pro Text',
+                  fontSize: 13,
+                  color: isDark
+                      ? AppColors.darkTextSec
+                      : AppColors.textSecondary)),
+          trailing: Icon(Icons.chevron_left_rounded,
+              color: isDark ? AppColors.darkTextSec : AppColors.textSecondary,
+              size: 18),
+        ),
       ),
     );
   }
@@ -170,12 +192,8 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
     final isDark = context.watch<SettingsService>().isDarkIn(context);
     final subColor = isDark ? AppColors.darkTextSec : AppColors.textSecondary;
 
-    final scoped = widget.surahNumbers != null;
     return Scaffold(
-      appBar: AppBar(
-          title: Text(scoped
-              ? 'البحث في ${widget.scopeLabel ?? "السورة"}'
-              : 'البحث في الآيات')),
+      appBar: AppBar(title: const Text('البحث في الآيات')),
       body: Column(children: [
         Container(
           margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -207,9 +225,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                             isDark ? AppColors.darkText : AppColors.textPrimary,
                         fontFamily: '.SF Pro Text'),
                     decoration: InputDecoration(
-                        hintText: scoped
-                            ? 'اكتب كلمة أو جزءاً من آية في هذه السورة...'
-                            : 'اكتب كلمة أو جزءاً من آية...',
+                        hintText: 'اكتب كلمة أو جزءاً من آية...',
                         hintTextDirection: TextDirection.rtl,
                         hintStyle: TextStyle(
                             color: isDark
@@ -261,44 +277,50 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                         final r = _results[i - _surahResults.length];
                         return Container(
                           margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(
-                              color:
-                                  isDark ? AppColors.darkSurface : Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                  color: isDark
-                                      ? AppColors.darkBorder
-                                      : AppColors.border)),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 6),
-                            onTap: () => _open(r),
-                            title: Text(r.text,
-                                textDirection: TextDirection.rtl,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    height: 1.8,
-                                    fontFamily: 'QuranHafs',
+                          // Material, not Container+BoxDecoration — see
+                          // the identical note on _surahTile above; the
+                          // same bug was duplicated in this tile too.
+                          child: Material(
+                            color:
+                                isDark ? AppColors.darkSurface : Colors.white,
+                            clipBehavior: Clip.antiAlias,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                side: BorderSide(
                                     color: isDark
-                                        ? AppColors.darkText
-                                        : AppColors.textPrimary)),
-                            subtitle: Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                  '${r.surahName} • الآية ${_ar(r.numberInSurah)}',
+                                        ? AppColors.darkBorder
+                                        : AppColors.border)),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 6),
+                              onTap: () => _open(r),
+                              title: Text(r.text,
                                   textDirection: TextDirection.rtl,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                      color: isDark
-                                          ? AppColors.darkPrimary
-                                          : AppColors.primary,
+                                      fontSize: 16,
+                                      height: 1.8,
                                       fontFamily: 'QuranHafs',
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold)),
+                                      color: isDark
+                                          ? AppColors.darkText
+                                          : AppColors.textPrimary)),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                    '${r.surahName} • الآية ${_ar(r.numberInSurah)}',
+                                    textDirection: TextDirection.rtl,
+                                    style: TextStyle(
+                                        color: isDark
+                                            ? AppColors.darkPrimary
+                                            : AppColors.primary,
+                                        fontFamily: 'QuranHafs',
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold)),
+                              ),
+                              trailing: Icon(Icons.chevron_left_rounded,
+                                  color: subColor, size: 18),
                             ),
-                            trailing: Icon(Icons.chevron_left_rounded,
-                                color: subColor, size: 18),
                           ),
                         );
                       }),

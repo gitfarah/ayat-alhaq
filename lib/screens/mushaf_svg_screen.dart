@@ -46,6 +46,23 @@ import 'tafsir_screen.dart';
 /// that visibly clears the edges.
 const double _phoneLeafWidthFraction = 0.94;
 
+/// Ink opacity for the main glyph body, per glyph edition.
+///
+/// The Madinah V1 (1405H) page font reads noticeably heavier than V2/V4
+/// at what SHOULD be the same weight — verified against the font files
+/// themselves, not just by eye: every page of all three editions
+/// declares `OS/2.usWeightClass = 400` and no bold bit in
+/// `head.macStyle`. So this isn't a weight Flutter/Skia could pick a
+/// lighter sibling for — QUL's V1 outlines are simply drawn with a
+/// thicker stroke, and there is no thinner variant on their CDN to
+/// switch to.
+///
+/// Slightly translucent ink is the fix available without a different
+/// font file: it reads as a lighter stroke against the flat page
+/// background without touching V2/V4, which stay fully opaque.
+double mushafGlyphInkOpacity(String editionId) =>
+    editionId == 'madinah1405' ? 0.86 : 1.0;
+
 /// The V2 glyph leaf's width for the given content-area size. Pulled
 /// out of `_buildV2Leaf` as a pure function so its device-dimension
 /// arithmetic can be unit-tested without pumping a widget tree.
@@ -2077,8 +2094,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
             fontSize: fontSize,
             height: 1,
             color: word.isAyahEnd
+                // The ayah-end medallion's colour is a marker, not
+                // reading text — left at full strength on every
+                // edition, V1 included.
                 ? (isDark ? const Color(0xFF82C8B5) : const Color(0xFF26705D))
-                : ink,
+                : ink.withValues(
+                    alpha: mushafGlyphInkOpacity(MushafSvgService.edition.id)),
           ),
         );
 
@@ -2197,7 +2218,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                         size: 16, color: textColor)),
                 onPressed: () => Navigator.pop(context)),
             IconButton(
-                tooltip: 'البحث في السورة',
+                tooltip: 'البحث في الآيات',
                 icon: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
@@ -2206,17 +2227,16 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     child:
                         Icon(Icons.search_rounded, size: 16, color: textColor)),
                 onPressed: () async {
-                  // Mushaf search returns its result to this page view. It
-                  // must never open ReaderScreen or change the chosen edition.
-                  final surahs = QuranPageMeta.surahsOnPage(_pageNum);
+                  // The full, unscoped search — same reach as the home
+                  // screen's (every surah name, every ayah in the
+                  // Quran). Only the RESULT handling is Mushaf-specific:
+                  // it comes back here rather than opening ReaderScreen,
+                  // so picking a result jumps to its page on the SAME
+                  // edition instead of leaving the Mushaf.
                   final result = await Navigator.push<AyahSearchResult>(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => AyahSearchScreen(
-                                surahNumbers: surahs.toSet(),
-                                scopeLabel: surahs
-                                    .map((s) => QuranPageMeta.surahName(s))
-                                    .join(' — '),
+                          builder: (_) => const AyahSearchScreen(
                                 returnResultToCaller: true,
                               )));
                   if (!mounted || result == null) return;

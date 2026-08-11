@@ -20,6 +20,7 @@ import '../widgets/ayah_share_sheet.dart';
 import '../widgets/reciter_picker.dart';
 import '../widgets/reciting_ayah_text.dart';
 import '../widgets/surah_frame.dart';
+import 'ayah_search_screen.dart';
 import 'tafsir_screen.dart';
 
 class ReaderScreen extends StatefulWidget {
@@ -581,111 +582,38 @@ class _ReaderScreenState extends State<ReaderScreen>
     );
   }
 
-  /// In-surah search: filters THIS surah's loaded ayahs as the user
-  /// types; tapping a match scrolls straight to that ayah.
-  void _showSurahSearch() {
-    final isDark = context.read<SettingsService>().isDarkIn(context);
-    final l = L10n.of(context);
-    final ctrl = TextEditingController();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (sheetCtx) => StatefulBuilder(builder: (ctx, setSheet) {
-        final q = QuranService.normalizeArabic(ctrl.text);
-        final matches = q.length < 2
-            ? const <Ayah>[]
-            : _ayahs
-                .where((a) => QuranService.normalizeArabic(a.text).contains(q))
-                .toList();
-        return Padding(
-          // Keep the sheet above the keyboard.
-          padding:
-              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          child: SizedBox(
-            height: MediaQuery.of(ctx).size.height * 0.6,
-            child: Column(children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: TextField(
-                  controller: ctrl,
-                  autofocus: true,
-                  textDirection: TextDirection.rtl,
-                  textAlign: TextAlign.right,
-                  onChanged: (_) => setSheet(() {}),
-                  style: TextStyle(
-                      fontFamily: '.SF Pro Text',
-                      color:
-                          isDark ? AppColors.darkText : AppColors.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: '${l('searchInSurah')} — ${widget.surah.name}',
-                    hintTextDirection: TextDirection.rtl,
-                    hintStyle: TextStyle(
-                        fontFamily: '.SF Pro Text',
-                        color: isDark
-                            ? AppColors.darkTextSec
-                            : AppColors.textLight),
-                    prefixIcon:
-                        Icon(Icons.search_rounded, color: Colors.grey[400]),
-                    filled: true,
-                    fillColor: isDark ? AppColors.darkBg : AppColors.background,
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: matches.isEmpty
-                    ? Center(
-                        child: Text(
-                            ctrl.text.trim().length < 2
-                                ? l('typeAyahWord')
-                                : l('noResultsInSurah'),
-                            style: TextStyle(
-                                fontFamily: '.SF Pro Text',
-                                color: isDark
-                                    ? AppColors.darkTextSec
-                                    : AppColors.textSecondary)))
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                        itemCount: matches.length,
-                        itemBuilder: (_, i) {
-                          final a = matches[i];
-                          return ListTile(
-                            dense: true,
-                            onTap: () {
-                              Navigator.pop(sheetCtx);
-                              _scrollTo(a.numberInSurah);
-                            },
-                            leading: Text(_ar(a.numberInSurah),
-                                style: TextStyle(
-                                    fontFamily: '.SF Pro Text',
-                                    fontWeight: FontWeight.bold,
-                                    color: isDark
-                                        ? AppColors.darkSecondary
-                                        : AppColors.accent)),
-                            title: Text(a.text,
-                                textDirection: TextDirection.rtl,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontFamily: '.SF Pro Text',
-                                    fontSize: 15,
-                                    height: 1.7,
-                                    color: isDark
-                                        ? AppColors.darkText
-                                        : AppColors.textPrimary)),
-                          );
-                        }),
-              ),
-            ]),
-          ),
-        );
-      }),
-    );
+  /// The same full-Quran search as the home screen and the Mushaf —
+  /// every surah name, every ayah, not just this one. A result in the
+  /// surah already open scrolls to it IN PLACE; anywhere else opens a
+  /// new reader on that surah, the same way tapping a home-screen
+  /// search result does.
+  Future<void> _searchAyahs() async {
+    final result = await Navigator.push<AyahSearchResult>(
+        context,
+        MaterialPageRoute(
+            builder: (_) =>
+                const AyahSearchScreen(returnResultToCaller: true)));
+    if (!mounted || result == null) return;
+
+    if (result.surahNumber == widget.surah.number) {
+      _scrollTo(result.numberInSurah);
+      return;
+    }
+    try {
+      final surahs = await QuranService.getAllSurahs();
+      final surah = surahs.firstWhere((s) => s.number == result.surahNumber);
+      if (!mounted) return;
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => ReaderScreen(
+                  surah: surah, targetAyah: result.numberInSurah)));
+    } catch (_) {
+      // Same failure mode AyahSearchScreen's own _open() accepts: the
+      // surah list came from cache and this ayah's surah wasn't in it.
+      // Nothing sensible to show for it, and the search screen already
+      // just closed.
+    }
   }
 
   void _showTafsir(int ayahNumber, String text) {
@@ -1132,9 +1060,9 @@ class _ReaderScreenState extends State<ReaderScreen>
                   ]),
             ),
             IconButton(
-              tooltip: l('searchInSurah'),
+              tooltip: l('searchAyahs'),
               icon: Icon(Icons.search_rounded, color: textColor),
-              onPressed: _showSurahSearch,
+              onPressed: _searchAyahs,
             ),
             IconButton(
               icon: Icon(Icons.translate_rounded,
