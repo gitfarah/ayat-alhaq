@@ -137,14 +137,15 @@ void main() {
       // The direct fix for "small space between the lines": tablets
       // must use LESS of the row height than phones, or the font
       // fills the row edge to edge and adjacent lines crowd together.
-      final tablet =
-          mushafV2HeightFraction(isTablet: true, isOpeningPage: false);
-      final phone =
-          mushafV2HeightFraction(isTablet: false, isOpeningPage: false);
-      expect(tablet, lessThan(phone),
-          reason: 'tablets need MORE headroom between lines than '
-              'phones, not the same amount');
-      expect(phone, 0.88, reason: 'phones were already fine — must not move');
+      for (final edition in _editions) {
+        final tablet = mushafV2HeightFraction(
+            isTablet: true, isOpeningPage: false, editionId: edition);
+        final phone = mushafV2HeightFraction(
+            isTablet: false, isOpeningPage: false, editionId: edition);
+        expect(tablet, lessThan(phone),
+            reason: 'tablets need MORE headroom between lines than '
+                'phones, not the same amount ($edition)');
+      }
     });
 
     test('opening pages (١-٢) keep their own, smaller fraction on '
@@ -152,10 +153,98 @@ void main() {
       // The Fatiha/opening-of-Baqarah pages already had a dedicated,
       // more generous fraction for their much shorter line count —
       // this must stay untouched by the tablet fix.
-      expect(mushafV2HeightFraction(isTablet: true, isOpeningPage: true),
-          0.78);
-      expect(mushafV2HeightFraction(isTablet: false, isOpeningPage: true),
-          0.78);
+      for (final edition in _editions) {
+        expect(
+            mushafV2HeightFraction(
+                isTablet: true, isOpeningPage: true, editionId: edition),
+            0.78);
+        expect(
+            mushafV2HeightFraction(
+                isTablet: false, isOpeningPage: true, editionId: edition),
+            0.78);
+      }
+    });
+  });
+
+  // 2026-08-13: "make the fontSize a bit bigger for the 3, specially for
+  // V1 because that one is very small in iphone/mobiles... All musahf
+  // types have good font size in ipads, so don't change anything in the
+  // ipad versions."
+  group('phones get a larger glyph than before; tablets do not move', () {
+    // The values the iPad line-spread fix settled on. Any change to
+    // these is a regression of that fix, whatever the phone needs.
+    const tabletWidthFactor = 0.91;
+    const tabletHeightFraction = 0.80;
+
+    test('every tablet value is exactly as the iPad fix left it', () {
+      for (final edition in _editions) {
+        expect(mushafV2WidthFactor(isTablet: true, editionId: edition),
+            tabletWidthFactor,
+            reason: '$edition changed the iPad width factor');
+        expect(
+            mushafV2HeightFraction(
+                isTablet: true, isOpeningPage: false, editionId: edition),
+            tabletHeightFraction,
+            reason: '$edition changed the iPad height fraction');
+      }
+    });
+
+    test('every edition draws larger on a phone than it used to', () {
+      // The previous shared phone values.
+      const wasWidth = 0.94;
+      const wasHeight = 0.88;
+      for (final edition in _editions) {
+        expect(mushafV2WidthFactor(isTablet: false, editionId: edition),
+            greaterThan(wasWidth),
+            reason: '$edition is no wider on a phone than before');
+        expect(
+            mushafV2HeightFraction(
+                isTablet: false, isOpeningPage: false, editionId: edition),
+            greaterThan(wasHeight),
+            reason: '$edition has no more row height on a phone than before');
+      }
+    });
+
+    test('the allowances run V1 > V2 > V4, as the fonts draw', () {
+      // Reported from the phone: V4 reads right, V2 is small, V1 is
+      // smaller still. The budgets must follow that order.
+      double h(String e) => mushafV2HeightFraction(
+          isTablet: false, isOpeningPage: false, editionId: e);
+      double w(String e) =>
+          mushafV2WidthFactor(isTablet: false, editionId: e);
+
+      expect(h('madinah1405'), greaterThan(h('madinah1421')),
+          reason: 'V1 must get more room than V2');
+      expect(h('madinah1421'), greaterThan(h('hafs')),
+          reason: 'V2 was reported small next to V4 and must get more room');
+      expect(w('madinah1405'), greaterThanOrEqualTo(w('madinah1421')));
+      expect(w('madinah1421'), greaterThanOrEqualTo(w('hafs')));
+    });
+
+    test('nothing is allowed to overflow the leaf it is measured into', () {
+      // The width factor scales the size at which the WIDEST line
+      // exactly fills the usable width, so above 1.0 that line would be
+      // clipped or forced to wrap.
+      for (final isTablet in [true, false]) {
+        for (final edition in _editions) {
+          expect(mushafV2WidthFactor(isTablet: isTablet, editionId: edition),
+              lessThanOrEqualTo(1.0),
+              reason: '$edition would overflow the leaf');
+        }
+      }
+    });
+
+    test('an unknown edition still gets sane values', () {
+      // A future edition must not fall through to zero and vanish.
+      expect(mushafV2WidthFactor(isTablet: false, editionId: 'something-new'),
+          inInclusiveRange(0.9, 1.0));
+      expect(
+          mushafV2HeightFraction(
+              isTablet: false, isOpeningPage: false, editionId: 'something-new'),
+          inInclusiveRange(0.8, 1.0));
     });
   });
 }
+
+/// The three glyph editions, by the ids MushafSvgService uses.
+const _editions = ['hafs', 'madinah1421', 'madinah1405'];

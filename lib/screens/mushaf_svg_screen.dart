@@ -89,22 +89,63 @@ double mushafV2LeafWidth({
         ? maxWidth * _phoneLeafWidthFraction
         : math.min(maxWidth, maxHeight * 0.58);
 
+/// How much of the leaf's width and of each row's height the glyphs may
+/// fill, per edition, on a PHONE.
+///
+/// One shared formula sizes all three glyph editions, but their fonts
+/// do not draw at the same visual size for a given fontSize. Reading the
+/// three side by side on a phone at identical settings, V4 is the one
+/// that looks right, V2 comes out smaller and V1 smaller still — so the
+/// allowances run in that order rather than being shared.
+///
+/// Tablets are deliberately absent: their values were arrived at by the
+/// iPad line-spread fix and are correct as they stand. See
+/// [[quran-mushaf-line-spread]].
+const Map<String, ({double width, double height})> _phoneGlyphBudget = {
+  'madinah1405': (width: 0.99, height: 0.97), // KFGQPC V1 — draws smallest
+  'madinah1421': (width: 0.99, height: 0.95), // KFGQPC V2 — draws small
+  'hafs': (width: 0.98, height: 0.93), //        KFGQPC V4 — reads right
+};
+
+const ({double width, double height}) _phoneGlyphBudgetFallback =
+    (width: 0.98, height: 0.93);
+
+/// Fraction of the leaf's usable width the WIDEST line may occupy. The
+/// font size that makes that line fit is one of the two budgets the
+/// final size is the smaller of.
+///
+/// Below 1.0 purely as slack against rounding — the leaf already carries
+/// its own side margin (see [mushafV2LeafWidth]), so this is not where
+/// the page's margin comes from.
+double mushafV2WidthFactor({
+  required bool isTablet,
+  required String editionId,
+}) =>
+    isTablet
+        ? 0.91
+        : (_phoneGlyphBudget[editionId] ?? _phoneGlyphBudgetFallback).width;
+
 /// Fraction of a row's height the glyph is allowed to fill. Pulled out
 /// of `_buildV2GlyphLayout` for the same reason as [mushafV2LeafWidth].
 ///
-/// A phone's own aspect ratio (much taller than wide) keeps WIDTH the
-/// binding constraint on the font-size choice there, so the rendered
-/// font sits comfortably under this row-height budget with slack left
-/// over between lines for free. A tablet's much wider aspect ratio
-/// flips that: HEIGHT becomes the binding constraint, so without a
+/// A phone's own aspect ratio (much taller than wide) usually keeps
+/// WIDTH the binding constraint on the font-size choice there, leaving
+/// slack under this row-height budget. A tablet's much wider aspect
+/// ratio flips that: HEIGHT becomes the binding constraint, so without a
 /// smaller fraction here the font fills the row almost edge to edge
 /// and adjacent lines' diacritics crowd together. See
 /// [[quran-mushaf-line-spread]].
 double mushafV2HeightFraction({
   required bool isTablet,
   required bool isOpeningPage,
+  required String editionId,
 }) =>
-    isOpeningPage ? 0.78 : (isTablet ? 0.80 : 0.88);
+    isOpeningPage
+        ? 0.78
+        : (isTablet
+            ? 0.80
+            : (_phoneGlyphBudget[editionId] ?? _phoneGlyphBudgetFallback)
+                .height);
 
 class MushafSvgScreen extends StatefulWidget {
   final int? startPage;
@@ -1860,10 +1901,16 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       final widest = ayahLines
           .map((line) => measuredWidth(line.glyphs))
           .fold<double>(1, (a, b) => a > b ? a : b);
-      final widthSize = usableWidth * 100 / widest * (isTablet ? 0.91 : 0.94);
+      final editionId = MushafSvgService.edition.id;
+      final widthSize = usableWidth *
+          100 /
+          widest *
+          mushafV2WidthFactor(isTablet: isTablet, editionId: editionId);
       final heightSize = rowHeight *
           mushafV2HeightFraction(
-              isTablet: isTablet, isOpeningPage: isOpeningPage);
+              isTablet: isTablet,
+              isOpeningPage: isOpeningPage,
+              editionId: editionId);
       final fontSize = widthSize < heightSize ? widthSize : heightSize;
 
       Widget lineWidget(MushafV2Line line) {
