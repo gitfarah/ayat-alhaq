@@ -86,7 +86,13 @@ void main() {
     // 14% of the screen. The leaf is now nearly full width; the margin
     // that remains comes from mushafV2WidthFactor holding the widest
     // line just inside it.
-    group('phones give the script nearly the whole width', () {
+    // 2026-08-13, second reversal: the leaf was widened to 0.99 to buy
+    // type size, and at that width the script ran into both screen
+    // edges. The margin is back at 0.94 — the reader asked for it
+    // knowing it costs type size, because type running off the edge is
+    // worse than type being small. Type size has to come from the glyph
+    // budgets instead, which do not touch the margin.
+    group('phones keep a real side margin', () {
       // Portrait content areas of real phones (logical points).
       const phones = {
         'iPhone SE': (width: 375.0, height: 667.0 - 140),
@@ -96,36 +102,23 @@ void main() {
       };
 
       for (final entry in phones.entries) {
-        test('${entry.key}: the leaf keeps a hairline, not a margin', () {
+        test('${entry.key}: the script clears both edges', () {
           final leaf = mushafV2LeafWidth(
             maxWidth: entry.value.width,
             maxHeight: entry.value.height,
             isTablet: false,
           );
 
-          // Still not edge to edge — the leaf is what the page's
-          // background and furniture are drawn into.
           expect(leaf, lessThan(entry.value.width));
-          // ...but the old 8-20pt-a-side margin is gone.
           final sideMargin = (entry.value.width - leaf) / 2;
-          expect(sideMargin, lessThan(4.0),
-              reason: '${entry.key} still spends a visible margin here — '
-                  'that width belongs to the script now');
-          expect(leaf / entry.value.width, greaterThan(0.97));
+          // A margin you can actually see, not a hairline.
+          expect(sideMargin, greaterThan(8.0),
+              reason: '${entry.key} has no real margin — the script will '
+                  'run into the bezel, which is what was reported');
+          // ...but not so wide it eats the type, which scales with it.
+          expect(sideMargin, lessThan(20.0));
         });
       }
-
-      test('the script gained real width over the old rule', () {
-        // The whole point of the change: compare the leaf a phone gets
-        // now against what the previous 0.94 rule gave it. The font
-        // size scales with this width, so this IS the size increase.
-        const width = 390.0;
-        final now =
-            mushafV2LeafWidth(maxWidth: width, maxHeight: 704, isTablet: false);
-        const before = width * 0.94;
-        expect(now / before, greaterThan(1.04),
-            reason: 'the leaf barely moved — the text will look the same');
-      });
 
       test('height never binds on a phone — nothing narrows it but the '
           'leaf fraction', () {
@@ -133,7 +126,7 @@ void main() {
         // on a tall phone would crush it to a narrow column.
         final leaf =
             mushafV2LeafWidth(maxWidth: 390, maxHeight: 2000, isTablet: false);
-        expect(leaf, closeTo(390 * 0.99, 0.01));
+        expect(leaf, closeTo(390 * 0.94, 0.01));
       });
     });
 

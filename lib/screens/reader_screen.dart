@@ -662,7 +662,13 @@ class _ReaderScreenState extends State<ReaderScreen>
     final baseStyle = TextStyle(
       fontSize: settings.fontSize,
       height: 2.1,
-      color: isDark ? AppColors.darkText : AppColors.textPrimary,
+      // Slightly translucent, and words pushed apart: the Quran face
+      // sets tight and heavy by default. See kQuranWordSpacing /
+      // kQuranInkOpacity for why the compensation lives here rather
+      // than in a different font.
+      color: (isDark ? AppColors.darkText : AppColors.textPrimary)
+          .withValues(alpha: kQuranInkOpacity),
+      wordSpacing: kQuranWordSpacing,
       // Quran verses only.
       fontFamily: 'QuranHafs',
     );
@@ -820,10 +826,16 @@ class _ReaderScreenState extends State<ReaderScreen>
                                       fontSize: settings.fontSize + 2,
                                       height: 1.8,
                                       fontFamily: 'QuranHafs',
-                                      fontWeight: FontWeight.bold,
-                                      color: isDark
-                                          ? AppColors.darkText
-                                          : AppColors.textPrimary,
+                                      // Matches the verses below it —
+                                      // the Basmala sitting darker and
+                                      // tighter than the ayahs it heads
+                                      // would look like a different face.
+                                      wordSpacing: kQuranWordSpacing,
+                                      color: (isDark
+                                              ? AppColors.darkText
+                                              : AppColors.textPrimary)
+                                          .withValues(
+                                              alpha: kQuranInkOpacity),
                                     ),
                                   ),
                                 );

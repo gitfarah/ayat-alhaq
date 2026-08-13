@@ -39,14 +39,18 @@ import 'tafsir_screen.dart';
 /// the script. Tablets are unaffected: their leaf is narrowed to a book
 /// column by the 0.58 rule below, which leaves margin as a side effect.
 ///
-/// 2026-08-13: raised from 0.94. That margin was added when the script
-/// sat hard against the bezel, but stacked with the leaf's own padding
-/// and the layout's usable-width inset it was costing about 14% of the
-/// screen — and phone text was reported as too small even after both
-/// glyph budgets were pushed nearly to their ceiling. The margin is now
-/// thin here and comes mostly from [mushafV2WidthFactor] instead, which
-/// holds the widest line just inside the leaf.
-const double _phoneLeafWidthFraction = 0.99;
+/// History, because this has now moved in both directions:
+///
+///  * 0.94 originally, to lift the script off the bezel.
+///  * 0.99 on 2026-08-13, because the margin stacked with the leaf's
+///    padding and the layout's inset and the text read too small.
+///  * 0.94 again — at 0.99 the script ran into both screen edges, which
+///    is worse than small type. The reader asked for the margin back
+///    knowing it costs type size, since the font scales with the leaf.
+///
+/// So: do not raise this again to buy type size. The size has to come
+/// from the glyph budgets below, which do not touch the margin.
+const double _phoneLeafWidthFraction = 0.94;
 
 /// Ink opacity for the main glyph body, per glyph edition.
 ///

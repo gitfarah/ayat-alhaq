@@ -1,7 +1,7 @@
 name: quran_app_v1
 description: A Quran reading app for Android and iOS.
 publish_to: 'none'
-version: 1.7.2+73
+version: 1.7.2+74
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -93,25 +93,34 @@ flutter:
     - family: QUL_Surah_Name_V4
       fonts:
         - asset: assets/fonts/qul_surah_name_v4.ttf
-    # Quran VERSES ONLY — the Uthmanic Hafs typeface of the printed Mushaf.
+    # Quran VERSES ONLY — the Uthmani typeface the reader sets ayahs in.
     #
-    # KFGQPC HAFS Uthmanic Script v2.2 (2021), the King Fahd Complex's
-    # released version, taken from the same QUL/Tarteel CDN this app
-    # already fetches its Mushaf page fonts from.
+    # "me_quran" v1.003, from the same QUL/Tarteel CDN this app already
+    # fetches its Mushaf page fonts from.
     #
-    # It replaced v0.18 — an early beta that could not shape a
-    # word-internal hamza: ٱلْءَاخِرَةِ came out broken in two, and the
-    # workaround for THAT (re-encoding the hamza onto a connector) came
-    # out looking like ٱلْكَاخِرَة, a different word.
+    # Chosen for ONE reason, and it is not aesthetics: it joins a
+    # word-internal hamza. ٱلْءَاخِرَةِ (2:4) must set as ٱلْأَخِرَة, the
+    # way the KFGQPC Mushaf page itself prints it. Two fonts out of eight
+    # tested do that — this one and Amiri Quran. The other six, INCLUDING
+    # both KFGQPC HAFS Uthmanic Script v0.18 and v2.2, split the word in
+    # two around the hamza.
     #
-    # v2.2 is chosen so the canonical spelling can be set with no
-    # rewriting of the text at all. Grounds: it is the King Fahd
-    # Complex's released version by the same designer, and carries ~52%
-    # more mark-positioning (GPOS) data than the beta — 23,898 vs 15,752
-    # bytes — which is the table whose gaps caused this class of bug.
-    # The RENDERING itself was confirmed on a device, not in CI: canvas
-    # ink measurements could not tell a connected Arabic word from a
-    # broken one reliably enough to trust.
+    # That history matters, because the obvious-looking fixes are all
+    # wrong and have each been tried:
+    #   * rewriting the hamza onto a connector (tatweel + U+0654) made it
+    #     read as ٱلْكَاخِرَة — a different word;
+    #   * leaving the canonical spelling on a font that cannot join it
+    #     leaves the word visibly broken;
+    #   * "upgrade KFGQPC v0.18 to v2.2" sounds right and does nothing —
+    #     v2.2 splits it identically. Verified by rendering, after
+    #     reasoning from the fonts' GPOS tables gave the wrong answer.
+    #
+    # So before swapping this font, render ٱلْءَاخِرَةِ in the candidate
+    # and LOOK at it. Font-table inspection is not sufficient evidence.
+    #
+    # The reader pairs it with a word-spacing and ink-opacity setting —
+    # see kQuranWordSpacing / kQuranInkOpacity in theme.dart — because
+    # this face sets words tight and dark by default.
     - family: QuranHafs
       fonts:
-        - asset: assets/fonts/UthmanicHafs_V22.ttf
+        - asset: assets/fonts/MeQuran.ttf

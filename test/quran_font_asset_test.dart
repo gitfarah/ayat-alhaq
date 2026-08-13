@@ -1,20 +1,23 @@
-// The bundled Quran typeface is load-bearing for the TEXT, not just its
-// looks: the previously shipped KFGQPC HAFS v0.18 could not shape a
-// word-internal hamza, and every attempt to work around that in the text
-// produced a misreading (ٱلْءَاخِرَةِ rendering as ٱلْكَاخِرَة).
+// The bundled Quran typeface is load-bearing for the TEXT, not just for
+// looks, and the reason is easy to lose.
 //
-// The app now ships v2.2, the King Fahd Complex's released version, and
-// the text is left exactly as the source spells it. These assert the
-// font asset is actually the one that behaviour depends on — a silent
-// swap back would reintroduce a wrong word in the Quran with nothing
-// else failing.
+// ٱلْءَاخِرَةِ (2:4) has a word-internal standalone hamza. Most Uthmani
+// faces cannot join it and split the word in two around the hamza. Of
+// eight rendered and compared, only TWO joined it as the KFGQPC Mushaf
+// page itself prints it (ٱلْأَخِرَة): "me_quran" and Amiri Quran. Both
+// KFGQPC HAFS Uthmanic Script v0.18 AND its v2.2 release split it —
+// which is why "just upgrade the KFGQPC font" is not a fix, and was
+// tried and shipped once before being caught.
+//
+// So this asserts the bundled face is one of the two known-good ones.
+// Swapping in anything else needs the word RENDERED and looked at;
+// font-table inspection gave the wrong answer here twice.
 
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Big-endian reads over the sfnt container.
 int _be16(Uint8List b, int o) => (b[o] << 8) | b[o + 1];
 int _be32(Uint8List b, int o) =>
     (b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3];
@@ -25,8 +28,9 @@ Map<int, Set<String>> _names(Uint8List b) {
   var nameOff = -1;
   for (var i = 0; i < numTables; i++) {
     final rec = 12 + i * 16;
-    final tag = String.fromCharCodes(b.sublist(rec, rec + 4));
-    if (tag == 'name') nameOff = _be32(b, rec + 8);
+    if (String.fromCharCodes(b.sublist(rec, rec + 4)) == 'name') {
+      nameOff = _be32(b, rec + 8);
+    }
   }
   expect(nameOff, greaterThan(0), reason: 'font has no name table');
 
@@ -43,7 +47,8 @@ Map<int, Set<String>> _names(Uint8List b) {
     // Platform 3 (Windows) stores UTF-16BE; platform 1 (Mac) is ASCII.
     final value = platform == 3
         ? String.fromCharCodes([
-            for (var k = 0; k + 1 < raw.length; k += 2) (raw[k] << 8) | raw[k + 1]
+            for (var k = 0; k + 1 < raw.length; k += 2)
+              (raw[k] << 8) | raw[k + 1]
           ])
         : ascii.decode(raw, allowInvalid: true);
     (out[nameId] ??= <String>{}).add(value);
@@ -54,32 +59,36 @@ Map<int, Set<String>> _names(Uint8List b) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('the bundled Quran face is KFGQPC HAFS v2.2, not the v0.18 beta',
+  test('the bundled Quran face is one that JOINS a word-internal hamza',
       () async {
-    final data = await rootBundle.load('assets/fonts/UthmanicHafs_V22.ttf');
-    final bytes = data.buffer.asUint8List();
-    final names = _names(bytes);
+    final data = await rootBundle.load('assets/fonts/MeQuran.ttf');
+    final names = _names(data.buffer.asUint8List());
 
-    expect(names[1], contains('KFGQPC HAFS Uthmanic Script'),
-        reason: 'family must still be the KFGQPC Uthmanic Hafs face');
-
-    final version = names[5]!.first;
-    expect(version, contains('2.2'),
-        reason: 'shipped version must be 2.2 — v0.18 cannot shape a '
-            'word-internal hamza and silently misrenders ٱلْءَاخِرَةِ');
-    expect(version, isNot(contains('0.18')));
+    // Family name as the font itself declares it.
+    expect(names[1], contains('me_quran'),
+        reason: 'the reader must use a face verified to join ٱلْأَخِرَة — '
+            'me_quran or Amiri Quran. If this is being changed, RENDER '
+            'ٱلْءَاخِرَةِ in the new face and look at it first.');
   });
 
-  test('the v0.18 beta is gone from the bundle', () async {
-    // Leaving it bundled would let the old rendering come back without
-    // any test noticing.
-    var stillBundled = true;
-    try {
-      await rootBundle.load('assets/fonts/HafsQuran.ttf');
-    } catch (_) {
-      stillBundled = false;
+  group('faces already proven to SPLIT the word are not bundled', () {
+    // Both KFGQPC HAFS versions were shipped at some point and both are
+    // wrong for this text. Named individually so a future swap back is
+    // caught by name, not just by absence.
+    for (final asset in const [
+      'assets/fonts/HafsQuran.ttf', // KFGQPC HAFS v0.18
+      'assets/fonts/UthmanicHafs_V22.ttf', // KFGQPC HAFS v2.2
+    ]) {
+      test(asset, () async {
+        var present = true;
+        try {
+          await rootBundle.load(asset);
+        } catch (_) {
+          present = false;
+        }
+        expect(present, isFalse,
+            reason: '$asset splits ٱلْءَاخِرَةِ in two and must not ship');
+      });
     }
-    expect(stillBundled, isFalse,
-        reason: 'the superseded v0.18 font must not still be bundled');
   });
 }
