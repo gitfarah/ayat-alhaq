@@ -31,20 +31,22 @@ import '../widgets/surah_frame.dart';
 import 'ayah_search_screen.dart';
 import 'tafsir_screen.dart';
 
-/// Share of a PHONE's width the glyph leaf may use, leaving a margin
-/// down each side.
+/// Share of a PHONE's width the glyph leaf may use.
 ///
 /// Lines are justified with spaceBetween, so they always reach both
-/// edges of whatever width the leaf is given. At full width that put
-/// the first and last word of every line hard against the screen
-/// edges, with nothing to separate the text from the bezel. Tablets
-/// never had this: their leaf is already narrowed to a book column by
-/// the 0.58 rule below, which leaves margin as a side effect.
+/// edges of whatever width the leaf is given, and the chosen font size
+/// scales with that width — every point of margin here is a point off
+/// the script. Tablets are unaffected: their leaf is narrowed to a book
+/// column by the 0.58 rule below, which leaves margin as a side effect.
 ///
-/// Deliberately small. The chosen font size scales with the leaf, so
-/// every point of margin is a point off the script — this is the least
-/// that visibly clears the edges.
-const double _phoneLeafWidthFraction = 0.94;
+/// 2026-08-13: raised from 0.94. That margin was added when the script
+/// sat hard against the bezel, but stacked with the leaf's own padding
+/// and the layout's usable-width inset it was costing about 14% of the
+/// screen — and phone text was reported as too small even after both
+/// glyph budgets were pushed nearly to their ceiling. The margin is now
+/// thin here and comes mostly from [mushafV2WidthFactor] instead, which
+/// holds the widest line just inside the leaf.
+const double _phoneLeafWidthFraction = 0.99;
 
 /// Ink opacity for the main glyph body, per glyph edition.
 ///
@@ -1845,7 +1847,10 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         isTablet: isTablet,
       );
       final layout = Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        // Phones take a much thinner inset than tablets: it stacks on
+        // top of the leaf fraction and the layout's own usable-width
+        // inset, and all three together were shrinking the script.
+        padding: EdgeInsets.symmetric(horizontal: isTablet ? 8 : 2, vertical: 2),
         child: _buildV2GlyphLayout(page, isDark),
       );
       return Center(
@@ -1878,7 +1883,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           ? availableHeight * (isTablet ? 0.72 : 0.80)
           : availableHeight;
       final usableWidth =
-          (constraints.maxWidth - (isTablet ? 16 : 12)).clamp(80.0, 2000.0);
+          (constraints.maxWidth - (isTablet ? 16 : 4)).clamp(80.0, 2000.0);
       final rowHeight = contentHeight / rowCount;
 
       double measuredWidth(String text) {

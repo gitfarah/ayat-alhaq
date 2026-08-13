@@ -75,13 +75,18 @@ void main() {
       expect(portraitLike, closeTo(maxHeight * 0.58, 0.01));
     });
 
-    // 2026-08-08: this requirement REVERSED. Phones were previously
-    // pinned to full width on purpose ("phones must not change" when
-    // the iPad bug was fixed); the reported problem now is that full
-    // width leaves the script hard against both screen edges, because
-    // spaceBetween justification always fills whatever width the leaf
-    // is given. Phones now get a slim margin; tablets are unaffected.
-    group('phones get a side margin', () {
+    // 2026-08-08: phones were given a slim side margin, because at full
+    // width spaceBetween justification put the first and last word of
+    // every line hard against the bezel.
+    //
+    // 2026-08-13: that margin was cut back again — "0.94 → 0.99 is
+    // still not enough for iphone/android mobiles! Touch that margin
+    // and go ahead". It stacked with the leaf's padding and the
+    // layout's usable-width inset, and the three together cost about
+    // 14% of the screen. The leaf is now nearly full width; the margin
+    // that remains comes from mushafV2WidthFactor holding the widest
+    // line just inside it.
+    group('phones give the script nearly the whole width', () {
       // Portrait content areas of real phones (logical points).
       const phones = {
         'iPhone SE': (width: 375.0, height: 667.0 - 140),
@@ -91,34 +96,44 @@ void main() {
       };
 
       for (final entry in phones.entries) {
-        test('${entry.key}: the leaf clears both edges', () {
+        test('${entry.key}: the leaf keeps a hairline, not a margin', () {
           final leaf = mushafV2LeafWidth(
             maxWidth: entry.value.width,
             maxHeight: entry.value.height,
             isTablet: false,
           );
 
-          expect(leaf, lessThan(entry.value.width),
-              reason: '${entry.key} still fills the full width — the '
-                  'script would touch both screen edges');
-
-          // Real, visible margin on each side, but not so much that it
-          // eats the script: the font size scales with the leaf.
+          // Still not edge to edge — the leaf is what the page's
+          // background and furniture are drawn into.
+          expect(leaf, lessThan(entry.value.width));
+          // ...but the old 8-20pt-a-side margin is gone.
           final sideMargin = (entry.value.width - leaf) / 2;
-          expect(sideMargin, greaterThan(8.0),
-              reason: 'too slim to read as a margin');
-          expect(sideMargin, lessThan(20.0),
-              reason: 'so wide the text shrinks noticeably');
+          expect(sideMargin, lessThan(4.0),
+              reason: '${entry.key} still spends a visible margin here — '
+                  'that width belongs to the script now');
+          expect(leaf / entry.value.width, greaterThan(0.97));
         });
       }
 
-      test('height never binds on a phone — the margin is the only '
-          'thing narrowing it', () {
+      test('the script gained real width over the old rule', () {
+        // The whole point of the change: compare the leaf a phone gets
+        // now against what the previous 0.94 rule gave it. The font
+        // size scales with this width, so this IS the size increase.
+        const width = 390.0;
+        final now =
+            mushafV2LeafWidth(maxWidth: width, maxHeight: 704, isTablet: false);
+        const before = width * 0.94;
+        expect(now / before, greaterThan(1.04),
+            reason: 'the leaf barely moved — the text will look the same');
+      });
+
+      test('height never binds on a phone — nothing narrows it but the '
+          'leaf fraction', () {
         // A phone's leaf must not pick up the tablet 0.58 rule, which
         // on a tall phone would crush it to a narrow column.
         final leaf =
             mushafV2LeafWidth(maxWidth: 390, maxHeight: 2000, isTablet: false);
-        expect(leaf, closeTo(390 * 0.94, 0.01));
+        expect(leaf, closeTo(390 * 0.99, 0.01));
       });
     });
 
