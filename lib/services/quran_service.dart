@@ -51,8 +51,18 @@ class QuranService {
 
   /// Re-encodes marks the KFGQPC HAFS font cannot shape.
   ///
-  /// Verified against the font (v0.18) by rendering each mark used in
-  /// the whole text:
+  /// NOTE: every finding below was measured against the font that used
+  /// to be bundled, KFGQPC HAFS **v0.18** — an early beta. The app now
+  /// ships **v2.2**, the King Fahd Complex's released version, which
+  /// carries ~52% more mark-positioning (GPOS) data. These replacements
+  /// are therefore very likely no longer needed, and each one DELETES a
+  /// mark from the Quran's text, so they are worth re-testing on a
+  /// device and removing one at a time. They are kept for now only
+  /// because the font swap was made to fix the medial hamza and
+  /// changing both at once would make a regression impossible to
+  /// attribute.
+  ///
+  /// Originally verified by rendering each mark used in the whole text:
   ///
   ///  * U+06DF, U+06E3, U+06EB have no mark support at all — each draws
   ///    as a bold ring on a dotted circle instead of combining. The
@@ -67,56 +77,36 @@ class QuranService {
   ///    font has none of the stacked-tanween codepoints (U+08F0-08F2)
   ///    that would carry the same rule, so the marks are dropped; the
   ///    tajweed colouring conveys ikhfa and iqlab instead.
-  static String fixForQuranFont(String s) => _joinMedialHamza(s
+  ///
+  /// Marks only. The letters are NEVER rewritten: see the medial-hamza
+  /// note below for why.
+  static String fixForQuranFont(String s) => s
       .replaceAll('۟', 'ْ')
       .replaceAll('ۣ', '')
       .replaceAll('۫', '')
       .replaceAll('ۭ', '')
-      .replaceAll('ۢ', ''));
+      .replaceAll('ۢ', '');
 
-  /// A combining mark: it sits ON a letter and never breaks a join.
-  static bool _isDiacritic(int cp) =>
-      (cp >= 0x0610 && cp <= 0x061A) ||
-      (cp >= 0x064B && cp <= 0x065F) ||
-      cp == 0x0670 ||
-      (cp >= 0x06D6 && cp <= 0x06ED);
-
-  /// Arabic letters that do not join to the letter after them.
-  static const String _nonJoining = 'اأإآٱدذرزوةى';
-
-  /// Reconnects a hamza sitting INSIDE a word.
-  ///
-  /// The source spells ٱلْءَاخِرَةُ and لِءَادَمَ with a standalone
-  /// hamza (U+0621), which cannot join, so the Mushaf font breaks the
-  /// word open around it — لام, gap, floating ء. The KFGQPC pages join
-  /// it: the hamza rides a connecting stroke. Writing it the same way
-  /// (tatweel + U+0654) reproduces the printed page exactly and keeps
-  /// both the hamza and the alef of madd.
-  ///
-  /// Only hamzas after a letter that joins forward are touched — 280
-  /// places. At the start of a word, or after a non-joining letter like
-  /// و in سَوَآءٌ, a standalone hamza is what the page shows anyway.
-  static String _joinMedialHamza(String s) {
-    if (!s.contains('ء')) return s;
-    final b = StringBuffer();
-    for (var i = 0; i < s.length; i++) {
-      final c = s[i];
-      if (c != 'ء') {
-        b.write(c);
-        continue;
-      }
-      var j = i - 1;
-      while (j >= 0 && _isDiacritic(s.codeUnitAt(j))) {
-        j--;
-      }
-      final prev = j >= 0 ? s.codeUnitAt(j) : 0;
-      final joins = prev >= 0x0620 &&
-          prev <= 0x064A &&
-          !_nonJoining.contains(s[j]);
-      b.write(joins ? 'ـٔ' : 'ء');
-    }
-    return b.toString();
-  }
+  // WORD-INTERNAL HAMZA — left exactly as the source spells it, and it
+  // must stay that way. Two rewrites were tried here and both were
+  // wrong; the fix was the FONT, not the text.
+  //
+  // The source writes ٱلْءَاخِرَةِ and لِءَادَمَ with a standalone hamza
+  // (U+0621), which cannot join. Under the old KFGQPC v0.18 face that
+  // broke the word in two, so this code re-encoded the hamza onto a
+  // connector (tatweel + U+0654). That rendered as a shape
+  // indistinguishable from كـ — وَبِٱلْءَاخِرَةِ reached readers as
+  // وَبِٱلْكَاخِرَة, a different word in the Quran's own text. Reverting
+  // to the canonical spelling fixed the wrong letter but left the gap.
+  //
+  // Both symptoms were the beta font, so the fix is the font: the app
+  // now bundles KFGQPC HAFS v2.2 (see pubspec.yaml) and this function
+  // leaves the letters completely alone.
+  //
+  // Do not reintroduce the connector, and do not "fix" anything here by
+  // substituting U+0622 (آ) either — ٱلْآخِرَة is the modern imla'i
+  // spelling, not the Uthmani one this app sets. If the word ever looks
+  // wrong again, the answer is in the font, not in this text.
 
   static Future<List<Surah>> getAllSurahs({bool forceRefresh = false}) async {
     await _ensureLoaded();

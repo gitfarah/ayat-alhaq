@@ -211,12 +211,15 @@ class MushafV2Service {
     );
   }
 
+  /// Only the Bismillah face still needs loading here. The surah-name
+  /// font ([surahNameFontFamily]) moved into pubspec.yaml when the app's
+  /// index and reader started setting their titles in it too: those show
+  /// surah names before any Mushaf page has been opened, so a font that
+  /// only arrives with the first page load would be too late for them.
   static Future<void> _ensureSurahFont() => _surahFontFuture ??= () async {
-        final surahLoader = FontLoader(surahNameFontFamily)
-          ..addFont(rootBundle.load('assets/fonts/qul_surah_name_v4.ttf'));
         final bismillahLoader = FontLoader(bismillahNameFontFamily)
           ..addFont(rootBundle.load('assets/fonts/qul_bismillah.ttf'));
-        await Future.wait([surahLoader.load(), bismillahLoader.load()]);
+        await bismillahLoader.load();
       }();
   static Future<String> _ensureFont(
       int page, List<MushafV2Line> lines, _MushafGlyphConfig config) async {

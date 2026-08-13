@@ -20,6 +20,7 @@ import '../widgets/ayah_share_sheet.dart';
 import '../widgets/reciter_picker.dart';
 import '../widgets/reciting_ayah_text.dart';
 import '../widgets/surah_frame.dart';
+import '../widgets/surah_name_text.dart';
 import 'ayah_search_screen.dart';
 import 'tafsir_screen.dart';
 
@@ -786,12 +787,25 @@ class _ReaderScreenState extends State<ReaderScreen>
                             itemBuilder: (context, index) {
                               if (index == 0) {
                                 // Ornamental surah-name frame, like the
-                                // decorated headers of the printed Mushaf.
-                                // The surah name from the data already
-                                // carries the "سُورَةُ" prefix.
+                                // decorated headers of the printed
+                                // Mushaf — and SET in the Mushaf's own
+                                // V4 name font rather than spelled in a
+                                // text face, so the band reads as the
+                                // printed header it is imitating. Bigger
+                                // than the old typed title: the
+                                // calligraphic name's ink sits well
+                                // inside its em box.
                                 return SurahFrame(
                                   title: widget.surah.name,
                                   isDark: isDark,
+                                  fontSize: 34,
+                                  child: SurahNameText(
+                                    surahNumber: widget.surah.number,
+                                    fontSize: 34,
+                                    color: isDark
+                                        ? AppColors.darkText
+                                        : AppColors.textPrimary,
+                                  ),
                                 );
                               }
                               if (_showBasmala && index == 1) {

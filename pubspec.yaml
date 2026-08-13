@@ -1,7 +1,7 @@
 name: quran_app_v1
 description: A Quran reading app for Android and iOS.
 publish_to: 'none'
-version: 1.7.2+72
+version: 1.7.2+73
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -83,7 +83,35 @@ flutter:
     - family: SurahNameV2
       fonts:
         - asset: assets/fonts/SurahNameV2.ttf
+    # Surah TITLES, V4 — the same ligature font the V4 Mushaf heads its
+    # pages with, and now the one every surah name in the app is set in
+    # (index, reader band, share card). Registered here rather than
+    # FontLoader-ed at runtime like it used to be: the index shows surah
+    # names before any Mushaf page has ever been opened, so waiting for
+    # the Mushaf's own font load would leave the list blank or fall back
+    # to raw "surah001" text.
+    - family: QUL_Surah_Name_V4
+      fonts:
+        - asset: assets/fonts/qul_surah_name_v4.ttf
     # Quran VERSES ONLY — the Uthmanic Hafs typeface of the printed Mushaf.
+    #
+    # KFGQPC HAFS Uthmanic Script v2.2 (2021), the King Fahd Complex's
+    # released version, taken from the same QUL/Tarteel CDN this app
+    # already fetches its Mushaf page fonts from.
+    #
+    # It replaced v0.18 — an early beta that could not shape a
+    # word-internal hamza: ٱلْءَاخِرَةِ came out broken in two, and the
+    # workaround for THAT (re-encoding the hamza onto a connector) came
+    # out looking like ٱلْكَاخِرَة, a different word.
+    #
+    # v2.2 is chosen so the canonical spelling can be set with no
+    # rewriting of the text at all. Grounds: it is the King Fahd
+    # Complex's released version by the same designer, and carries ~52%
+    # more mark-positioning (GPOS) data than the beta — 23,898 vs 15,752
+    # bytes — which is the table whose gaps caused this class of bug.
+    # The RENDERING itself was confirmed on a device, not in CI: canvas
+    # ink measurements could not tell a connected Arabic word from a
+    # broken one reliably enough to trust.
     - family: QuranHafs
       fonts:
-        - asset: assets/fonts/HafsQuran.ttf
+        - asset: assets/fonts/UthmanicHafs_V22.ttf

@@ -12,6 +12,7 @@ import '../services/settings_service.dart';
 import '../services/adhan_notification_service.dart';
 import '../theme.dart';
 import '../widgets/prayer_visuals.dart';
+import '../widgets/surah_name_text.dart';
 import 'reader_screen.dart';
 import 'settings_screen.dart';
 import 'mushaf_svg_screen.dart';
@@ -268,13 +269,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                     color: Colors.grey.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(2))),
-            Text(surah.name,
-                style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'QuranHafs',
-                    color:
-                        isDark ? AppColors.darkText : AppColors.textPrimary)),
+            SurahNameText(
+                surahNumber: surah.number,
+                fontSize: 36,
+                color: isDark ? AppColors.darkText : AppColors.textPrimary),
             Text(
                 '${l(surah.revelationType == 'Meccan' ? 'meccan' : 'medinan')} • ${l.number(surah.numberOfAyahs)} ${l('ayahWord')}',
                 style: TextStyle(
@@ -623,13 +621,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // The heading is the surah either way — a page number alone says
     // little about where you were.
+    //
+    // [titleSurah] is the surah to SET calligraphically. Null when the
+    // heading cannot be one ligature: a Mushaf page can open on two or
+    // three short surahs, and the name font carries one name per key,
+    // so those keep the plain multi-surah label.
     final String title;
     final String subtitle;
+    final int? titleSurah;
     if (mushaf) {
-      title = QuranPageMeta.headerLabelForPage(page!);
+      final onPage = QuranPageMeta.surahsOnPage(page!);
+      title = QuranPageMeta.headerLabelForPage(page);
+      titleSurah = onPage.length == 1 ? onPage.first : null;
       subtitle = '${l('pageWord')} ${l.number(page)}';
     } else {
       title = surah!.name;
+      titleSurah = surah.number;
       subtitle = s.lastAyah != null
           ? '${l('ayahWord')} ${l.number(s.lastAyah!)}'
           : '${l('surahNo')} ${l.number(s.lastSurah!)}';
@@ -683,15 +690,29 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontSize: 12.5,
                           fontFamily: '.SF Pro Text')),
                   const SizedBox(height: 2),
-                  Text(title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textDirection: TextDirection.rtl,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'QuranHafs')),
+                  if (titleSurah != null)
+                    // The card's headline. Scaled down only if a long
+                    // name would not otherwise fit the column, so short
+                    // names keep the full size instead of every name
+                    // being sized for the longest one.
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: SurahNameText(
+                          surahNumber: titleSurah,
+                          fontSize: 52,
+                          color: Colors.white),
+                    )
+                  else
+                    Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textDirection: TextDirection.rtl,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'QuranHafs')),
                   const SizedBox(height: 2),
                   Text(subtitle,
                       maxLines: 1,
@@ -830,15 +851,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    Text(surah.name,
+                    SurahNameText(
+                        surahNumber: surah.number,
+                        // The calligraphic name reads smaller than a
+                        // text face at the same nominal size — its ink
+                        // sits well inside the em box.
+                        fontSize: 34,
                         textAlign: TextAlign.start,
-                        style: TextStyle(
-                            fontSize: 27,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'QuranHafs',
-                            color: isDark
-                                ? AppColors.darkText
-                                : AppColors.textPrimary)),
+                        color: isDark
+                            ? AppColors.darkText
+                            : AppColors.textPrimary),
                     const SizedBox(height: 3),
                     Row(mainAxisAlignment: MainAxisAlignment.start, children: [
                       Text(
