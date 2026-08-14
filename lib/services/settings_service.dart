@@ -191,6 +191,12 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
     _mushafEdition = p.getString('mushafEdition') ?? 'hafs';
     _mushafBackground = p.getString('mushafBackground') ?? 'parchment';
     MushafSvgService.setEdition(_mushafEdition);
+    // An edition that no longer exists — 'text', which stopped being an
+    // edition when a Hafs page became pinch-to-reflow — falls back to
+    // Hafs inside the service. Take the id back from it rather than
+    // trusting what was saved, or the picker would highlight nothing
+    // and every later comparison would be against a phantom.
+    _mushafEdition = MushafSvgService.edition.id;
     notifyListeners();
   }
 

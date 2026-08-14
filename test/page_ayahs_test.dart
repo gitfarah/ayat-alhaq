@@ -50,12 +50,20 @@ void main() {
   });
 
   group('Mushaf editions', () {
-    test('the reflowing text edition needs no download', () {
+    test('the reflowing view is no longer an edition, and selecting it '
+        'falls back to Hafs', () {
+      // It became the state a Hafs page enters when pinched, so it is
+      // not something to choose between. Anyone whose saved preference
+      // still names it must land on a real edition rather than on
+      // nothing — setEdition's orElse is what carries them.
+      expect(MushafSvgService.editions.any((e) => e.id == 'text'), isFalse,
+          reason: 'the reflowing view must not be offered as an edition');
+
+      MushafSvgService.setEdition('madinah1421');
       MushafSvgService.setEdition('text');
-      expect(MushafSvgService.edition.isText, isTrue);
-      expect(MushafSvgService.supportsFullOfflineDownload, isFalse);
+      expect(MushafSvgService.edition.id, 'hafs',
+          reason: 'a stale "text" preference must fall back to Hafs');
       MushafSvgService.setEdition('hafs');
-      expect(MushafSvgService.edition.isText, isFalse);
     });
 
     test('V4 Hafs, V2 1421H and V1 1405H lead the menu', () {
@@ -72,7 +80,6 @@ void main() {
       MushafSvgService.setEdition('madinah1421');
       expect(MushafSvgService.edition.isGlyph, isTrue);
       expect(MushafSvgService.edition.isArtwork, isFalse);
-      expect(MushafSvgService.edition.isPrintedPage, isTrue);
       expect(MushafSvgService.supportsFullOfflineDownload, isFalse);
       MushafSvgService.setEdition('hafs');
     });
@@ -81,7 +88,6 @@ void main() {
       MushafSvgService.setEdition('madinah1405');
       expect(MushafSvgService.edition.isGlyph, isTrue);
       expect(MushafSvgService.edition.isArtwork, isFalse);
-      expect(MushafSvgService.edition.isPrintedPage, isTrue);
       expect(MushafSvgService.supportsFullOfflineDownload, isFalse);
       MushafSvgService.setEdition('hafs');
     });

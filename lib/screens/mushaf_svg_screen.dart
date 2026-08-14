@@ -318,21 +318,29 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   bool get _showsReflow => mushafShowsReflow(
       editionId: MushafSvgService.edition.id, zoom: _zoom);
 
-  /// Whether this edition prints its own furniture on the leaf — the
-  /// running head and the ornamented page number — instead of leaving
-  /// that to the floating bars. Those editions also lose the bottom
-  /// page-number bar and its arrows, which only duplicate it.
+  /// Whether what is on screen REFLOWS to the width rather than
+  /// overflowing it.
   ///
-  /// Any edition that renders an actual PAGE — the five SVG-artwork
-  /// riwayat — carries this the same way a printed leaf does. Only the
-  /// reflowing text edition has no page to print it on, and keeps the
-  /// floating bar for its page number.
+  /// This is what decides whether a horizontal drag turns the page or
+  /// pans the content. A zoomed page IMAGE has to be panned, so it must
+  /// swallow the drag; reflowed text has nothing to pan, so it keeps its
+  /// page turns at every zoom level.
   ///
-  /// A glyph page showing its reflowed text has no leaf to print on
-  /// either, so the floating bar has to come back for as long as the
-  /// swap lasts.
-  bool get _usesPageFurniture =>
-      MushafSvgService.edition.isPrintedPage && !_showsReflow;
+  /// Asking the EDITION was right while the reflowing view was one, and
+  /// became the bug that stranded a pinched-open Hafs page: the edition
+  /// is a glyph one, so page turns were disabled, but the content on
+  /// screen was reflowed text with nowhere to pan to.
+  bool get _reflowsToWidth => _showsReflow;
+
+  /// Whether the leaf prints its own furniture — the running head and
+  /// the ornamented page number — instead of leaving that to the
+  /// floating bars, which also drops the bottom page-number bar and its
+  /// arrows as duplicates.
+  ///
+  /// Every edition renders an actual page and so carries it. A page
+  /// showing its REFLOWED text has no leaf to print on, so the floating
+  /// bar comes back for as long as the swap lasts.
+  bool get _usesPageFurniture => !_showsReflow;
 
   void _onScaleStart(ScaleStartDetails d) => _zoomStart = _zoom;
 
@@ -417,8 +425,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     KhatmaService.markPageRead(basePage);
     if (_wide && basePage + 1 <= 604) KhatmaService.markPageRead(basePage + 1);
 
-    // The text edition is bundled — nothing to prefetch, and it is
-    // offline by definition.
+    // Reflowed pages are typeset from the bundled text, so they cost
+    // nothing to fetch — but they are still worth pruning, and they are
+    // reachable from any GLYPH edition now rather than only from an
+    // edition of their own, so this cannot sit behind the branch below.
+    _textFutures.removeWhere((k, _) => (k - basePage).abs() > 4);
+
     if (MushafSvgService.edition.isGlyph) {
       final step = _wide ? 2 : 1;
       final editionId = MushafSvgService.edition.id;
@@ -430,11 +442,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       final cached =
           await MushafV2Service.isCached(basePage, editionId: editionId);
       if (mounted) setState(() => _isCachedOffline = cached);
-      return;
-    }
-    if (MushafSvgService.edition.isText) {
-      _textFutures.removeWhere((k, _) => (k - basePage).abs() > 4);
-      if (!_isCachedOffline) setState(() => _isCachedOffline = true);
       return;
     }
 
@@ -466,8 +473,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
   bool get _supportsFullOfflineDownload => MushafSvgService.edition.isGlyph
       ? MushafV2Service.supportsFullOfflineDownload
-      : !MushafSvgService.edition.isText &&
-          MushafSvgService.supportsFullOfflineDownload;
+      : MushafSvgService.supportsFullOfflineDownload;
 
   (int, int)? get _currentBulkProgress {
     if (!MushafSvgService.edition.isGlyph) {
@@ -885,9 +891,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     Navigator.pop(context);
                     _jumpDialog();
                   }),
-              // Only the reflowing text edition can be coloured — the
-              // other editions are page artwork.
-              if (MushafSvgService.edition.isText)
+              // Only the REFLOWED text can be coloured by rule: a
+              // printed leaf is artwork or page glyphs, and V4 carries
+              // its own tajweed colours in the font. Offered while the
+              // reader is actually looking at reflowed text, so the
+              // switch is never shown against a page it cannot change.
+              if (_showsReflow)
                 Builder(builder: (_) {
                   final s = context.watch<SettingsService>();
                   return SwitchListTile(
@@ -1675,10 +1684,13 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               controller: _pageCtrl,
               reverse: true,
               // A zoomed page IMAGE has to be panned, so a drag there
-              // must not flip the page. The reflowing text reflows to
-              // the width instead of overflowing it, so it keeps its
-              // page turns at every zoom level.
-              physics: _isZoomed && !MushafSvgService.edition.isText
+              // must not flip the page. Anything that REFLOWS to the
+              // width instead of overflowing it has nothing to pan, so
+              // it keeps its page turns at every zoom level — that now
+              // includes a printed page showing its reflowed text,
+              // which is why this asks _reflowsToWidth rather than
+              // asking the edition.
+              physics: _isZoomed && !_reflowsToWidth
                   ? const NeverScrollableScrollPhysics()
                   : const PageScrollPhysics(),
               itemCount: _pageCount,
@@ -1750,24 +1762,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     if (MushafSvgService.edition.isGlyph) {
       return _buildV2PageItem(index, base, isDark);
     }
-    // The reflowing text edition is typeset from the bundled text —
-    // no artwork to fetch, and no illuminated-frame special case.
-    if (MushafSvgService.edition.isText) {
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _setBars(!_barsVisible),
-        onScaleStart: _onScaleStart,
-        onScaleUpdate: _onScaleUpdate,
-        child: SafeArea(
-          child: !_wide || base + 1 > 604
-              ? _buildTextPage(base, isDark)
-              : Row(children: [
-                  Expanded(child: _buildTextPage(base + 1, isDark)),
-                  Expanded(child: _buildTextPage(base, isDark)),
-                ]),
-        ),
-      );
-    }
+    // Everything below is page ARTWORK. The reflowing view used to be
+    // handled here as an edition of its own; it is now reached only by
+    // pinching a glyph page, inside _buildV2PageItem above.
 
     final edition = MushafSvgService.edition.id;
     var entry = _pageFutures[index];

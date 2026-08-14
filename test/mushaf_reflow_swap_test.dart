@@ -22,8 +22,6 @@ void main() {
       MushafSvgService.editions.where((e) => e.isGlyph).map((e) => e.id);
   final artwork =
       MushafSvgService.editions.where((e) => e.isArtwork).map((e) => e.id);
-  final text =
-      MushafSvgService.editions.where((e) => e.isText).map((e) => e.id);
 
   group('which editions may reflow', () {
     test('the Hafs glyph editions do, pinched out', () {
@@ -45,12 +43,12 @@ void main() {
       }
     });
 
-    test('the reflowing edition itself does not "swap" — it already is '
-        'the text', () {
-      for (final id in text) {
-        expect(mushafShowsReflow(editionId: id, zoom: 3.0), isFalse,
-            reason: id);
-      }
+    test('every edition is glyph or artwork — there is no third kind', () {
+      // The reflowing view was one, and is not any more: it is the state
+      // a Hafs page enters when pinched. If a third kind ever comes
+      // back, the reflow rule above has to be told what to do with it.
+      expect(glyph.length + artwork.length, MushafSvgService.editions.length);
+      expect(MushafSvgService.editions.any((e) => e.id == 'text'), isFalse);
     });
 
     test('an unknown edition id never reflows', () {

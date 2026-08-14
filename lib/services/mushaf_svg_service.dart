@@ -118,25 +118,22 @@ class MushafEdition {
   final String hintAr;
   final String hintEn;
 
-  /// True for the reflowing text edition, which is typeset live from
-  /// the bundled Quran text instead of being fetched as page artwork.
-  /// Nothing about it is downloadable or page-image based.
-  final bool isText;
-
   /// True for a live KFGQPC page-glyph layout.
   final bool isGlyph;
 
-  /// Whether this edition is fetched as SVG page artwork — the five
+  /// Whether this edition is fetched as SVG page artwork — the four
   /// riwayat. Guards every path that assumes page images.
-  bool get isArtwork => !isText && !isGlyph;
-
-  bool get isPrintedPage => isArtwork || isGlyph;
+  ///
+  /// EVERY edition is now one or the other. There used to be a third
+  /// kind, `isText`: the reflowing view, offered as an edition of its
+  /// own. It is no longer an edition — it is the state a Hafs page
+  /// enters when the reader pinches it (see mushafShowsReflow), so
+  /// there is nothing left to choose between a printed page and its own
+  /// zoomed-in form.
+  bool get isArtwork => !isGlyph;
 
   const MushafEdition(this.id, this.nameAr, this.nameEn,
-      {this.hintAr = '',
-      this.hintEn = '',
-      this.isText = false,
-      this.isGlyph = false});
+      {this.hintAr = '', this.hintEn = '', this.isGlyph = false});
 }
 
 class MushafSvgService {
@@ -167,10 +164,11 @@ class MushafSvgService {
     MushafEdition('douri', 'مصحف الدوري', 'Ad-Duri',
         hintAr: 'رواية الدوري عن أبي عمرو',
         hintEn: 'Riwayat ad-Dūrī ʿan Abī ʿAmr'),
-    MushafEdition('text', 'نص متجاوب', 'Reflowing text',
-        hintAr: 'يتكيّف مع التكبير وحجم الشاشة',
-        hintEn: 'Reflows to the zoom level and screen size',
-        isText: true),
+    // NOTE: the reflowing text view used to be listed here as an
+    // edition of its own ('text'). It was removed once a Hafs page
+    // could be pinched into it: it is a way of READING these editions,
+    // not an alternative to them. Anyone who had it selected falls back
+    // to Hafs through setEdition's orElse below.
   ];
   static const String _repo =
       'https://raw.githubusercontent.com/quranpedia/quran-svg/main/mushafs';

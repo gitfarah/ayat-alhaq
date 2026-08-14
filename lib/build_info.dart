@@ -20,9 +20,9 @@
 /// rule is really about. This constant just tries to track it, for the
 /// About screen and bug reports.
 const String kAppVersion = '1.7.3';
-const int kBuildNumber = 79;
+const int kBuildNumber = 80;
 
-/// "1.7.3 (78)" — what to show the reader and what to quote in a bug
+/// "1.7.3 (80)" — what to show the reader and what to quote in a bug
 /// report. May read a lower build number than what is actually live on
 /// TestFlight/the App Store; see the class doc.
 String get kVersionLabel => '$kAppVersion ($kBuildNumber)';
