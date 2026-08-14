@@ -597,6 +597,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// The illustrations that decorate the continue-reading card, cycled
+  /// as the position being continued changes — a static picture reads
+  /// as decoration painted on the app; one that visibly varies reads as
+  /// belonging to THIS surah or page.
+  static const List<String> _continueIllustrations = [
+    'assets/icon/mushaf_illustration.png',
+    'assets/icon/mushaf_illustration_2.png',
+    'assets/icon/mushaf_illustration_3.png',
+  ];
+
+  /// Deterministic on [identity] (the page or surah number currently
+  /// being continued) rather than random: the same position always
+  /// shows the same picture, on this launch and the next one, and nine
+  /// times out of ten a genuinely different position lands on a
+  /// different index too, since surah/page numbers are consecutive.
+  String _illustrationFor(int identity) =>
+      _continueIllustrations[identity % _continueIllustrations.length];
+
   /// "Continue reading" — the emerald card that resumes wherever the
   /// reader left off, in EITHER surface.
   ///
@@ -641,6 +659,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ? '${l('ayahWord')} ${l.number(s.lastAyah!)}'
           : '${l('surahNo')} ${l.number(s.lastSurah!)}';
     }
+
+    // What is actually being continued — a page in the Mushaf, or a
+    // surah in the reader — is what the illustration keys off, not
+    // which surface it's in: two different pages should not share a
+    // picture just because both are "the Mushaf".
+    final illustration = _illustrationFor(mushaf ? page! : s.lastSurah!);
 
     void resume() => Navigator.push(
           context,
@@ -755,7 +779,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            Image.asset('assets/icon/mushaf_illustration.png',
+            Image.asset(illustration,
                 height: 104,
                 fit: BoxFit.contain,
                 errorBuilder: (_, __, ___) => const SizedBox(width: 0)),
