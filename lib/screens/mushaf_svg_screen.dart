@@ -82,6 +82,38 @@ double mushafV2LineWidth({
   return total;
 }
 
+/// Pinching out past this on a printed Hafs page replaces the leaf with
+/// the SAME page's text, reflowed — see [mushafShowsReflow].
+///
+/// Far enough above 1.0 that an imprecise pinch does not flip the
+/// surface, and low enough that the reflowed type arrives slightly
+/// LARGER than the print rather than smaller: the reflowing page's
+/// fitted size already fills the leaf and is drawn at that size times
+/// the zoom, so 1.15 reads as a step in rather than a jolt.
+const double kReflowZoom = 1.15;
+
+/// Whether the printed leaf of [editionId] should stand in for its
+/// reflowing text at [zoom] — the Mushaf and the responsive view as ONE
+/// surface that swaps under a pinch, rather than two editions to pick
+/// between.
+///
+/// True only for the GLYPH editions, and that is a CORRECTNESS limit
+/// rather than a scoping one. The reflowing page is typeset from the
+/// bundled Hafs text on Hafs pagination, and the three glyph editions
+/// (V1/V2/V4) are all Madinah Hafs prints whose page N holds exactly
+/// what page N holds here. The four artwork riwayat — Warsh, Qalon,
+/// Shu'bah, ad-Duri — are different readings AND paginate differently,
+/// so reflowing one of their pages would put the wrong words on screen.
+/// They keep pinch's original meaning (drawing the artwork wider),
+/// which is why this cannot simply key off the zoom level.
+bool mushafShowsReflow({required String editionId, required double zoom}) {
+  final edition = MushafSvgService.editions
+      .where((e) => e.id == editionId)
+      .firstOrNull;
+  if (edition == null || !edition.isGlyph) return false;
+  return zoom >= kReflowZoom;
+}
+
 /// Share of a PHONE's width the glyph leaf may use.
 ///
 /// Lines are justified with spaceBetween, so they always reach both
@@ -280,6 +312,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
   bool get _isZoomed => _zoom > 1.01;
 
+  /// Whether the printed leaf is currently standing in for its
+  /// reflowing text. See [mushafShowsReflow] for why this is limited to
+  /// the Hafs glyph editions.
+  bool get _showsReflow => mushafShowsReflow(
+      editionId: MushafSvgService.edition.id, zoom: _zoom);
+
   /// Whether this edition prints its own furniture on the leaf — the
   /// running head and the ornamented page number — instead of leaving
   /// that to the floating bars. Those editions also lose the bottom
@@ -289,13 +327,25 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// riwayat — carries this the same way a printed leaf does. Only the
   /// reflowing text edition has no page to print it on, and keeps the
   /// floating bar for its page number.
-  bool get _usesPageFurniture => MushafSvgService.edition.isPrintedPage;
+  ///
+  /// A glyph page showing its reflowed text has no leaf to print on
+  /// either, so the floating bar has to come back for as long as the
+  /// swap lasts.
+  bool get _usesPageFurniture =>
+      MushafSvgService.edition.isPrintedPage && !_showsReflow;
 
   void _onScaleStart(ScaleStartDetails d) => _zoomStart = _zoom;
 
   void _onScaleUpdate(ScaleUpdateDetails d) {
     if (d.pointerCount < 2) return; // one finger = swipe/tap, not zoom
-    final next = (_zoomStart * d.scale).clamp(_minZoom, _maxZoom);
+    var next = (_zoomStart * d.scale).clamp(_minZoom, _maxZoom);
+    // A glyph page has exactly two states, printed or reflowed — there
+    // is no half-zoomed leaf. Anything under the threshold collapses to
+    // 1.0 so pinching back in lands on the page as printed rather than
+    // on a slightly-scaled one.
+    if (MushafSvgService.edition.isGlyph && next < kReflowZoom) {
+      next = _minZoom;
+    }
     if ((next - _zoom).abs() > 0.005) setState(() => _zoom = next);
   }
 
@@ -469,18 +519,34 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     }
   }
 
-  /// One-time coach mark for the new gesture model.
+  /// One-time coach mark for the gesture model.
+  ///
+  /// The key is VERSIONED. Pinch-to-reflow is invisible — there is no
+  /// control for it — so everyone has to be told once, including the
+  /// readers who already dismissed the previous hint and would never
+  /// see an updated one under the old key.
   Future<void> _maybeShowGestureHint() async {
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('gestureHintShown') ?? false) return;
-    await prefs.setBool('gestureHintShown', true);
+    const key = 'gestureHintShown_v2';
+    if (prefs.getBool(key) ?? false) return;
+    await prefs.setBool(key, true);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        duration: Duration(seconds: 5),
-        content: Text(
-            'اضغط مطولاً على أي آية لعرض خياراتها، واضغط ضغطة سريعة لإظهار أو إخفاء الأشرطة',
+
+    // The pinch line is only true on the glyph editions — the artwork
+    // riwayat keep pinch's original meaning — so it is only offered
+    // when one of them is open.
+    const base = 'اضغط مطولاً على أي آية لعرض خياراتها، '
+        'واضغط ضغطة سريعة لإظهار أو إخفاء الأشرطة';
+    const reflow = '، واقرص بإصبعيك لعرض النص المتجاوب';
+    final text =
+        MushafSvgService.edition.isGlyph ? '$base$reflow' : base;
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(seconds: 6),
+        content: Text(text,
             textDirection: TextDirection.rtl,
-            style: TextStyle(fontFamily: '.SF Pro Text', height: 1.6))));
+            style:
+                const TextStyle(fontFamily: '.SF Pro Text', height: 1.6))));
   }
 
   /// One-time offer (per install) to download the whole Mushaf for
@@ -1800,6 +1866,32 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   }
 
   Widget _buildV2PageItem(int index, int base, bool isDark) {
+    // Pinched out: the SAME page, reflowed. Not an edition switch — the
+    // reader's chosen Mushaf is untouched and pinching back in returns
+    // to it. Page-level alignment is all that is needed and it is free:
+    // both surfaces render whatever _pageNum currently is, and in
+    // portrait the printed leaf is sized to the screen rather than
+    // scrolled, so there is no offset within the page to carry across.
+    //
+    // Composes with the 2-page spread without special-casing: the text
+    // branch below already lays two pages out side by side.
+    if (_showsReflow) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _setBars(!_barsVisible),
+        onScaleStart: _onScaleStart,
+        onScaleUpdate: _onScaleUpdate,
+        child: SafeArea(
+          child: !_wide || base + 1 > 604
+              ? _buildTextPage(base, isDark)
+              : Row(children: [
+                  Expanded(child: _buildTextPage(base + 1, isDark)),
+                  Expanded(child: _buildTextPage(base, isDark)),
+                ]),
+        ),
+      );
+    }
+
     final editionId = MushafSvgService.edition.id;
     final future = _v2Futures[index] ??= () async {
       final first = await MushafV2Service.getPage(base, editionId: editionId);
@@ -1813,6 +1905,10 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _setBars(!_barsVisible),
+      // The printed leaf had no scale handler at all: pinching did
+      // nothing on the glyph editions. This is what arms the swap.
+      onScaleStart: _onScaleStart,
+      onScaleUpdate: _onScaleUpdate,
       child: FutureBuilder<List<MushafV2Page>>(
         future: future,
         builder: (context, snapshot) {
