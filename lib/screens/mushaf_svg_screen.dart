@@ -31,6 +31,57 @@ import '../widgets/surah_frame.dart';
 import 'ayah_search_screen.dart';
 import 'tafsir_screen.dart';
 
+// Fixed boxes the glyph row draws INSTEAD of a word's natural advance,
+// as multiples of the font size. Shared by the renderer and by
+// [mushafV2LineWidth] so the two can never disagree — they did, and the
+// opening pages overflowed because of it.
+
+/// The square an ayah-end medallion is drawn into.
+const double kAyahEndBoxEm = 0.84;
+
+/// Gap inserted inside a juz-opening word, between its ornament and the
+/// rest of the word.
+const double kJuzOrnamentGapEm = 0.22;
+
+/// Gap between words on a CENTRED line, which is laid out with
+/// MainAxisSize.min instead of being justified.
+const double kCenteredWordGapEm = 0.12;
+
+/// Padding inside the reflowing text page's leaf. Matches the glyph
+/// leaf's own inner padding so the two editions set their text in an
+/// identical column.
+const double _kTextPageHPadding = 8.0;
+
+/// Width of one rendered glyph line at font size 100 — what the row will
+/// ACTUALLY occupy, which is not the width of its concatenated text.
+///
+/// The row swaps a fixed [kAyahEndBoxEm] square in for every ayah-end
+/// marker and adds spacers for juz ornaments and centred lines. Measuring
+/// the joined glyph string instead under-counts every one of those, and
+/// the shortfall grows with the number of markers on a line — which is
+/// why pages 1-2 (many short ayahs, so many markers) were the pages that
+/// overflowed while ordinary pages fitted.
+///
+/// [naturalWidths] and [isAyahEnd] are parallel, one entry per word,
+/// measured at size 100.
+double mushafV2LineWidth({
+  required List<double> naturalWidths,
+  required List<bool> isAyahEnd,
+  required bool centered,
+  bool firstWordHasJuzOrnament = false,
+}) {
+  assert(naturalWidths.length == isAyahEnd.length);
+  var total = 0.0;
+  for (var i = 0; i < naturalWidths.length; i++) {
+    total += isAyahEnd[i] ? kAyahEndBoxEm * 100 : naturalWidths[i];
+  }
+  if (firstWordHasJuzOrnament) total += kJuzOrnamentGapEm * 100;
+  if (centered && naturalWidths.length > 1) {
+    total += kCenteredWordGapEm * 100 * (naturalWidths.length - 1);
+  }
+  return total;
+}
+
 /// Share of a PHONE's width the glyph leaf may use.
 ///
 /// Lines are justified with spaceBetween, so they always reach both
@@ -1907,8 +1958,19 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
       final ayahLines =
           lines.where((line) => line.type == MushafV2LineType.ayah).toList();
+      // Measured the way the row is BUILT, not as one joined string —
+      // see [mushafV2LineWidth].
       final widest = ayahLines
-          .map((line) => measuredWidth(line.glyphs))
+          .map((line) => mushafV2LineWidth(
+                naturalWidths: [
+                  for (final w in line.words) measuredWidth(w.glyph)
+                ],
+                isAyahEnd: [for (final w in line.words) w.isAyahEnd],
+                centered: line.centered,
+                firstWordHasJuzOrnament: line.words.isNotEmpty &&
+                    _isJuzStart(line.words.first) &&
+                    line.words.first.glyph.runes.length > 1,
+              ))
           .fold<double>(1, (a, b) => a > b ? a : b);
       final editionId = MushafSvgService.edition.id;
       final widthSize = usableWidth *
@@ -2059,7 +2121,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         isJuzOpening: index == 0 && _isJuzStart(line.words[index]),
       ));
       if (line.centered && index + 1 < line.words.length) {
-        children.add(SizedBox(width: fontSize * 0.12));
+        children.add(SizedBox(width: fontSize * kCenteredWordGapEm));
       }
     }
 
@@ -2212,7 +2274,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     final hasSplitJuzOrnament = isJuzOpening && codepoints.length > 1;
     final content = word.isAyahEnd
         ? SizedBox(
-            width: fontSize * 0.84,
+            width: fontSize * kAyahEndBoxEm,
             height: fontSize,
             child: FittedBox(fit: BoxFit.contain, child: text),
           )
@@ -2223,7 +2285,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     glyphText(String.fromCharCode(codepoints.first)),
-                    SizedBox(width: fontSize * 0.22),
+                    SizedBox(width: fontSize * kJuzOrnamentGapEm),
                     glyphText(String.fromCharCodes(codepoints.skip(1))),
                   ],
                 ),
@@ -2523,25 +2585,42 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           // trial sizes until the largest one that still fits is found.
           // Guessing from a character count was never going to be right
           // for every page — pages hold anywhere from 7 to 25 lines.
-          final base = _fitFontSize(page, blocks, constraints);
+          // The SAME leaf width the printed editions get, and the same
+          // 8pt inner padding, so the reflowing page and a glyph page
+          // occupy an identical column. They did not: this page carried
+          // 14 + 14 a side against the glyph leaf's ~12 + 8, so it read
+          // visibly squeezed next to the Mushaf it is meant to mirror —
+          // and the two have to agree before they can be layered as one
+          // surface that swaps on zoom.
+          final leafWidth = mushafV2LeafWidth(
+            maxWidth: constraints.maxWidth,
+            maxHeight: constraints.maxHeight,
+            isTablet: MediaQuery.of(context).size.shortestSide >= 600,
+          );
+          // The width the TEXT actually gets, passed to the fit rather
+          // than re-derived there: the two drifting apart is how the
+          // page ends up typeset for a column it is not drawn in.
+          final textWidth = leafWidth - _kTextPageHPadding * 2;
+          final base = _fitFontSize(page, blocks, constraints, textWidth);
           final fontSize = base * _zoom;
-
           return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+            padding: const EdgeInsets.only(top: 8, bottom: 24),
             physics: const ClampingScrollPhysics(),
             // No card of its own: the page draws straight onto the
             // chosen Mushaf background, like every other edition. It
             // still claims the full height so a short page reads as a
             // page rather than a floating block of text.
-            child: Container(
-              width: double.infinity,
-              constraints:
-                  BoxConstraints(minHeight: constraints.maxHeight - 32),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final block in blocks) ...[
+            child: Center(
+              child: Container(
+                width: leafWidth,
+                constraints:
+                    BoxConstraints(minHeight: constraints.maxHeight - 32),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: _kTextPageHPadding, vertical: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final block in blocks) ...[
                     // A surah that BEGINS on this page gets its name band
                     // and the Basmala, as the printed page does.
                     if (block.first.numberInSurah == 1) ...[
@@ -2577,9 +2656,10 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           height: 2.0,
                           color: ink),
                     ),
-                    const SizedBox(height: 6),
+                      const SizedBox(height: 6),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           );
@@ -2638,9 +2718,13 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   ///
   /// Cached per page and box: the search costs a dozen layouts, and a
   /// PageView rebuilds its children constantly while swiping.
-  double _fitFontSize(
-      int page, List<List<PageAyah>> blocks, BoxConstraints constraints) {
-    final key = '$page:${constraints.maxWidth.round()}'
+  /// [textWidth] is the width the page's text is actually laid out in —
+  /// the leaf minus its padding, passed in by the caller rather than
+  /// re-derived here, so a change to the leaf cannot leave the fit
+  /// typesetting for a column that no longer exists.
+  double _fitFontSize(int page, List<List<PageAyah>> blocks,
+      BoxConstraints constraints, double textWidth) {
+    final key = '$page:${textWidth.round()}'
         'x${constraints.maxHeight.round()}';
     final cached = _fitCache[key];
     if (cached != null) return cached;
@@ -2649,7 +2733,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     // name frame and a Basmala line.
     const cardPadding = 32.0 + 16.0;
     final openings = blocks.where((b) => b.first.numberInSurah == 1).length;
-    final width = constraints.maxWidth - 28 - 28;
+    final width = textWidth;
     final height = constraints.maxHeight - cardPadding - 32;
 
     double textHeight(double size) {
