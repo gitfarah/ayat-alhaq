@@ -2637,6 +2637,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                                   fontFamily: 'QuranHafs',
                                   fontSize: fontSize * 0.92,
                                   height: 1.9,
+                                  // Matches the verses it heads.
+                                  wordSpacing: kQuranWordSpacing,
                                   color: isDark
                                       ? AppColors.darkPrimary
                                       : AppColors.primary)),
@@ -2654,6 +2656,12 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           fontFamily: 'QuranHafs',
                           fontSize: fontSize,
                           height: 2.0,
+                          // The body face sets words tight — the same
+                          // reason the reader carries this. Justify
+                          // stretches the spaces it is GIVEN, so
+                          // without a wider base space a full line
+                          // still comes out cramped.
+                          wordSpacing: kQuranWordSpacing,
                           color: ink),
                     ),
                       const SizedBox(height: 6),
@@ -2736,6 +2744,10 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     final width = textWidth;
     final height = constraints.maxHeight - cardPadding - 32;
 
+    // Laid out the way the page is BUILT — same word spacing, and the
+    // ayah marker in its own face. Measuring without those makes the fit
+    // think a line is shorter than it will be drawn, which is how a page
+    // ends up typeset too large for the box it lands in.
     double textHeight(double size) {
       var total = openings * size * 3.4; // frame + Basmala line
       for (final block in blocks) {
@@ -2743,11 +2755,18 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           textDirection: TextDirection.rtl,
           textAlign: TextAlign.justify,
           text: TextSpan(
-            style:
-                TextStyle(fontFamily: 'QuranHafs', fontSize: size, height: 2.0),
+            style: TextStyle(
+                fontFamily: 'QuranHafs',
+                fontSize: size,
+                height: 2.0,
+                wordSpacing: kQuranWordSpacing),
             children: [
-              for (final a in block)
-                TextSpan(text: '${a.text} ${_ar(a.numberInSurah)} '),
+              for (final a in block) ...[
+                TextSpan(text: a.text),
+                TextSpan(
+                    text: ' ${_ar(a.numberInSurah)} ',
+                    style: const TextStyle(fontFamily: 'QuranAyahMark')),
+              ],
             ],
           ),
         )..layout(maxWidth: width);
@@ -2841,12 +2860,18 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   backgroundColor: bg,
                   color:
                       seg.isPlain ? null : TajweedService.colorFor(seg.rule))),
-      // End-of-ayah mark: bare Arabic-Indic digits. The KFGQPC HAFS
-      // font itself sets them inside the ornate medallion — that is its
-      // own convention — and unlike a drawn WidgetSpan (directionally
-      // neutral, so it drifts out of reading order in an RTL paragraph)
-      // real digits take part in the bidi algorithm and always land
-      // beside their own ayah.
+      // End-of-ayah mark: bare Arabic-Indic digits, which a KFGQPC face
+      // sets inside the ornate medallion by itself. Real digits are used
+      // rather than a drawn WidgetSpan because a WidgetSpan is
+      // directionally neutral and drifts out of reading order in an RTL
+      // paragraph, while digits take part in the bidi algorithm and
+      // always land beside their own ayah.
+      //
+      // Set in QuranAyahMark, NOT the body face: enclosing the digits is
+      // a KFGQPC convention, and me_quran — the body font — draws them
+      // plain with square marks above and below, which reads as a
+      // squashed frame wedged between the words.
+      //
       // Tinted, so the medallions read as marks between ayahs rather
       // than as part of the script — as a printed Mushaf prints them.
       TextSpan(
@@ -2854,6 +2879,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           recognizer: recognizer,
           style: TextStyle(
               backgroundColor: bg,
+              fontFamily: 'QuranAyahMark',
               color:
                   isDark ? AppColors.darkSecondary : const Color(0xFFB8892B))),
     ];

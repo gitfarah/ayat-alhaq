@@ -71,15 +71,15 @@ void main() {
             'ٱلْءَاخِرَةِ in the new face and look at it first.');
   });
 
-  group('faces already proven to SPLIT the word are not bundled', () {
-    // Both KFGQPC HAFS versions were shipped at some point and both are
-    // wrong for this text. Named individually so a future swap back is
+  group('faces already proven to SPLIT the word are not the BODY font', () {
+    // Both KFGQPC HAFS versions were the body font at some point and
+    // both are wrong for that job. Named individually so a swap back is
     // caught by name, not just by absence.
     for (final asset in const [
       'assets/fonts/HafsQuran.ttf', // KFGQPC HAFS v0.18
       'assets/fonts/UthmanicHafs_V22.ttf', // KFGQPC HAFS v2.2
     ]) {
-      test(asset, () async {
+      test('$asset is gone', () async {
         var present = true;
         try {
           await rootBundle.load(asset);
@@ -87,8 +87,23 @@ void main() {
           present = false;
         }
         expect(present, isFalse,
-            reason: '$asset splits ٱلْءَاخِرَةِ in two and must not ship');
+            reason: '$asset splits ٱلْءَاخِرَةِ and must not be the body '
+                'font. A KFGQPC face is still bundled for ayah medallions '
+                'as AyahMarkHafs.ttf — that is a different job.');
       });
     }
+  });
+
+  test('a KFGQPC face IS bundled for the ayah medallions', () async {
+    // The reflowing page prints ayah numbers as bare digits and relies
+    // on the font to enclose them in the ornate circle. me_quran does
+    // not — it draws them plain with square marks above and below, which
+    // is what "the number and its frame are squashed between the words"
+    // looked like. This face does the enclosing.
+    final data = await rootBundle.load('assets/fonts/AyahMarkHafs.ttf');
+    final names = _names(data.buffer.asUint8List());
+    expect(names[1], contains('KFGQPC HAFS Uthmanic Script'),
+        reason: 'the medallion convention is a KFGQPC one — a face that '
+            'does not follow it will draw bare digits again');
   });
 }

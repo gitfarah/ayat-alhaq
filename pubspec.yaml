@@ -1,7 +1,7 @@
 name: quran_app_v1
 description: A Quran reading app for Android and iOS.
 publish_to: 'none'
-version: 1.7.2+75
+version: 1.7.2+76
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -124,3 +124,20 @@ flutter:
     - family: QuranHafs
       fonts:
         - asset: assets/fonts/MeQuran.ttf
+    # END-OF-AYAH MEDALLIONS ONLY, on the reflowing page.
+    #
+    # That page prints an ayah number as bare Arabic-Indic digits and
+    # relies on the FONT to set them inside the ornate circle, which is
+    # the KFGQPC convention. me_quran does not follow it: it draws the
+    # digits plain, with small square marks above and below, which reads
+    # as a squashed frame jammed between the words. It does not enclose
+    # them for U+06DD either — that just adds an empty medallion beside
+    # the digits.
+    #
+    # So the marker keeps a KFGQPC face (v2.2) while the verse text is
+    # set in me_quran. Same file that was bundled as the body font for
+    # one build; it is kept ONLY for these digits, never for verse text —
+    # it splits ٱلْءَاخِرَةِ, which is why it stopped being the body font.
+    - family: QuranAyahMark
+      fonts:
+        - asset: assets/fonts/AyahMarkHafs.ttf
