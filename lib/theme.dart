@@ -120,27 +120,14 @@ class AppColors {
   static Color highlight(String name) => highlights[name] ?? Colors.transparent;
 }
 
-/// Extra space added between WORDS of Quran verses, in logical pixels.
-///
-/// The bundled "me_quran" face sets words very tight — in a running ayah
-/// they run into each other ("ٱلنَّاسِ مَن يَقُولُ" reads as one blob).
-/// It is used anyway because it is one of only two faces tested that
-/// join a word-internal hamza correctly; this is the compensation.
-///
-/// Chosen by rendering the same ayah at 0 / 8 / 14 and picking from the
-/// three, not by taste in the abstract.
-const double kQuranWordSpacing = 8.0;
-
-/// Opacity of the ink Quran verses are set in.
-///
-/// Same face, same reason: it draws heavier than the app's other type,
-/// and at full strength a page of it reads as a solid block. Slightly
-/// translucent ink lightens the stroke without touching the letterforms
-/// — there is no lighter weight of this font to switch to.
-///
-/// Kept well above the point where the text starts reading grey: 0.72
-/// was tried and rejected as washed out.
-const double kQuranInkOpacity = 0.82;
+// NOTE: kQuranWordSpacing (8.0) and kQuranInkOpacity (0.82) used to live
+// here. They were not typography choices — they were a crutch for the
+// old "me_quran" body face, which set words so tight they ran into each
+// other and drew so heavy that a full page read as a solid block. The
+// Quran face is now Amiri Quran, which needs neither: it was compared
+// against me_quran at 0 / 8 / 14 word spacing and 72% / 82% / 100% ink,
+// and won set AS-IS. Verses now take the plain text colour and no word
+// spacing. Reintroducing either means the face changed again.
 
 class AppTypography {
   // '.SF Pro Text' is the private CoreText name Apple's own system-font

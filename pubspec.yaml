@@ -94,16 +94,24 @@ flutter:
       fonts:
         - asset: assets/fonts/qul_surah_name_v4.ttf
     # Quran VERSES ONLY — the Uthmani typeface the reader sets ayahs in.
+    # (The family is still called QuranHafs: it names the JOB — the Quran
+    # body face — not the file behind it, which has changed.)
     #
-    # "me_quran" v1.003, from the same QUL/Tarteel CDN this app already
-    # fetches its Mushaf page fonts from.
+    # Amiri Quran v1.000, the Quranic cut of the Amiri family, from
+    # Google Fonts (SIL OFL 1.1).
     #
-    # Chosen for ONE reason, and it is not aesthetics: it joins a
-    # word-internal hamza. ٱلْءَاخِرَةِ (2:4) must set as ٱلْأَخِرَة, the
-    # way the KFGQPC Mushaf page itself prints it. Two fonts out of eight
-    # tested do that — this one and Amiri Quran. The other six, INCLUDING
-    # both KFGQPC HAFS Uthmanic Script v0.18 and v2.2, split the word in
-    # two around the hamza.
+    # It must join a word-internal hamza: ٱلْءَاخِرَةِ (2:4) has to set as
+    # ٱلْأَخِرَة, the way the KFGQPC Mushaf page itself prints it. Two
+    # fonts out of eight tested do that — this one and "me_quran", which
+    # this replaced. The other six, INCLUDING both KFGQPC HAFS Uthmanic
+    # Script v0.18 and v2.2, split the word in two around the hamza.
+    #
+    # Amiri was chosen over me_quran on looks, after rendering the same
+    # ayah in both side by side: me_quran sets words tight and heavy and
+    # needed a word-spacing + ink-opacity crutch to be readable (see the
+    # deleted kQuranWordSpacing / kQuranInkOpacity in theme.dart). Amiri
+    # Quran is set AS-IS, with no such compensation — if either of those
+    # ever comes back, the face was probably swapped without looking.
     #
     # That history matters, because the obvious-looking fixes are all
     # wrong and have each been tried:
@@ -118,26 +126,22 @@ flutter:
     # So before swapping this font, render ٱلْءَاخِرَةِ in the candidate
     # and LOOK at it. Font-table inspection is not sufficient evidence.
     #
-    # The reader pairs it with a word-spacing and ink-opacity setting —
-    # see kQuranWordSpacing / kQuranInkOpacity in theme.dart — because
-    # this face sets words tight and dark by default.
     - family: QuranHafs
       fonts:
-        - asset: assets/fonts/MeQuran.ttf
+        - asset: assets/fonts/AmiriQuran.ttf
     # END-OF-AYAH MEDALLIONS ONLY, on the reflowing page.
     #
     # That page prints an ayah number as bare Arabic-Indic digits and
     # relies on the FONT to set them inside the ornate circle, which is
-    # the KFGQPC convention. me_quran does not follow it: it draws the
-    # digits plain, with small square marks above and below, which reads
-    # as a squashed frame jammed between the words. It does not enclose
-    # them for U+06DD either — that just adds an empty medallion beside
-    # the digits.
+    # the KFGQPC convention. The body face is not asked to: me_quran, the
+    # body font when this was split out, drew the digits plain with small
+    # square marks above and below — a squashed frame jammed between the
+    # words — and did not enclose them for U+06DD either.
     #
-    # So the marker keeps a KFGQPC face (v2.2) while the verse text is
-    # set in me_quran. Same file that was bundled as the body font for
-    # one build; it is kept ONLY for these digits, never for verse text —
-    # it splits ٱلْءَاخِرَةِ, which is why it stopped being the body font.
+    # So the marker keeps a KFGQPC face (v2.2) of its own. Same file that
+    # was bundled as the body font for one build; it is kept ONLY for
+    # these digits, never for verse text — it splits ٱلْءَاخِرَةِ, which is
+    # why it stopped being the body font.
     - family: QuranAyahMark
       fonts:
         - asset: assets/fonts/AyahMarkHafs.ttf

@@ -662,13 +662,10 @@ class _ReaderScreenState extends State<ReaderScreen>
     final baseStyle = TextStyle(
       fontSize: settings.fontSize,
       height: 2.1,
-      // Slightly translucent, and words pushed apart: the Quran face
-      // sets tight and heavy by default. See kQuranWordSpacing /
-      // kQuranInkOpacity for why the compensation lives here rather
-      // than in a different font.
-      color: (isDark ? AppColors.darkText : AppColors.textPrimary)
-          .withValues(alpha: kQuranInkOpacity),
-      wordSpacing: kQuranWordSpacing,
+      // Full-strength ink and the face's own spacing: Amiri Quran is set
+      // as-is (see the note where kQuranWordSpacing / kQuranInkOpacity
+      // used to live in theme.dart).
+      color: isDark ? AppColors.darkText : AppColors.textPrimary,
       // Quran verses only.
       fontFamily: 'QuranHafs',
     );
@@ -827,15 +824,12 @@ class _ReaderScreenState extends State<ReaderScreen>
                                       height: 1.8,
                                       fontFamily: 'QuranHafs',
                                       // Matches the verses below it —
-                                      // the Basmala sitting darker and
-                                      // tighter than the ayahs it heads
-                                      // would look like a different face.
-                                      wordSpacing: kQuranWordSpacing,
-                                      color: (isDark
-                                              ? AppColors.darkText
-                                              : AppColors.textPrimary)
-                                          .withValues(
-                                              alpha: kQuranInkOpacity),
+                                      // same face, same ink, so the
+                                      // Basmala does not read as a
+                                      // different font.
+                                      color: isDark
+                                          ? AppColors.darkText
+                                          : AppColors.textPrimary,
                                     ),
                                   ),
                                 );
