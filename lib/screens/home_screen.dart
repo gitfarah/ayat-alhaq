@@ -1050,6 +1050,9 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner>
   int _period = 0;
   int _wasPeriod = 0;
 
+  /// The prayer picked out as next, or null once today's are all past.
+  int? _next;
+
   /// Watches for the prayer time passing while the app sits open. The
   /// card is a clock face — leaving it on Asr an hour into Maghrib
   /// would make it a wrong one.
@@ -1072,18 +1075,30 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner>
     _tick = Timer.periodic(const Duration(seconds: 30), (_) => _syncPeriod());
   }
 
-  /// Moves the card to whichever prayer we are now inside, fading if it
-  /// has changed since the last check.
+  /// Moves the card on to the current hour, fading the sky if it has
+  /// changed since the last check.
+  ///
+  /// Watches the highlighted prayer as well as the sky. They move at
+  /// different moments — the highlight jumps the instant a prayer is
+  /// called, the sky only when the light outside actually changes — and
+  /// the highlight was previously left to whatever unrelated rebuild
+  /// happened to come along, so it could sit a prayer behind.
   void _syncPeriod() {
     final times = _times;
     if (times == null || !mounted) return;
-    final now = times.currentPrayerIndex(DateTime.now());
-    if (now == _period) return;
+    final now = DateTime.now();
+    final sky = times.skyPrayerIndex(now);
+    final next = times.nextPrayerIndex(now);
+    if (sky == _period && next == _next) return;
+    final skyChanged = sky != _period;
     setState(() {
-      _wasPeriod = _period;
-      _period = now;
+      if (skyChanged) {
+        _wasPeriod = _period;
+        _period = sky;
+      }
+      _next = next;
     });
-    _change.forward(from: 0);
+    if (skyChanged) _change.forward(from: 0);
   }
 
   @override
@@ -1119,8 +1134,9 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner>
         // The card opens ALREADY in the right sky rather than fading
         // into it from whatever index 0 happens to be.
         if (times != null) {
-          _period = times.currentPrayerIndex(DateTime.now());
+          _period = times.skyPrayerIndex(DateTime.now());
           _wasPeriod = _period;
+          _next = times.nextPrayerIndex(DateTime.now());
         }
       });
       if (times != null) {
@@ -1192,7 +1208,9 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner>
 
     final times = _times;
     if (times == null) return const SizedBox.shrink();
-    final next = times.nextPrayerIndex(DateTime.now());
+    // Kept in state and refreshed on the same tick as the sky, so the
+    // highlight cannot drift a prayer behind between rebuilds.
+    final next = _next ?? times.nextPrayerIndex(DateTime.now());
     // Reduce Motion turns the sky into a still frame rather than
     // removing it: the sky is what tells the hour, the movement in it
     // is only ornament.

@@ -28,44 +28,70 @@ double _contrast(Color fg, Color bg) {
   return (math.max(a, b) + 0.05) / (math.min(a, b) + 0.05);
 }
 
+/// Kuala Lumpur — the times the sky rule was actually reported wrong
+/// against, kept as the case it has to get right.
 const _times = PrayerTimes(
-  fajr: '04:41',
-  dhuhr: '12:25',
-  asr: '15:48',
-  maghrib: '18:51',
-  isha: '20:05',
+  fajr: '06:00',
+  dhuhr: '13:18',
+  asr: '16:35',
+  maghrib: '19:24',
+  isha: '20:31',
 );
 
 DateTime _at(int h, int m) => DateTime(2026, 8, 15, h, m);
 
 void main() {
   group('which sky the card wears', () {
-    test('the hour picks the prayer we are INSIDE, not the next one', () {
-      // Just before a prayer we are still in the previous one; a minute
-      // after it, we are in it.
-      expect(_times.currentPrayerIndex(_at(12, 24)), 0); // still Fajr
-      expect(_times.currentPrayerIndex(_at(12, 26)), 1); // now Dhuhr
-      expect(_times.currentPrayerIndex(_at(15, 49)), 2); // Asr
-      expect(_times.currentPrayerIndex(_at(18, 52)), 3); // Maghrib
-      expect(_times.currentPrayerIndex(_at(20, 6)), 4); // Isha
+    test('between Maghrib and Isha the card is NIGHT, not a sunset', () {
+      // The bug this rule exists for. Maghrib's PERIOD runs until Isha
+      // is called, but the sunset is long over: at 20:00 it is dark
+      // outside and the card is counting down to Isha, so a sunset card
+      // reads as simply stuck.
+      expect(_times.skyPrayerIndex(_at(20, 0)), 4);
+      expect(_times.skyPrayerIndex(_at(19, 30)), 4);
+      // ...while the run-up TO Maghrib is when the sunset belongs.
+      expect(_times.skyPrayerIndex(_at(18, 45)), 3);
+      expect(_times.skyPrayerIndex(_at(17, 0)), 3);
     });
 
-    test('both ends of the night are Isha', () {
-      // The stretch before Fajr and the stretch after Isha are one
-      // night; the card must not go bright between midnight and dawn.
-      expect(_times.currentPrayerIndex(_at(23, 30)), 4);
-      expect(_times.currentPrayerIndex(_at(0, 15)), 4);
-      expect(_times.currentPrayerIndex(_at(4, 40)), 4);
-      // ...and the moment Fajr is called it stops being night.
-      expect(_times.currentPrayerIndex(_at(4, 42)), 0);
+    test('the whole stretch from Isha to Fajr is night', () {
+      expect(_times.skyPrayerIndex(_at(21, 0)), 4); // after Isha
+      expect(_times.skyPrayerIndex(_at(23, 59)), 4);
+      expect(_times.skyPrayerIndex(_at(0, 20)), 4); // past midnight
+      expect(_times.skyPrayerIndex(_at(5, 59)), 4); // still dark
     });
 
-    test('the next prayer is still answered separately', () {
-      // The card highlights the NEXT prayer while wearing the CURRENT
-      // one's sky; if these ever collapse into one number the card
-      // stops being able to do both.
-      expect(_times.nextPrayerIndex(_at(13, 0)), 2);
-      expect(_times.currentPrayerIndex(_at(13, 0)), 1);
+    test('dawn is the window after Fajr, not the whole morning', () {
+      expect(_times.skyPrayerIndex(_at(6, 5)), 0); // dawn
+      expect(_times.skyPrayerIndex(_at(7, 20)), 0); // still dawn
+      expect(_times.skyPrayerIndex(_at(7, 40)), 1); // morning is blue
+      expect(_times.skyPrayerIndex(_at(11, 0)), 1);
+    });
+
+    test('the middle of the day runs blue then gold', () {
+      expect(_times.skyPrayerIndex(_at(13, 0)), 1); // before Dhuhr
+      expect(_times.skyPrayerIndex(_at(14, 0)), 2); // afternoon gold
+      expect(_times.skyPrayerIndex(_at(16, 30)), 2);
+    });
+
+    test('the sky and the highlighted prayer stay separate questions', () {
+      // Through the day the sky IS the prayer being counted to, which
+      // is why the card finally agrees with its own highlight...
+      expect(_times.nextPrayerIndex(_at(14, 0)), 2);
+      expect(_times.skyPrayerIndex(_at(14, 0)), 2);
+      // ...but not at night: Fajr is highlighted from midnight onward,
+      // and it is emphatically not dawn at 2am.
+      expect(_times.nextPrayerIndex(_at(2, 0)), 0);
+      expect(_times.skyPrayerIndex(_at(2, 0)), 4);
+    });
+
+    test('every hour of the day maps to a real sky', () {
+      for (var h = 0; h < 24; h++) {
+        for (final m in [0, 30]) {
+          expect(_times.skyPrayerIndex(_at(h, m)), inInclusiveRange(0, 4),
+              reason: 'at $h:$m');
+        }
+      }
     });
   });
 

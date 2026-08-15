@@ -48,16 +48,41 @@ class PrayerTimes {
     return null;
   }
 
-  /// Index (0-4) of the prayer whose time we are currently INSIDE — the
-  /// last one called, which is what the hour outside actually looks
-  /// like. [nextPrayerIndex] answers the opposite question.
+  /// Today's [i]th prayer as a DateTime on [now]'s date.
+  DateTime timeOf(DateTime now, int i) {
+    final parts = all[i].split(':');
+    return DateTime(
+        now.year, now.month, now.day, int.parse(parts[0]), int.parse(parts[1]));
+  }
+
+  /// Index (0-4) of the prayer whose SKY is outside the window at [now]
+  /// — which is the prayer being counted toward, not the one whose
+  /// period we are technically inside.
   ///
-  /// The night wraps at both ends: before Fajr and after Isha are the
-  /// same stretch of night, and both report Isha.
-  int currentPrayerIndex(DateTime now) {
+  /// That distinction is the whole point. Maghrib's period runs until
+  /// Isha is called, but the sunset itself is over within the hour: at
+  /// 20:00 with Maghrib at 19:24 and Isha at 20:31, it is dark outside
+  /// and the card says Isha — so a sunset card is simply wrong. Taking
+  /// the NEXT prayer instead puts each sky over the stretch that
+  /// actually looks like it: gold through the afternoon, sunset as
+  /// Maghrib approaches, night from dusk onward.
+  ///
+  /// Two stretches are not just "the next prayer", and both are about
+  /// the night:
+  ///  * from Isha until Fajr — including past midnight — it is night
+  ///    the whole way, even though Fajr is what is being counted to.
+  ///  * dawn is the SHORT window after Fajr is called, not the whole
+  ///    morning, so Fajr's sky gets that window and the rest of the
+  ///    morning is ordinary blue.
+  int skyPrayerIndex(DateTime now) {
     final next = nextPrayerIndex(now);
-    if (next == null) return 4; // after Isha — still tonight
-    return (next - 1 + 5) % 5; // before Fajr wraps back to Isha
+    // After Isha (null) and before Fajr (0) are one stretch of night.
+    if (next == null || next == 0) return 4;
+    if (next == 1 &&
+        now.isBefore(timeOf(now, 0).add(const Duration(minutes: 90)))) {
+      return 0; // still dawn
+    }
+    return next;
   }
 }
 
