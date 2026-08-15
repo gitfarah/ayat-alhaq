@@ -1,7 +1,7 @@
 name: quran_app_v1
 description: A Quran reading app for Android and iOS.
 publish_to: 'none'
-version: 1.7.3+80
+version: 1.7.3+81
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -70,8 +70,6 @@ flutter:
     - assets/icon/logo_transparent.png
     - assets/icon/bismillah.png
     - assets/icon/mushaf_illustration.png
-    - assets/icon/mushaf_illustration_2.png
-    - assets/icon/mushaf_illustration_3.png
   fonts:
     # UI everywhere: menus, labels, buttons, surah lists. The '.SF Pro
     # Text' family (referenced directly in code, not registered here)
