@@ -332,14 +332,18 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// screen was reflowed text with nowhere to pan to.
   bool get _reflowsToWidth => _showsReflow;
 
-  /// Whether the leaf prints its own furniture — the running head and
-  /// the ornamented page number — instead of leaving that to the
-  /// floating bars, which also drops the bottom page-number bar and its
-  /// arrows as duplicates.
+  /// Whether the leaf prints its own furniture — the running head above
+  /// the text and the ornamented page number below it.
   ///
   /// Every edition renders an actual page and so carries it. A page
-  /// showing its REFLOWED text has no leaf to print on, so the floating
-  /// bar comes back for as long as the swap lasts.
+  /// showing its REFLOWED text has no leaf to print on, so the running
+  /// head moves into the top bar for as long as the swap lasts.
+  ///
+  /// The page number does NOT come back with it: the top bar already
+  /// prints it, and turning pages is a swipe in both states, so the
+  /// bottom bar of number-plus-arrows this used to restore was two
+  /// duplicates and a row of screen height. It was removed rather than
+  /// re-gated.
   bool get _usesPageFurniture => !_showsReflow;
 
   void _onScaleStart(ScaleStartDetails d) => _zoomStart = _zoom;
@@ -739,24 +743,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       ctrl.jumpToPage(_indexForPage(page));
     } else {
       _onPageSettled(_wide ? _spreadBase(page) : page);
-    }
-  }
-
-  void _next() {
-    final ctrl = _pageCtrl;
-    if (ctrl != null && ctrl.hasClients) {
-      ctrl.nextPage(
-          duration: const Duration(milliseconds: 260),
-          curve: Curves.easeOutCubic);
-    }
-  }
-
-  void _prev() {
-    final ctrl = _pageCtrl;
-    if (ctrl != null && ctrl.hasClients) {
-      ctrl.previousPage(
-          duration: const Duration(milliseconds: 260),
-          curve: Curves.easeOutCubic);
     }
   }
 
@@ -1739,12 +1725,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 top: false,
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                 if (audio.hasActiveTrack) _buildAudioBar(audio, isDark),
-                // The page-number bar and its two arrows are redundant
-                // once the leaf prints its own number: the number is on
-                // the page, and turning pages is a swipe. Tapping the
-                // printed number opens the same go-to dialog the old
-                // circle did.
-                if (!_usesPageFurniture) _buildNavBar(isDark),
                 ]),
               ),
             ),
@@ -3424,62 +3404,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavBar(bool isDark) {
-    // Kept deliberately slim — every vertical pixel here is stolen from
-    // the page itself, which hurts most in phone landscape.
-    final compact = _isLandscapeCompact(context);
-    final gold = isDark ? AppColors.darkSecondary : AppColors.accent;
-    final disabled = isDark ? AppColors.darkBorder : Colors.grey[300];
-    final circleSize = compact ? 30.0 : 36.0;
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: compact ? 0 : 2),
-      decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : Colors.white,
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 4,
-                offset: const Offset(0, -2))
-          ]),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            IconButton(
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                onPressed: _pageNum > 1 ? _prev : null,
-                icon: Icon(Icons.chevron_right, size: compact ? 22 : 26),
-                color: _pageNum > 1 ? gold : disabled),
-            GestureDetector(
-                onTap: _jumpDialog,
-                child: Container(
-                    width: circleSize,
-                    height: circleSize,
-                    decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: gold.withValues(alpha: 0.4), width: 1.2)),
-                    child: Center(
-                        child: Text(_ar(_pageNum),
-                            style: TextStyle(
-                                fontSize: compact ? 11 : 12,
-                                fontWeight: FontWeight.bold,
-                                color: gold,
-                                fontFamily: '.SF Pro Text'))))),
-            IconButton(
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                onPressed: _pageNum < 604 ? _next : null,
-                icon: Icon(Icons.chevron_left, size: compact ? 22 : 26),
-                color: _pageNum < 604 ? gold : disabled),
           ],
         ),
       ),
