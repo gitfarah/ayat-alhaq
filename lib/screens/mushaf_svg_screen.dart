@@ -2710,8 +2710,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                                   fontFamily: 'QuranHafs',
                                   fontSize: fontSize * 0.92,
                                   height: 1.9,
-                                  // Matches the verses it heads.
-                                  wordSpacing: kQuranWordSpacing,
                                   color: isDark
                                       ? AppColors.darkPrimary
                                       : AppColors.primary)),
@@ -2729,12 +2727,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                           fontFamily: 'QuranHafs',
                           fontSize: fontSize,
                           height: 2.0,
-                          // The body face sets words tight — the same
-                          // reason the reader carries this. Justify
-                          // stretches the spaces it is GIVEN, so
-                          // without a wider base space a full line
-                          // still comes out cramped.
-                          wordSpacing: kQuranWordSpacing,
                           color: ink),
                     ),
                       const SizedBox(height: 6),
@@ -2829,10 +2821,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           textAlign: TextAlign.justify,
           text: TextSpan(
             style: TextStyle(
-                fontFamily: 'QuranHafs',
-                fontSize: size,
-                height: 2.0,
-                wordSpacing: kQuranWordSpacing),
+                fontFamily: 'QuranHafs', fontSize: size, height: 2.0),
             children: [
               for (final a in block) ...[
                 TextSpan(text: a.text),

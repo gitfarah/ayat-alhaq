@@ -103,6 +103,7 @@ class AboutScreen extends StatelessWidget {
           const SizedBox(height: 14),
           _Section(isDark: isDark, title: t('aboutFonts'), rows: const [
             ('SF Arabic (San Francisco)', 'Apple system font, on-device'),
+            ('Amiri Quran', 'The Amiri Project — SIL OFL 1.1'),
             (
               'KFGQPC HAFS Uthmanic Script',
               'King Fahd Glorious Quran Printing Complex'

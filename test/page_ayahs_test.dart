@@ -68,9 +68,10 @@ void main() {
 
     test('V4 Hafs, V2 1421H and V1 1405H lead the menu', () {
       expect(MushafSvgService.editions[0].id, 'hafs');
-      expect(MushafSvgService.editions[0].nameEn, 'Midinah Hafs Musahf 1441 H');
+      expect(MushafSvgService.editions[0].nameEn, 'Musahf Hafs with Tajweed');
       expect(MushafSvgService.editions[0].isGlyph, isTrue);
       expect(MushafSvgService.editions[1].id, 'madinah1421');
+      expect(MushafSvgService.editions[1].nameEn, 'Musahf Hafs');
       expect(MushafSvgService.editions[1].isGlyph, isTrue);
       expect(MushafSvgService.editions[2].id, 'madinah1405');
       expect(MushafSvgService.editions[2].nameEn, 'Midinah Hafs Musahf 1405 H');

@@ -4,10 +4,11 @@
 // ٱلْءَاخِرَةِ (2:4) has a word-internal standalone hamza. Most Uthmani
 // faces cannot join it and split the word in two around the hamza. Of
 // eight rendered and compared, only TWO joined it as the KFGQPC Mushaf
-// page itself prints it (ٱلْأَخِرَة): "me_quran" and Amiri Quran. Both
-// KFGQPC HAFS Uthmanic Script v0.18 AND its v2.2 release split it —
-// which is why "just upgrade the KFGQPC font" is not a fix, and was
-// tried and shipped once before being caught.
+// page itself prints it (ٱلْأَخِرَة): Amiri Quran — the face now bundled
+// — and "me_quran", which it replaced. Both KFGQPC HAFS Uthmanic Script
+// v0.18 AND its v2.2 release split it — which is why "just upgrade the
+// KFGQPC font" is not a fix, and was tried and shipped once before
+// being caught.
 //
 // So this asserts the bundled face is one of the two known-good ones.
 // Swapping in anything else needs the word RENDERED and looked at;
@@ -61,13 +62,13 @@ void main() {
 
   test('the bundled Quran face is one that JOINS a word-internal hamza',
       () async {
-    final data = await rootBundle.load('assets/fonts/MeQuran.ttf');
+    final data = await rootBundle.load('assets/fonts/AmiriQuran.ttf');
     final names = _names(data.buffer.asUint8List());
 
     // Family name as the font itself declares it.
-    expect(names[1], contains('me_quran'),
+    expect(names[1], contains('Amiri Quran'),
         reason: 'the reader must use a face verified to join ٱلْأَخِرَة — '
-            'me_quran or Amiri Quran. If this is being changed, RENDER '
+            'Amiri Quran or me_quran. If this is being changed, RENDER '
             'ٱلْءَاخِرَةِ in the new face and look at it first.');
   });
 
