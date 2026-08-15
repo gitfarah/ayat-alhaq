@@ -1030,22 +1030,60 @@ class _PrayerTimesBanner extends StatefulWidget {
 }
 
 class _PrayerTimesBannerState extends State<_PrayerTimesBanner>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   PrayerTimes? _times;
   String? _label;
   bool _loaded = false;
   String _lang = 'ar';
 
-  /// Drives all five skies at once. One controller, handed to the
-  /// painters as `repaint:` — so the stars twinkle without a single
-  /// widget rebuild, and the surah list underneath never sees it.
+  /// The twinkle clock. Handed to the painter as `repaint:` — so the
+  /// stars move without a single widget rebuild, and the surah list
+  /// underneath never sees it.
   late final AnimationController _sky;
+
+  /// Runs once each time the hour turns over, fading the card from the
+  /// prayer that just ended into the one that just began.
+  late final AnimationController _change;
+
+  /// The prayer the card is currently painted as, and the one it is
+  /// fading from. Equal except during a change.
+  int _period = 0;
+  int _wasPeriod = 0;
+
+  /// Watches for the prayer time passing while the app sits open. The
+  /// card is a clock face — leaving it on Asr an hour into Maghrib
+  /// would make it a wrong one.
+  Timer? _tick;
 
   @override
   void initState() {
     super.initState();
     _sky = AnimationController(vsync: this, duration: kSkyCycle)..repeat();
+    _change = AnimationController(vsync: this, duration: kSkyChange, value: 1)
+      // The type is tinted from the blended sky, so the whole card has
+      // to rebuild across the fade, not just the painted layer. It runs
+      // for 1.4s about five times a day.
+      ..addListener(() {
+        if (mounted) setState(() {});
+      });
     LibraryEvents.prayer.addListener(_load);
+    // Half a minute is far finer than the thing being watched for, and
+    // costs nothing; it also carries the card over midnight.
+    _tick = Timer.periodic(const Duration(seconds: 30), (_) => _syncPeriod());
+  }
+
+  /// Moves the card to whichever prayer we are now inside, fading if it
+  /// has changed since the last check.
+  void _syncPeriod() {
+    final times = _times;
+    if (times == null || !mounted) return;
+    final now = times.currentPrayerIndex(DateTime.now());
+    if (now == _period) return;
+    setState(() {
+      _wasPeriod = _period;
+      _period = now;
+    });
+    _change.forward(from: 0);
   }
 
   @override
@@ -1062,6 +1100,8 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner>
 
   @override
   void dispose() {
+    _tick?.cancel();
+    _change.dispose();
     _sky.dispose();
     LibraryEvents.prayer.removeListener(_load);
     super.dispose();
@@ -1076,6 +1116,12 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner>
         _label = label;
         _times = times;
         _loaded = true;
+        // The card opens ALREADY in the right sky rather than fading
+        // into it from whatever index 0 happens to be.
+        if (times != null) {
+          _period = times.currentPrayerIndex(DateTime.now());
+          _wasPeriod = _period;
+        }
       });
       if (times != null) {
         await AdhanNotificationService.syncToday(times, _lang);
@@ -1147,81 +1193,82 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner>
     final times = _times;
     if (times == null) return const SizedBox.shrink();
     final next = times.nextPrayerIndex(DateTime.now());
-    final accent = isDark ? AppColors.darkPrimary : AppColors.primary;
-    // Reduce Motion turns the skies into still frames rather than
-    // removing them: the scene is what tells the prayers apart, the
-    // movement is only ornament.
+    // Reduce Motion turns the sky into a still frame rather than
+    // removing it: the sky is what tells the hour, the movement in it
+    // is only ornament.
     final motion = !MediaQuery.disableAnimationsOf(context);
+
+    // The card IS the hour it is now. Mid-change it is the blend of the
+    // prayer that has just ended and the one that has begun — and the
+    // type is tinted from those same blended colours, so the ink turns
+    // over with the sky instead of snapping at the end of the fade.
+    final sky = PrayerSkyTheme.lerp(
+      prayerSkyTheme(_wasPeriod, isDark: isDark),
+      prayerSkyTheme(_period, isDark: isDark),
+      motion ? Curves.easeInOut.transform(_change.value) : 1.0,
+    );
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      // Clipped so the sky stops at the card's rounded corners.
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-              color: isDark ? AppColors.darkBorder : AppColors.border)),
-      child: Column(children: [
-        Row(children: [
-          Icon(Icons.mosque_rounded, size: 14, color: accent),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text('${L10n.of(context)('prayerTimes')} — $_label',
-                textAlign: TextAlign.start,
-                style: TextStyle(
-                    fontFamily: '.SF Pro Text',
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color:
-                        isDark ? AppColors.darkText : AppColors.textPrimary)),
+          border: Border.all(color: sky.ink.withValues(alpha: 0.16))),
+      child: Stack(children: [
+        Positioned.fill(
+          child: CustomPaint(
+            painter: PrayerCardSkyPainter(
+                theme: sky, animation: motion ? _sky : kSkyStill),
           ),
-        ]),
-        const SizedBox(height: 10),
-        // Follows the app-language direction: in Arabic the row reads
-        // right-to-left (Fajr on the right), in English/German left-to-
-        // right (Fajr on the left). Each prayer shows its sun-status
-        // icon, name and time.
-        Row(
-          children: [
-            for (var i = 0; i < 5; i++)
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Column(children: [
+            Row(children: [
+              Icon(Icons.mosque_rounded, size: 14, color: sky.inkSoft),
+              const SizedBox(width: 8),
               Expanded(
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  // Clipped so the sky stops at the cell's rounded
-                  // corners instead of squaring them off.
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                      color: i == next
-                          ? accent.withValues(alpha: 0.14)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      border: i == next
-                          ? Border.all(color: accent.withValues(alpha: 0.35))
-                          : null),
-                  child: Stack(children: [
-                    // The hour this prayer is called at, painted behind
-                    // its name. The NEXT prayer gets a stronger sky, so
-                    // the cell that matters is also the liveliest one.
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: PrayerSkyPainter(
-                          index: i,
-                          strength:
-                              skyStrength(isNext: i == next, isDark: isDark),
-                          animation: motion ? _sky : kSkyStill,
-                        ),
-                      ),
-                    ),
-                    Padding(
+                child: Text('${L10n.of(context)('prayerTimes')} — $_label',
+                    textAlign: TextAlign.start,
+                    style: TextStyle(
+                        fontFamily: '.SF Pro Text',
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: sky.ink)),
+              ),
+            ]),
+            const SizedBox(height: 10),
+            // Follows the app-language direction: in Arabic the row
+            // reads right-to-left (Fajr on the right), in English/German
+            // left-to-right. Each prayer shows its sun-status icon, name
+            // and time — on the card's sky, with no scene of its own.
+            Row(
+              children: [
+                for (var i = 0; i < 5; i++)
+                  Expanded(
+                    child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      // The next prayer is picked out in the sky's own
+                      // ink. The app's green accent was readable on a
+                      // white card and disappears into a night one.
+                      decoration: BoxDecoration(
+                          color: i == next ? sky.highlight : null,
+                          borderRadius: BorderRadius.circular(12),
+                          border: i == next
+                              ? Border.all(color: sky.highlightLine)
+                              : null),
                       child: Column(children: [
                         Icon(PrayerVisuals.icons[i],
                             size: 20,
-                            color: i == next
-                                ? accent
-                                : (skyIconColor(i, isDark: isDark) ??
-                                        PrayerVisuals.colors[i])
-                                    .withValues(alpha: isDark ? 0.9 : 1)),
+                            // The icons keep their warm identity, but
+                            // only where the sky is light enough to
+                            // carry it; on the dark skies they would be
+                            // five muddy smudges, so they take the ink.
+                            color: sky.ink.computeLuminance() > 0.5
+                                ? (i == next ? sky.ink : sky.inkSoft)
+                                : PrayerVisuals.colors[i]),
                         const SizedBox(height: 5),
                         Text(_prayerName(l, i),
                             maxLines: 1,
@@ -1232,11 +1279,7 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner>
                                 fontWeight: i == next
                                     ? FontWeight.bold
                                     : FontWeight.normal,
-                                color: i == next
-                                    ? accent
-                                    : (isDark
-                                        ? AppColors.darkTextSec
-                                        : AppColors.textSecondary))),
+                                color: i == next ? sky.ink : sky.inkSoft)),
                         const SizedBox(height: 2),
                         Text(_digits(times.all[i]),
                             style: TextStyle(
@@ -1245,16 +1288,14 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner>
                                     ? FontWeight.bold
                                     : FontWeight.normal,
                                 color: i == next
-                                    ? accent
-                                    : (isDark
-                                        ? AppColors.darkText
-                                        : AppColors.textPrimary))),
+                                    ? sky.ink
+                                    : sky.ink.withValues(alpha: 0.86))),
                       ]),
                     ),
-                  ]),
-                ),
-              ),
-          ],
+                  ),
+              ],
+            ),
+          ]),
         ),
       ]),
     );

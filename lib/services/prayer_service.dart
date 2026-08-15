@@ -41,11 +41,23 @@ class PrayerTimes {
   int? nextPrayerIndex(DateTime now) {
     for (var i = 0; i < all.length; i++) {
       final parts = all[i].split(':');
-      final t = DateTime(now.year, now.month, now.day,
-          int.parse(parts[0]), int.parse(parts[1]));
+      final t = DateTime(now.year, now.month, now.day, int.parse(parts[0]),
+          int.parse(parts[1]));
       if (t.isAfter(now)) return i;
     }
     return null;
+  }
+
+  /// Index (0-4) of the prayer whose time we are currently INSIDE — the
+  /// last one called, which is what the hour outside actually looks
+  /// like. [nextPrayerIndex] answers the opposite question.
+  ///
+  /// The night wraps at both ends: before Fajr and after Isha are the
+  /// same stretch of night, and both report Isha.
+  int currentPrayerIndex(DateTime now) {
+    final next = nextPrayerIndex(now);
+    if (next == null) return 4; // after Isha — still tonight
+    return (next - 1 + 5) % 5; // before Fajr wraps back to Isha
   }
 }
 
@@ -123,8 +135,9 @@ class PrayerService {
 
   /// Calculation-method label in the app language (Arabic name for
   /// 'ar', an English name otherwise).
-  static String methodName(int id, String lang) =>
-      lang == 'ar' ? (methods[id] ?? '') : (_methodsEn[id] ?? methods[id] ?? '');
+  static String methodName(int id, String lang) => lang == 'ar'
+      ? (methods[id] ?? '')
+      : (_methodsEn[id] ?? methods[id] ?? '');
 
   /// Selected city, or null when unconfigured OR in GPS mode.
   static Future<PrayerCity?> selectedCity() async {
