@@ -11,6 +11,7 @@ import '../services/quran_service.dart';
 import '../services/settings_service.dart';
 import '../services/adhan_notification_service.dart';
 import '../theme.dart';
+import '../widgets/prayer_sky.dart';
 import '../widgets/prayer_visuals.dart';
 import '../widgets/surah_name_text.dart';
 import 'reader_screen.dart';
@@ -24,8 +25,14 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   List<Surah> _all = [], _filtered = [];
+
+  /// Drives the glints on the continue-reading card. Handed to the
+  /// painter as `repaint:`, so it never rebuilds the surah list this
+  /// screen is mostly made of.
+  late final AnimationController _sparkle;
 
   /// Ayah-text matches shown INLINE below the surah matches — search
   /// happens right here on the home screen, no separate page.
@@ -41,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _sparkle = AnimationController(vsync: this, duration: kSkyCycle)..repeat();
     _scrollController.addListener(_onScroll);
     _load();
   }
@@ -63,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _sparkle.dispose();
     _debounce?.cancel();
     _search.dispose();
     _scrollController.dispose();
@@ -259,69 +268,70 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (_) => SafeArea(
         top: false,
         child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
-                decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2))),
-            SurahNameText(
-                surahNumber: surah.number,
-                fontSize: 36,
-                color: isDark ? AppColors.darkText : AppColors.textPrimary),
-            Text(
-                '${l(surah.revelationType == 'Meccan' ? 'meccan' : 'medinan')} • ${l.number(surah.numberOfAyahs)} ${l('ayahWord')}',
-                style: TextStyle(
-                    color: isDark
-                        ? AppColors.darkTextSec
-                        : AppColors.textSecondary,
-                    fontFamily: '.SF Pro Text')),
-            const SizedBox(height: 24),
-            // Fixed order in every language: Mushaf on the LEFT, the
-            // responsive reader on the RIGHT (pinned LTR so the app
-            // language can't reverse them).
-            Directionality(
-              textDirection: TextDirection.ltr,
-              child: Row(children: [
-                Expanded(
-                    child: _ModeBtn(
-                        icon: Icons.menu_book_rounded,
-                        label: 'المصحف',
-                        sub: 'قراءة بالصفحات',
-                        color: AppColors.primary,
-                        isDark: isDark,
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => MushafSvgScreen(
-                                      startPage:
-                                          _surahPage[surah.number] ?? 1)));
-                        })),
-                const SizedBox(width: 14),
-                Expanded(
-                    child: _ModeBtn(
-                        icon: Icons.format_align_right_rounded,
-                        label: 'الآيات',
-                        sub: 'قراءة متجاوبة',
-                        color: AppColors.accent,
-                        isDark: isDark,
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => ReaderScreen(surah: surah)));
-                        })),
-              ]),
-            ),
-          ]),
-        ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2))),
+              SurahNameText(
+                  surahNumber: surah.number,
+                  fontSize: 36,
+                  color: isDark ? AppColors.darkText : AppColors.textPrimary),
+              Text(
+                  '${l(surah.revelationType == 'Meccan' ? 'meccan' : 'medinan')} • ${l.number(surah.numberOfAyahs)} ${l('ayahWord')}',
+                  style: TextStyle(
+                      color: isDark
+                          ? AppColors.darkTextSec
+                          : AppColors.textSecondary,
+                      fontFamily: '.SF Pro Text')),
+              const SizedBox(height: 24),
+              // Fixed order in every language: Mushaf on the LEFT, the
+              // responsive reader on the RIGHT (pinned LTR so the app
+              // language can't reverse them).
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Row(children: [
+                  Expanded(
+                      child: _ModeBtn(
+                          icon: Icons.menu_book_rounded,
+                          label: 'المصحف',
+                          sub: 'قراءة بالصفحات',
+                          color: AppColors.primary,
+                          isDark: isDark,
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => MushafSvgScreen(
+                                        startPage:
+                                            _surahPage[surah.number] ?? 1)));
+                          })),
+                  const SizedBox(width: 14),
+                  Expanded(
+                      child: _ModeBtn(
+                          icon: Icons.format_align_right_rounded,
+                          label: 'الآيات',
+                          sub: 'قراءة متجاوبة',
+                          color: AppColors.accent,
+                          isDark: isDark,
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        ReaderScreen(surah: surah)));
+                          })),
+                ]),
+              ),
+            ]),
+          ),
         ),
       ),
     );
@@ -614,9 +624,8 @@ class _HomeScreenState extends State<HomeScreen> {
     // The surah list arrives asynchronously while the saved position is
     // read from preferences immediately, so on the first frame there can
     // be a last-read surah with nothing to look it up in.
-    final surah = mushaf
-        ? null
-        : _all.where((x) => x.number == s.lastSurah).firstOrNull;
+    final surah =
+        mushaf ? null : _all.where((x) => x.number == s.lastSurah).firstOrNull;
     if (!mushaf && surah == null) return const SizedBox.shrink();
 
     // The heading is the surah either way — a page number alone says
@@ -657,6 +666,8 @@ class _HomeScreenState extends State<HomeScreen> {
         // No fixed height: the pill was being clipped off the bottom
         // whenever the type ran a little taller than the 132 assumed.
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        // Keeps the sparkles inside the rounded corners.
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           gradient: const LinearGradient(
@@ -675,90 +686,107 @@ class _HomeScreenState extends State<HomeScreen> {
         // words sit on the reading edge and the illustration opposite
         // them — right/left in Arabic, left/right in English and
         // German — with no per-language special-casing.
-        child: Row(
+        child: Stack(
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(l('lastRead'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.75),
-                          fontSize: 12.5,
-                          fontFamily: '.SF Pro Text')),
-                  const SizedBox(height: 2),
-                  if (titleSurah != null)
-                    // The card's headline. Scaled down only if a long
-                    // name would not otherwise fit the column, so short
-                    // names keep the full size instead of every name
-                    // being sized for the longest one.
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: AlignmentDirectional.centerStart,
-                      child: SurahNameText(
-                          surahNumber: titleSurah,
-                          fontSize: 52,
-                          color: Colors.white),
-                    )
-                  else
-                    Text(title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textDirection: TextDirection.rtl,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'QuranHafs')),
-                  const SizedBox(height: 2),
-                  Text(subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.75),
-                          fontSize: 12.5,
-                          fontFamily: '.SF Pro Text')),
-                  const SizedBox(height: 10),
-                  // A real affordance, not just a tappable card.
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(l('continueReading'),
-                            style: const TextStyle(
-                                color: AppColors.primary,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: '.SF Pro Text')),
-                        const SizedBox(width: 6),
-                        // Points the way the reader is going, which is
-                        // the opposite arrow in a left-to-right UI.
-                        Icon(
-                            Directionality.of(context) == TextDirection.rtl
-                                ? Icons.arrow_back_rounded
-                                : Icons.arrow_forward_rounded,
-                            size: 15,
-                            color: AppColors.primary),
-                      ],
-                    ),
-                  ),
-                ],
+            // Glints drifting over the green. The card's own gradient
+            // is untouched — this layer paints sparkles and nothing
+            // else, so the colour underneath stays exactly as it was.
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: SparklePainter(
+                      animation: MediaQuery.disableAnimationsOf(context)
+                          ? kSkyStill
+                          : _sparkle),
+                ),
               ),
             ),
-            const SizedBox(width: 10),
-            Image.asset('assets/icon/mushaf_illustration.png',
-                height: 104,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const SizedBox(width: 0)),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(l('lastRead'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.75),
+                              fontSize: 12.5,
+                              fontFamily: '.SF Pro Text')),
+                      const SizedBox(height: 2),
+                      if (titleSurah != null)
+                        // The card's headline. Scaled down only if a long
+                        // name would not otherwise fit the column, so short
+                        // names keep the full size instead of every name
+                        // being sized for the longest one.
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: AlignmentDirectional.centerStart,
+                          child: SurahNameText(
+                              surahNumber: titleSurah,
+                              fontSize: 52,
+                              color: Colors.white),
+                        )
+                      else
+                        Text(title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textDirection: TextDirection.rtl,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'QuranHafs')),
+                      const SizedBox(height: 2),
+                      Text(subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.75),
+                              fontSize: 12.5,
+                              fontFamily: '.SF Pro Text')),
+                      const SizedBox(height: 10),
+                      // A real affordance, not just a tappable card.
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(l('continueReading'),
+                                style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: '.SF Pro Text')),
+                            const SizedBox(width: 6),
+                            // Points the way the reader is going, which is
+                            // the opposite arrow in a left-to-right UI.
+                            Icon(
+                                Directionality.of(context) == TextDirection.rtl
+                                    ? Icons.arrow_back_rounded
+                                    : Icons.arrow_forward_rounded,
+                                size: 15,
+                                color: AppColors.primary),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Image.asset('assets/icon/mushaf_illustration.png',
+                    height: 104,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const SizedBox(width: 0)),
+              ],
+            ),
           ],
         ),
       ),
@@ -1001,15 +1029,22 @@ class _PrayerTimesBanner extends StatefulWidget {
   State<_PrayerTimesBanner> createState() => _PrayerTimesBannerState();
 }
 
-class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
+class _PrayerTimesBannerState extends State<_PrayerTimesBanner>
+    with SingleTickerProviderStateMixin {
   PrayerTimes? _times;
   String? _label;
   bool _loaded = false;
   String _lang = 'ar';
 
+  /// Drives all five skies at once. One controller, handed to the
+  /// painters as `repaint:` — so the stars twinkle without a single
+  /// widget rebuild, and the surah list underneath never sees it.
+  late final AnimationController _sky;
+
   @override
   void initState() {
     super.initState();
+    _sky = AnimationController(vsync: this, duration: kSkyCycle)..repeat();
     LibraryEvents.prayer.addListener(_load);
   }
 
@@ -1027,6 +1062,7 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
 
   @override
   void dispose() {
+    _sky.dispose();
     LibraryEvents.prayer.removeListener(_load);
     super.dispose();
   }
@@ -1112,6 +1148,10 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
     if (times == null) return const SizedBox.shrink();
     final next = times.nextPrayerIndex(DateTime.now());
     final accent = isDark ? AppColors.darkPrimary : AppColors.primary;
+    // Reduce Motion turns the skies into still frames rather than
+    // removing them: the scene is what tells the prayers apart, the
+    // movement is only ornament.
+    final motion = !MediaQuery.disableAnimationsOf(context);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -1146,8 +1186,10 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
             for (var i = 0; i < 5; i++)
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
                   margin: const EdgeInsets.symmetric(horizontal: 2),
+                  // Clipped so the sky stops at the cell's rounded
+                  // corners instead of squaring them off.
+                  clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
                       color: i == next
                           ? accent.withValues(alpha: 0.14)
@@ -1156,38 +1198,59 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner> {
                       border: i == next
                           ? Border.all(color: accent.withValues(alpha: 0.35))
                           : null),
-                  child: Column(children: [
-                    Icon(PrayerVisuals.icons[i],
-                        size: 20,
-                        color: i == next
-                            ? accent
-                            : PrayerVisuals.colors[i]
-                                .withValues(alpha: isDark ? 0.9 : 1)),
-                    const SizedBox(height: 5),
-                    Text(_prayerName(l, i),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontFamily: '.SF Pro Text',
-                            fontSize: 12.5,
-                            fontWeight:
-                                i == next ? FontWeight.bold : FontWeight.normal,
+                  child: Stack(children: [
+                    // The hour this prayer is called at, painted behind
+                    // its name. The NEXT prayer gets a stronger sky, so
+                    // the cell that matters is also the liveliest one.
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: PrayerSkyPainter(
+                          index: i,
+                          strength:
+                              skyStrength(isNext: i == next, isDark: isDark),
+                          animation: motion ? _sky : kSkyStill,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(children: [
+                        Icon(PrayerVisuals.icons[i],
+                            size: 20,
                             color: i == next
                                 ? accent
-                                : (isDark
-                                    ? AppColors.darkTextSec
-                                    : AppColors.textSecondary))),
-                    const SizedBox(height: 2),
-                    Text(_digits(times.all[i]),
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight:
-                                i == next ? FontWeight.bold : FontWeight.normal,
-                            color: i == next
-                                ? accent
-                                : (isDark
-                                    ? AppColors.darkText
-                                    : AppColors.textPrimary))),
+                                : (skyIconColor(i, isDark: isDark) ??
+                                        PrayerVisuals.colors[i])
+                                    .withValues(alpha: isDark ? 0.9 : 1)),
+                        const SizedBox(height: 5),
+                        Text(_prayerName(l, i),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontFamily: '.SF Pro Text',
+                                fontSize: 12.5,
+                                fontWeight: i == next
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: i == next
+                                    ? accent
+                                    : (isDark
+                                        ? AppColors.darkTextSec
+                                        : AppColors.textSecondary))),
+                        const SizedBox(height: 2),
+                        Text(_digits(times.all[i]),
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: i == next
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: i == next
+                                    ? accent
+                                    : (isDark
+                                        ? AppColors.darkText
+                                        : AppColors.textPrimary))),
+                      ]),
+                    ),
                   ]),
                 ),
               ),

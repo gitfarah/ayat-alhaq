@@ -45,7 +45,19 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final t = L10n.of(context);
     return Scaffold(
-      body: IndexedStack(index: _idx, children: _screens),
+      // Every tab is BUILT at app start and kept alive, so a tab that
+      // is not on screen still has live tickers — the home screen's
+      // prayer skies and continue-card glints would go on driving a
+      // vsync callback every frame from behind the Khatma tab, keeping
+      // the engine awake for something nobody can see. IndexedStack
+      // does not mute them on its own; TickerMode is what does.
+      body: IndexedStack(
+        index: _idx,
+        children: [
+          for (var i = 0; i < _screens.length; i++)
+            TickerMode(enabled: i == _idx, child: _screens[i]),
+        ],
+      ),
       // The tab ORDER is fixed (only the labels follow the language) —
       // pin the bar to LTR so switching to Arabic doesn't reverse the
       // tabs. The screens inside the IndexedStack still follow the
