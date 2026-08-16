@@ -15,6 +15,7 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
   bool _recitationHighlight = true;
   String _mushafEdition = 'hafs';
   String _mushafBackground = 'parchment';
+  String _shareCardBackground = 'emerald';
 
   /// Page-background colour for every Mushaf view, one choice for all
   /// editions. See AppColors.mushafBackgrounds.
@@ -24,6 +25,20 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
     if (id == _mushafBackground) return;
     _mushafBackground = id;
     (await SharedPreferences.getInstance()).setString('mushafBackground', id);
+    notifyListeners();
+  }
+
+  /// Ground the shared/saved ayah CARD is drawn on — see
+  /// kShareBackgrounds. Remembered because it is a taste, not a
+  /// per-share decision: someone who wants their verses on black wants
+  /// every one of them on black.
+  String get shareCardBackground => _shareCardBackground;
+
+  Future<void> setShareCardBackground(String id) async {
+    if (id == _shareCardBackground) return;
+    _shareCardBackground = id;
+    (await SharedPreferences.getInstance())
+        .setString('shareCardBackground', id);
     notifyListeners();
   }
 
@@ -65,8 +80,7 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
   /// app doesn't translate). Quran content itself always stays Arabic.
   String get effectiveLanguage {
     if (_appLanguage != 'system') return _appLanguage;
-    final code =
-        WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+    final code = WidgetsBinding.instance.platformDispatcher.locale.languageCode;
     return (code == 'en' || code == 'de') ? code : 'ar';
   }
 
@@ -169,14 +183,13 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
     final p = await SharedPreferences.getInstance();
     final stored = p.getString('themeMode');
     if (stored != null) {
-      _themeMode = ThemeMode.values.firstWhere((m) => m.name == stored,
-          orElse: () => ThemeMode.system);
+      _themeMode = ThemeMode.values
+          .firstWhere((m) => m.name == stored, orElse: () => ThemeMode.system);
     } else if (p.containsKey('dark')) {
       // Migrate the old boolean setting — the user made an explicit
       // choice back then, keep honouring it.
-      _themeMode = (p.getBool('dark') ?? false)
-          ? ThemeMode.dark
-          : ThemeMode.light;
+      _themeMode =
+          (p.getBool('dark') ?? false) ? ThemeMode.dark : ThemeMode.light;
     }
     _fontSize = p.getDouble('fontSize') ?? 26.0;
     _lastSurah = p.getInt('lastSurah');
@@ -190,6 +203,7 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
     _recitationHighlight = p.getBool('recitationHighlight') ?? true;
     _mushafEdition = p.getString('mushafEdition') ?? 'hafs';
     _mushafBackground = p.getString('mushafBackground') ?? 'parchment';
+    _shareCardBackground = p.getString('shareCardBackground') ?? 'emerald';
     MushafSvgService.setEdition(_mushafEdition);
     // An edition that no longer exists — 'text', which stopped being an
     // edition when a Hafs page became pinch-to-reflow — falls back to
@@ -202,8 +216,7 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
-    (await SharedPreferences.getInstance())
-        .setString('themeMode', mode.name);
+    (await SharedPreferences.getInstance()).setString('themeMode', mode.name);
     notifyListeners();
   }
 
@@ -227,13 +240,25 @@ class SettingsService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> saveLastRead(
       {int? surah, int? ayah, int? page, String? mode}) async {
     final p = await SharedPreferences.getInstance();
-    if (surah != null) { _lastSurah = surah; p.setInt('lastSurah', surah); }
-    if (ayah != null) { _lastAyah = ayah; p.setInt('lastAyah', ayah); }
-    if (page != null) { _lastPage = page; p.setInt('lastPage', page); }
+    if (surah != null) {
+      _lastSurah = surah;
+      p.setInt('lastSurah', surah);
+    }
+    if (ayah != null) {
+      _lastAyah = ayah;
+      p.setInt('lastAyah', ayah);
+    }
+    if (page != null) {
+      _lastPage = page;
+      p.setInt('lastPage', page);
+    }
     // Each surface keeps its own position, so switching back and forth
     // never loses the other one — only which of the two to RESUME
     // changes here.
-    if (mode != null) { _lastMode = mode; p.setString('lastMode', mode); }
+    if (mode != null) {
+      _lastMode = mode;
+      p.setString('lastMode', mode);
+    }
     notifyListeners();
   }
 }

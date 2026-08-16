@@ -128,5 +128,154 @@ void main() {
       // paragraphs laid out far smaller than intended.
       expect(image.height, greaterThan(600));
     });
+
+    test('every background renders a real PNG', () async {
+      for (final bg in kShareBackgrounds) {
+        final bytes = await AyahShareService.renderCard(ayahOnly, style: bg);
+        expect(bytes.sublist(0, 4), [0x89, 0x50, 0x4E, 0x47],
+            reason: 'background ${bg.id}');
+      }
+    });
+  });
+
+  group('card backgrounds', () {
+    test('black is actually black, not a dark grey', () {
+      // The point of the option: on an OLED screen the card should have
+      // no visible edges at all.
+      final black = shareBackgroundById('black');
+      expect(black.top, const Color(0xFF000000));
+      expect(black.bottom, const Color(0xFF000000));
+    });
+
+    test('every ground carries ink that can be read on it', () {
+      // The card is looked at in someone else's chat, so a ground and
+      // an ink that drift toward each other cannot be caught by looking
+      // at the app.
+      for (final bg in kShareBackgrounds) {
+        double lum(Color c) => c.computeLuminance();
+        final contrast = (lum(bg.ink) > lum(bg.top))
+            ? (lum(bg.ink) + 0.05) / (lum(bg.top) + 0.05)
+            : (lum(bg.top) + 0.05) / (lum(bg.ink) + 0.05);
+        expect(contrast, greaterThan(7.0), reason: 'ink on ${bg.id}');
+      }
+    });
+
+    test('ids are unique and the default leads', () {
+      final ids = kShareBackgrounds.map((b) => b.id).toList();
+      expect(ids.toSet().length, ids.length);
+      expect(kShareBackgrounds.first.id, 'emerald',
+          reason: 'the ground every card was drawn on before there was '
+              'a choice must stay the default');
+    });
+
+    test('an unknown or missing saved id falls back rather than throwing', () {
+      // A card must still render for someone whose saved preference
+      // names a background a later build removed.
+      expect(shareBackgroundById(null).id, 'emerald');
+      expect(shareBackgroundById('sepia-from-2019').id, 'emerald');
+    });
+
+    test('the bands behind the surah name stay part of the ground', () {
+      // The cartouche is a panel ON the card, not a plate stuck to it:
+      // if its fill drifts far from the ground the band stops reading
+      // as part of the page it is heading.
+      for (final bg in kShareBackgrounds) {
+        final d =
+            (bg.bandFill.computeLuminance() - bg.top.computeLuminance()).abs();
+        expect(d, lessThan(0.12), reason: 'band on ${bg.id}');
+      }
+    });
+  });
+
+  group('sharing a run of verses', () {
+    const run = ShareableAyah(
+      surahNumber: 2,
+      surahName: 'البقرة',
+      ayahNumber: 2,
+      ayahText: 'ذَٰلِكَ ٱلْكِتَٰبُ لَا رَيْبَ',
+      moreVerses: [
+        ShareVerse(3, 'ٱلَّذِينَ يُؤْمِنُونَ بِٱلْغَيْبِ'),
+        ShareVerse(4, 'وَٱلَّذِينَ يُؤْمِنُونَ بِمَآ أُنزِلَ إِلَيْكَ'),
+      ],
+    );
+
+    test('a lone verse still reports itself as one', () {
+      expect(ayahOnly.verseCount, 1);
+      expect(ayahOnly.lastAyahNumber, ayahOnly.ayahNumber);
+      expect(ayahOnly.referenceLabel, 'الآية ٣');
+    });
+
+    test('a run knows its span', () {
+      expect(run.verseCount, 3);
+      expect(run.lastAyahNumber, 4);
+      expect(run.referenceLabel, 'الآيات ٢ - ٤');
+    });
+
+    test('the text form numbers each verse inside one quotation', () {
+      final text = AyahShareService.buildText(run);
+      // One pair of outer brackets around the whole passage, as the
+      // Mushaf sets it — not three separately quoted lines.
+      expect('﴿'.allMatches(text).length, 4); // outer + one per verse
+      expect(text, contains('﴿٣﴾'));
+      expect(text, contains('[البقرة — ٢-٤]'));
+    });
+
+    test('every verse of the run actually reaches the text', () {
+      final text = AyahShareService.buildText(run);
+      for (final v in run.verses) {
+        expect(text, contains(v.text));
+      }
+    });
+
+    test('a run makes a taller card than the verse it started from', () {
+      final one = AyahShareService.cardAspect(ayahOnly);
+      expect(AyahShareService.cardAspect(run), greaterThan(one));
+    });
+
+    test('a run renders as a real PNG', () async {
+      final bytes = await AyahShareService.renderCard(run);
+      expect(bytes.sublist(0, 4), [0x89, 0x50, 0x4E, 0x47]);
+    });
+  });
+
+  group('warning that a card has grown too tall', () {
+    // The hint exists because a messenger scales an image to the bubble
+    // WIDTH: past a point, adding verses shrinks all of them rather
+    // than making the card longer.
+    ShareableAyah runOf(int n) => ShareableAyah(
+          surahNumber: 2,
+          surahName: 'البقرة',
+          ayahNumber: 1,
+          ayahText:
+              'وَٱلَّذِينَ يُؤْمِنُونَ بِمَآ أُنزِلَ إِلَيْكَ وَمَآ أُنزِلَ مِن قَبْلِكَ',
+          moreVerses: [
+            for (var i = 2; i <= n; i++)
+              ShareVerse(
+                  i,
+                  'وَٱلَّذِينَ يُؤْمِنُونَ بِمَآ أُنزِلَ إِلَيْكَ وَمَآ أُنزِلَ مِن '
+                  'قَبْلِكَ وَبِٱلْءَاخِرَةِ هُمْ يُوقِنُونَ'),
+          ],
+        );
+
+    test('an ordinary single verse never trips it', () {
+      expect(AyahShareService.isCardTooTall(ayahOnly), isFalse);
+      expect(AyahShareService.isCardTooTall(withTafsir), isFalse);
+    });
+
+    test('a long enough run does trip it', () {
+      expect(AyahShareService.isCardTooTall(runOf(30)), isTrue);
+    });
+
+    test('the measure grows with the passage, monotonically', () {
+      // Measured from the real layout rather than guessed from a verse
+      // COUNT — one ayah of Al-Baqarah runs longer than twenty short
+      // ones, so a count-based rule would warn on the wrong passages.
+      var last = 0.0;
+      for (final n in [1, 5, 10, 20]) {
+        final aspect = AyahShareService.cardAspect(runOf(n));
+        expect(aspect, greaterThan(last), reason: '$n verses');
+        last = aspect;
+      }
+    });
   });
 }

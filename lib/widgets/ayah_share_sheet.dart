@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../l10n/app_strings.dart';
 import '../services/ayah_share_service.dart';
+import '../services/quran_service.dart';
 import '../services/settings_service.dart';
 import '../services/tafsir_service.dart';
 import '../theme.dart';
@@ -85,6 +86,89 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
   String? _fetchedTafsir;
   String? _fetchedTafsirName;
 
+  /// How many verses the reader wants, starting at the one they opened
+  /// this on. 1 is the ordinary share.
+  int _count = 1;
+
+  /// Verses after the first, loaded as the count is raised. Kept as a
+  /// growing list so stepping down and back up costs nothing.
+  final List<ShareVerse> _extra = [];
+
+  /// The last verse of the surah, so the stepper stops at its end
+  /// rather than asking for ayahs that do not exist.
+  int? _surahLength;
+
+  /// Cached because it means laying every paragraph of the card out,
+  /// and it is read on every rebuild to draw the hint.
+  bool _tooLong = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSurahLength();
+  }
+
+  Future<void> _loadSurahLength() async {
+    try {
+      final ayahs = await QuranService.getSurahAyahs(widget.surahNumber);
+      if (!mounted) return;
+      setState(() => _surahLength = ayahs.length);
+    } catch (_) {
+      // Offline: the stepper simply stops at what is already loaded.
+    }
+  }
+
+  /// The most verses that can be added from here — never past the end
+  /// of the surah, and never so many that the card becomes absurd.
+  int get _maxCount {
+    const hardCap = 20;
+    final toEnd =
+        _surahLength == null ? 1 : _surahLength! - widget.ayahNumber + 1;
+    return toEnd.clamp(1, hardCap);
+  }
+
+  /// Loads verses up to [n] and re-measures the card.
+  Future<void> _setCount(int n) async {
+    final wanted = n.clamp(1, _maxCount);
+    if (wanted == _count) return;
+    if (wanted > 1 && _extra.length < wanted - 1) {
+      try {
+        final ayahs = await QuranService.getSurahAyahs(widget.surahNumber);
+        _extra
+          ..clear()
+          ..addAll(ayahs
+              .where((x) =>
+                  x.numberInSurah > widget.ayahNumber &&
+                  x.numberInSurah < widget.ayahNumber + wanted)
+              .map((x) => ShareVerse(x.numberInSurah, x.text)));
+      } catch (_) {
+        return; // leave the count where it was rather than lying
+      }
+    }
+    if (!mounted) return;
+    setState(() => _count = wanted);
+    _remeasure();
+  }
+
+  /// Asks the card how tall it will actually be. Measured, not guessed:
+  /// one ayah of Al-Baqarah runs longer than twenty short ones, so a
+  /// count-based warning would fire on the wrong passages.
+  void _remeasure() {
+    // Measured WITH the tafsir when it is switched on and already in
+    // hand — it is usually the tallest block on the card, so leaving it
+    // out would have the hint miss the very case it exists for. When
+    // the tafsir has not been fetched yet there is nothing to measure,
+    // and the hint appears once it arrives.
+    final tafsir =
+        _withTafsir ? (widget.tafsirText ?? _fetchedTafsir) : null;
+    final tall = AyahShareService.isCardTooTall(
+      _payloadSync(tafsirText: tafsir, tafsirName: 'التفسير'),
+      style: shareBackgroundById(
+          context.read<SettingsService>().shareCardBackground),
+    );
+    if (tall != _tooLong && mounted) setState(() => _tooLong = tall);
+  }
+
   String _ar(int n) {
     const d = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
     return n.toString().split('').map((c) => d[int.parse(c)]).join();
@@ -116,6 +200,19 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
     }
   }
 
+  /// The verses currently chosen, without touching the network — used
+  /// for measuring the card as the reader changes the count.
+  ShareableAyah _payloadSync({String? tafsirText, String? tafsirName}) =>
+      ShareableAyah(
+        surahNumber: widget.surahNumber,
+        surahName: widget.surahName,
+        ayahNumber: widget.ayahNumber,
+        ayahText: widget.ayahText,
+        moreVerses: _extra.take(_count - 1).toList(),
+        tafsirText: tafsirText,
+        tafsirName: tafsirName,
+      );
+
   Future<ShareableAyah> _payload() async {
     String? tafsirText;
     String? tafsirName;
@@ -126,14 +223,7 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
         tafsirName = t.$2;
       }
     }
-    return ShareableAyah(
-      surahNumber: widget.surahNumber,
-      surahName: widget.surahName,
-      ayahNumber: widget.ayahNumber,
-      ayahText: widget.ayahText,
-      tafsirText: tafsirText,
-      tafsirName: tafsirName,
-    );
+    return _payloadSync(tafsirText: tafsirText, tafsirName: tafsirName);
   }
 
   /// The rect of the button that was tapped, in global coordinates.
@@ -154,18 +244,20 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
     final l = L10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
+    final style = _style;
     try {
       final payload = await _payload();
       if (asImage) {
-        await AyahShareService.shareImage(payload, origin: origin);
+        await AyahShareService.shareImage(payload,
+            origin: origin, style: style);
       } else {
         await AyahShareService.shareText(payload, origin: origin);
       }
       if (mounted) navigator.pop();
     } catch (e) {
       if (mounted) setState(() => _busy = false);
-      messenger.showSnackBar(
-          SnackBar(content: Text('${l('shareFailed')} — $e')));
+      messenger
+          .showSnackBar(SnackBar(content: Text('${l('shareFailed')} — $e')));
     }
   }
 
@@ -177,8 +269,9 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
     final l = L10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
+    final style = _style;
     try {
-      await AyahShareService.saveImageToGallery(await _payload());
+      await AyahShareService.saveImageToGallery(await _payload(), style: style);
       if (mounted) navigator.pop();
       messenger.showSnackBar(SnackBar(content: Text(l('savedToPhotos'))));
     } on GalException catch (e) {
@@ -191,10 +284,14 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
               : '${l('shareFailed')} — ${e.type.name}')));
     } catch (e) {
       if (mounted) setState(() => _busy = false);
-      messenger.showSnackBar(
-          SnackBar(content: Text('${l('shareFailed')} — $e')));
+      messenger
+          .showSnackBar(SnackBar(content: Text('${l('shareFailed')} — $e')));
     }
   }
+
+  /// The ground the card will be drawn on, as last chosen.
+  ShareCardStyle get _style =>
+      shareBackgroundById(context.read<SettingsService>().shareCardBackground);
 
   @override
   Widget build(BuildContext context) {
@@ -202,6 +299,8 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
     final isDark = widget.isDark;
     final textColor = isDark ? AppColors.darkText : AppColors.textPrimary;
     final accent = isDark ? AppColors.darkPrimary : AppColors.primary;
+    final secondary = isDark ? AppColors.darkTextSec : AppColors.textSecondary;
+    final chosen = context.watch<SettingsService>().shareCardBackground;
 
     return SafeArea(
       top: false,
@@ -211,7 +310,9 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
           children: [
             AyahSheetHeader(
               ayahText: widget.ayahText,
-              label: '${widget.surahName} — آية ${_ar(widget.ayahNumber)}',
+              label: _count == 1
+                  ? '${widget.surahName} — آية ${_ar(widget.ayahNumber)}'
+                  : '${widget.surahName} — ${l('shareVerseRange').replaceFirst('@from', _ar(widget.ayahNumber)).replaceFirst('@to', _ar(widget.ayahNumber + _count - 1))}',
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -222,16 +323,88 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
                     contentPadding: EdgeInsets.zero,
                     value: _withTafsir,
                     activeThumbColor: accent,
-                    onChanged:
-                        _busy ? null : (v) => setState(() => _withTafsir = v),
+                    onChanged: _busy
+                        ? null
+                        : (v) {
+                            setState(() => _withTafsir = v);
+                            _remeasure();
+                          },
                     title: Text(l('shareIncludeTafsir'),
                         textDirection: TextDirection.rtl,
                         style: TextStyle(
                             fontFamily: '.SF Pro Text', color: textColor)),
-                    secondary:
-                        Icon(Icons.menu_book_rounded, color: accent),
+                    secondary: Icon(Icons.menu_book_rounded, color: accent),
+                  ),
+                  // ── How many verses, and the warning when that starts
+                  // to make a card nobody can read in a chat.
+                  if (_maxCount > 1)
+                    _VerseCounter(
+                      count: _count,
+                      max: _maxCount,
+                      enabled: !_busy,
+                      isDark: isDark,
+                      label: l('shareVerseCount'),
+                      onChanged: _setCount,
+                    ),
+                  if (_tooLong)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.info_outline_rounded,
+                              size: 16, color: Color(0xFFC2703A)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(l('shareTooLong'),
+                                style: const TextStyle(
+                                    fontFamily: '.SF Pro Text',
+                                    fontSize: 12.5,
+                                    height: 1.4,
+                                    color: Color(0xFFC2703A))),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 14),
+                  // ── The ground the card is drawn on.
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(l('shareBackground'),
+                        style: TextStyle(
+                            fontFamily: '.SF Pro Text',
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: secondary)),
                   ),
                   const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      for (final bg in kShareBackgrounds) ...[
+                        Expanded(
+                          child: _BackgroundSwatch(
+                            style: bg,
+                            label: l('shareBg'
+                                '${bg.id[0].toUpperCase()}${bg.id.substring(1)}'),
+                            selected: bg.id == chosen,
+                            accent: accent,
+                            labelColor: secondary,
+                            onTap: _busy
+                                ? null
+                                : () async {
+                                    await context
+                                        .read<SettingsService>()
+                                        .setShareCardBackground(bg.id);
+                                    _remeasure();
+                                  },
+                          ),
+                        ),
+                        if (bg != kShareBackgrounds.last)
+                          const SizedBox(width: 8),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   if (_busy)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 18),
@@ -259,8 +432,7 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
                             label: l('shareAsText'),
                             filled: false,
                             isDark: isDark,
-                            onTap: () =>
-                                _share(asImage: false, from: _textKey),
+                            onTap: () => _share(asImage: false, from: _textKey),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -271,8 +443,7 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
                             label: l('shareAsImage'),
                             filled: true,
                             isDark: isDark,
-                            onTap: () =>
-                                _share(asImage: true, from: _imageKey),
+                            onTap: () => _share(asImage: true, from: _imageKey),
                           ),
                         ),
                       ],
@@ -293,6 +464,144 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A swatch of the ground a card can be drawn on, showing the actual
+/// gradient and gold rather than a colour name — the reader is choosing
+/// how the image will LOOK, so the choice shows it.
+class _BackgroundSwatch extends StatelessWidget {
+  final ShareCardStyle style;
+  final String label;
+  final bool selected;
+  final Color accent;
+  final Color labelColor;
+  final VoidCallback? onTap;
+
+  const _BackgroundSwatch({
+    required this.style,
+    required this.label,
+    required this.selected,
+    required this.accent,
+    required this.labelColor,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        children: [
+          Container(
+            height: 54,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [style.top, style.bottom],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected ? accent : style.gold.withValues(alpha: 0.45),
+                width: selected ? 2.5 : 1,
+              ),
+            ),
+            child: Center(
+              // A stroke of the gold that the frame and the surah band
+              // are drawn in, so the swatch previews both colours the
+              // card is actually made of.
+              child: selected
+                  ? Icon(Icons.check_rounded, size: 20, color: style.gold)
+                  : Container(
+                      width: 22,
+                      height: 2,
+                      color: style.gold.withValues(alpha: 0.8)),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontFamily: '.SF Pro Text',
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                  color: selected ? accent : labelColor)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Minus / count / plus, for choosing how many consecutive verses go on
+/// the card.
+class _VerseCounter extends StatelessWidget {
+  final int count;
+  final int max;
+  final bool enabled;
+  final bool isDark;
+  final String label;
+  final ValueChanged<int> onChanged;
+
+  const _VerseCounter({
+    required this.count,
+    required this.max,
+    required this.enabled,
+    required this.isDark,
+    required this.label,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = isDark ? AppColors.darkPrimary : AppColors.primary;
+    final textColor = isDark ? AppColors.darkText : AppColors.textPrimary;
+    final border = isDark ? AppColors.darkBorder : AppColors.border;
+
+    Widget step(IconData icon, int to, bool on) => InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: enabled && on ? () => onChanged(to) : null,
+          child: Container(
+            width: 38,
+            height: 34,
+            alignment: Alignment.center,
+            child: Icon(icon, size: 20, color: enabled && on ? accent : border),
+          ),
+        );
+
+    return Row(
+      children: [
+        Icon(Icons.format_list_numbered_rounded, size: 20, color: accent),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(label,
+              style: TextStyle(
+                  fontFamily: '.SF Pro Text', fontSize: 15, color: textColor)),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: border),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            step(Icons.remove_rounded, count - 1, count > 1),
+            SizedBox(
+              width: 34,
+              child: Text('$count',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontFamily: '.SF Pro Text',
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: textColor)),
+            ),
+            step(Icons.add_rounded, count + 1, count < max),
+          ]),
+        ),
+      ],
     );
   }
 }
