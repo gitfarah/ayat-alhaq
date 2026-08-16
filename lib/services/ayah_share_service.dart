@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -10,13 +11,14 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../theme.dart';
-import '../widgets/surah_banner_painter.dart';
 
-/// One verse of a shared run: its number within the surah and its text.
+/// One verse of a shared run: its number within the surah, its text, and
+/// the translation of THAT verse when one was asked for.
 class ShareVerse {
   final int number;
   final String text;
-  const ShareVerse(this.number, this.text);
+  final String? translation;
+  const ShareVerse(this.number, this.text, {this.translation});
 }
 
 /// One ayah — or a RUN of consecutive ayahs — packaged for sharing,
@@ -34,6 +36,16 @@ class ShareableAyah {
   /// caller shares exactly one.
   final List<ShareVerse> moreVerses;
 
+  /// The FIRST verse's translation, and the language it is in. The rest
+  /// of a run carry their own on [ShareVerse.translation], so a shared
+  /// passage is translated verse by verse rather than as one blob.
+  final String? translationText;
+  final String? translationName;
+
+  /// Whether that language is written right-to-left (Urdu, Farsi), so
+  /// the card sets it the way it is read.
+  final bool translationRtl;
+
   /// Tafsir body and the edition it came from. Both null when the
   /// reader is sharing the verse on its own.
   ///
@@ -47,15 +59,26 @@ class ShareableAyah {
     required this.ayahNumber,
     required this.ayahText,
     this.moreVerses = const [],
+    this.translationText,
+    this.translationName,
+    this.translationRtl = false,
     this.tafsirText,
     this.tafsirName,
   });
 
   bool get hasTafsir => (tafsirText?.trim().isNotEmpty ?? false);
 
+  /// True when ANY verse of the run carries a translation — a run can
+  /// be part-translated if the edition is missing a verse.
+  bool get hasTranslation =>
+      (translationText?.trim().isNotEmpty ?? false) ||
+      moreVerses.any((v) => v.translation?.trim().isNotEmpty ?? false);
+
   /// Every verse in the run, in order.
-  List<ShareVerse> get verses =>
-      [ShareVerse(ayahNumber, ayahText), ...moreVerses];
+  List<ShareVerse> get verses => [
+        ShareVerse(ayahNumber, ayahText, translation: translationText),
+        ...moreVerses
+      ];
 
   int get verseCount => 1 + moreVerses.length;
 
@@ -197,6 +220,19 @@ class AyahShareService {
       ..writeln('﴿$quoted﴾')
       ..writeln(
           '[${a.surahName} — ${a.verseCount == 1 ? _ar(a.ayahNumber) : '${_ar(a.ayahNumber)}-${_ar(a.lastAyahNumber)}'}]');
+    // The translation follows the Arabic and precedes any tafsir: it is
+    // the same words in another language, so it belongs against the
+    // verse, not filed under commentary.
+    if (a.hasTranslation) {
+      b
+        ..writeln()
+        ..writeln('${a.translationName ?? ''}:'.trim());
+      for (final v in a.verses) {
+        final t = v.translation?.trim();
+        if (t == null || t.isEmpty) continue;
+        b.writeln(a.verseCount == 1 ? t : '(${v.number}) $t');
+      }
+    }
     if (a.hasTafsir) {
       b
         ..writeln()
@@ -331,27 +367,14 @@ class AyahShareService {
     // the full column the paragraph was laid out in.
     final bandRect = Rect.fromLTWH(
         _CardLayout.margin, y, _CardLayout.contentWidth, l.bannerHeight);
-    paintSurahBand(
-      canvas,
-      band: bandRect,
-      ink: Rect.fromCenter(
-        center: bandRect.center,
-        width: l.surahTitle.maxIntrinsicWidth,
-        height: l.bannerTitleSize,
-      ),
-      // The card's own ground stands in for the page colour, so the
-      // band belongs to the card the way it belongs to a leaf.
-      palette: SurahBandPalette(
-        bandFill: s.bandFill,
-        innerFill: s.bandInner,
-        rule: s.gold.withValues(alpha: 0.85),
-        gold: s.gold,
-      ),
-    );
+    await _paintSuraBorder(canvas, s, bandRect);
+    // Centred in the border's own clear cartouche, not in the band as a
+    // whole — the ornament is not symmetrical top to bottom.
+    final clear = _CardLayout.clearBoxIn(bandRect);
     canvas.drawParagraph(
         l.surahTitle,
         Offset(_CardLayout.margin,
-            y + (l.bannerHeight - l.surahTitle.height) / 2));
+            clear.top + (clear.height - l.surahTitle.height) / 2));
     y += l.bannerHeight + _CardLayout.gapAfterBanner;
 
     canvas.drawParagraph(l.verse, Offset(_CardLayout.margin, y));
@@ -359,13 +382,29 @@ class AyahShareService {
     canvas.drawParagraph(l.reference, Offset(_CardLayout.margin, y));
     y += l.reference.height;
 
-    if (l.tafsirBody != null) {
-      y += _CardLayout.gapBeforeRule;
+    // A gold hairline separates each block that is NOT the Quran from
+    // the verse above it.
+    void rule() {
       canvas.drawRect(
         Rect.fromLTWH(_CardLayout.margin + _CardLayout.contentWidth * 0.25, y,
             _CardLayout.contentWidth * 0.5, 1),
         Paint()..color = s.gold.withValues(alpha: 0.45),
       );
+    }
+
+    if (l.translationBody != null) {
+      y += _CardLayout.gapBeforeRule;
+      rule();
+      y += 1 + _CardLayout.gapAfterRule;
+      canvas.drawParagraph(l.translationTitle!, Offset(_CardLayout.margin, y));
+      y += l.translationTitle!.height + _CardLayout.gapTafsirTitle;
+      canvas.drawParagraph(l.translationBody!, Offset(_CardLayout.margin, y));
+      y += l.translationBody!.height;
+    }
+
+    if (l.tafsirBody != null) {
+      y += _CardLayout.gapBeforeRule;
+      rule();
       y += 1 + _CardLayout.gapAfterRule;
       canvas.drawParagraph(l.tafsirTitle!, Offset(_CardLayout.margin, y));
       y += l.tafsirTitle!.height + _CardLayout.gapTafsirTitle;
@@ -383,18 +422,49 @@ class AyahShareService {
     const logoSize = 84.0;
     final logo = await _loadLogo();
     const brandRight = _width - _CardLayout.margin;
-    // The paragraph is right-ALIGNED inside a box far wider than the
-    // name, so it has to be positioned by that box's width — offsetting
-    // by the ink width instead pushes the name off the card entirely,
-    // which is exactly what it did until it was rendered and looked at.
-    final brandInk = l.brand.maxIntrinsicWidth;
 
-    canvas.drawParagraph(
-        l.brand, Offset(brandRight - l.brand.width, footerTop + 14));
+    // The app's WORDMARK rather than its name typed out, so the card is
+    // signed the way everything else the app puts its name on is.
+    final wordmark = await _loadWordmark();
+    double markLeft = brandRight;
+    if (wordmark != null) {
+      // The mark is a LOCKUP — the Arabic name over a Latin subtitle —
+      // so its height is shared between two lines of type. Sized off
+      // the logo tile beside it rather than off the old name's cap
+      // height, or the subtitle comes out as a smudge.
+      const markHeight = 88.0;
+      final markWidth = wordmark.width * markHeight / wordmark.height;
+      markLeft = brandRight - markWidth;
+      final dst = Rect.fromLTWH(markLeft,
+          footerTop + (logoSize - markHeight) / 2, markWidth, markHeight);
+      // The artwork is light-on-transparent, so on the one LIGHT ground
+      // it would be all but invisible. There it is drawn as a
+      // silhouette in the card's own ink instead — the lockup keeps its
+      // shape, and the reader gets something they can actually see.
+      final onLight = s.ink.computeLuminance() < 0.5;
+      canvas.drawImageRect(
+        wordmark,
+        Rect.fromLTWH(
+            0, 0, wordmark.width.toDouble(), wordmark.height.toDouble()),
+        dst,
+        Paint()
+          ..colorFilter =
+              onLight ? ColorFilter.mode(s.ink, BlendMode.srcIn) : null,
+      );
+    } else {
+      // No wordmark: fall back to the name set in type. The paragraph
+      // is right-ALIGNED inside a box far wider than the name, so it
+      // must be positioned by that box's width — offsetting by the ink
+      // width instead pushes it clean off the card.
+      canvas.drawParagraph(
+          l.brand, Offset(brandRight - l.brand.width, footerTop + 14));
+      markLeft = brandRight - l.brand.maxIntrinsicWidth;
+    }
+
     if (logo != null) {
       final rrect = RRect.fromRectAndRadius(
-          Rect.fromLTWH(brandRight - brandInk - 20 - logoSize, footerTop,
-              logoSize, logoSize),
+          Rect.fromLTWH(
+              markLeft - 20 - logoSize, footerTop, logoSize, logoSize),
           const Radius.circular(18));
       canvas.save();
       canvas.clipRRect(rrect);
@@ -455,6 +525,49 @@ class AyahShareService {
     canvas.restore();
   }
 
+  /// The ornamental sura band the surah name is headed with.
+  ///
+  /// "Sura border" by Hadysylmy, from Wikipedia, CC BY-SA 4.0. It is a
+  /// single monochrome path, so it is tinted to each card's gold with a
+  /// srcIn layer rather than being redrawn — and because that tinting
+  /// makes every drawn frame a DERIVATIVE, the licence travels with the
+  /// app: see the About screen's credits, which name the author and the
+  /// licence. Do not drop that credit without also dropping this asset.
+  static Future<void> _paintSuraBorder(
+      Canvas canvas, ShareCardStyle style, Rect band) async {
+    final border = await _loadSuraBorder();
+    if (border == null) return;
+    canvas.save();
+    canvas.translate(band.left, band.top);
+    canvas.scale(band.width / border.size.width);
+    canvas.saveLayer(
+      Rect.fromLTWH(0, 0, border.size.width, border.size.height),
+      Paint()..colorFilter = ColorFilter.mode(style.gold, BlendMode.srcIn),
+    );
+    canvas.drawPicture(border.picture);
+    canvas.restore();
+    canvas.restore();
+  }
+
+  static ui.Picture? _borderPicture;
+  static Size? _borderSize;
+
+  static Future<({ui.Picture picture, Size size})?> _loadSuraBorder() async {
+    if (_borderPicture != null && _borderSize != null) {
+      return (picture: _borderPicture!, size: _borderSize!);
+    }
+    try {
+      final raw = await rootBundle.loadString('assets/icon/sura_border.svg');
+      final info = await vg.loadPicture(SvgStringLoader(raw), null);
+      _borderPicture = info.picture;
+      _borderSize = info.size;
+      return (picture: info.picture, size: info.size);
+    } catch (e) {
+      debugPrint('share card: sura border unavailable ($e)');
+      return null;
+    }
+  }
+
   static ui.Picture? _badgePicture;
   static Size? _badgeSize;
 
@@ -476,18 +589,22 @@ class AyahShareService {
   }
 
   static ui.Image? _logoCache;
+  static ui.Image? _wordmarkCache;
 
-  static Future<ui.Image?> _loadLogo() async {
-    if (_logoCache != null) return _logoCache;
+  static Future<ui.Image?> _loadLogo() async =>
+      _logoCache ??= await _loadImage('assets/icon/app_icon.png');
+
+  static Future<ui.Image?> _loadWordmark() async =>
+      _wordmarkCache ??= await _loadImage('assets/icon/wordmark.png');
+
+  static Future<ui.Image?> _loadImage(String asset) async {
     try {
-      final data = await rootBundle.load('assets/icon/app_icon.png');
+      final data = await rootBundle.load(asset);
       final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
-      final frame = await codec.getNextFrame();
-      _logoCache = frame.image;
-      return _logoCache;
+      return (await codec.getNextFrame()).image;
     } catch (e) {
-      // A missing logo must not cost the reader the whole card.
-      debugPrint('share card: logo unavailable ($e)');
+      // A missing mark must not cost the reader the whole card.
+      debugPrint('share card: $asset unavailable ($e)');
       return null;
     }
   }
@@ -501,6 +618,7 @@ class AyahShareService {
     required TextAlign align,
     required double maxWidth,
     bool bold = false,
+    bool rtl = true,
     List<ui.FontFeature>? fontFeatures,
   }) =>
       _paragraph(text,
@@ -511,6 +629,7 @@ class AyahShareService {
           align: align,
           maxWidth: maxWidth,
           bold: bold,
+          rtl: rtl,
           fontFeatures: fontFeatures);
 
   static ui.Paragraph _paragraph(
@@ -522,11 +641,15 @@ class AyahShareService {
     required TextAlign align,
     required double maxWidth,
     bool bold = false,
+    bool rtl = true,
     List<ui.FontFeature>? fontFeatures,
   }) {
     final builder = ui.ParagraphBuilder(ui.ParagraphStyle(
       textAlign: align,
-      textDirection: TextDirection.rtl,
+      // The card is an Arabic object, so everything defaults to RTL —
+      // but a Latin-script translation laid out RTL puts its full stops
+      // on the wrong end of every line.
+      textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
       fontFamily: fontFamily,
       fontSize: fontSize,
       height: height,
@@ -572,18 +695,43 @@ class _CardLayout {
   // apparent weight — the name font's ink sits well inside its em box —
   // and the tafsir is the block people actually read at length, so both
   // are set larger than the rest.
+  /// The sura border's own proportions, from its viewBox (16320x2000),
+  /// and the clear cartouche inside it as fractions of the band. The
+  /// name is sized to THAT box, not to the band: the ornament fills
+  /// everything either side of it.
+  static const double borderAspect = 16320 / 2000;
+  static const Rect borderClear = Rect.fromLTRB(0.265, 0.08, 0.735, 0.89);
+
+  /// Roughly how much of the surah-name font's EM BOX its ink actually
+  /// fills, vertically. The face sets its calligraphy small inside a
+  /// tall box, so a name sized to a box that matches the cartouche
+  /// comes out about this fraction of the cartouche's height.
+  static const double inkInEm = 0.62;
+
+  static Rect clearBoxIn(Rect band) => Rect.fromLTRB(
+        band.left + band.width * borderClear.left,
+        band.top + band.height * borderClear.top,
+        band.left + band.width * borderClear.right,
+        band.top + band.height * borderClear.bottom,
+      );
+
   static const double wantedBannerTitleSize = 132.0;
   static const double verseSize = 74.0;
   static const double referenceSize = 44.0;
   static const double tafsirTitleSize = 48.0;
   static const double tafsirBodySize = 54.0;
+  static const double translationSize = 50.0;
   static const double ayahMarkSize = 52.0;
 
   final ui.Paragraph surahTitle;
   final ui.Paragraph verse;
   final ui.Paragraph reference;
+  final ui.Paragraph? translationTitle;
+  final ui.Paragraph? translationBody;
   final ui.Paragraph? tafsirTitle;
   final ui.Paragraph? tafsirBody;
+
+  /// Drawn only when the wordmark image cannot be had.
   final ui.Paragraph brand;
 
   /// The size the name was actually SET at — see the constructor.
@@ -610,16 +758,27 @@ class _CardLayout {
           fontFeatures: const [ui.FontFeature.enable('liga')],
         );
 
+    // The band is the ornamental sura border, whose height follows from
+    // its own proportions once it spans the column.
+    const bannerHeight = contentWidth / borderAspect;
+    final clear =
+        clearBoxIn(const Rect.fromLTWH(0, 0, contentWidth, bannerHeight));
+
     // One ligature cannot wrap, so an oversized name does not reflow —
-    // it runs off the card. The long names are the reason this is not
-    // simply a constant: set it at the size wanted, and if the drawn
-    // ink is wider than the cartouche can hold, set it again smaller by
-    // exactly the overflow. Every name is then as large as IT can be.
-    var titleSize = wantedBannerTitleSize;
+    // it runs off the card. So: set it as large as the cartouche is
+    // TALL, then, if the drawn ink is too wide for the cartouche, set
+    // it again smaller by exactly the overflow. Every name comes out as
+    // large as it can be inside the frame, and the long ones
+    // (المطففين, المؤمنون) shrink only as much as they must.
+    // Sized against the cartouche's height TIMES inkInEm, not against
+    // it directly: this face draws its ink well inside its em box, so
+    // fitting the box to the cartouche left the cartouche looking half
+    // empty and the name smaller than it had been before the border
+    // existed. Measured off the rendered card, not guessed.
+    var titleSize = math.min(wantedBannerTitleSize, clear.height / inkInEm);
     var title = setName(titleSize);
-    const maxInk = contentWidth * 0.78;
-    if (title.maxIntrinsicWidth > maxInk) {
-      titleSize *= maxInk / title.maxIntrinsicWidth;
+    if (title.maxIntrinsicWidth > clear.width) {
+      titleSize *= clear.width / title.maxIntrinsicWidth;
       title = setName(titleSize);
     }
 
@@ -633,6 +792,41 @@ class _CardLayout {
       align: TextAlign.center,
       maxWidth: contentWidth,
     );
+    // The translation, verse by verse. Set in the app's UI face rather
+    // than the Quran face — it is not Quran, and setting it in the same
+    // hand would say that it is.
+    final translationTitle = a.hasTranslation
+        ? AyahShareService.paragraph(
+            a.translationName ?? '',
+            fontFamily: '.SF Pro Text',
+            fontSize: tafsirTitleSize,
+            height: 1.4,
+            color: s.gold,
+            align: TextAlign.center,
+            maxWidth: contentWidth,
+            bold: true,
+          )
+        : null;
+    final translationBody = a.hasTranslation
+        ? AyahShareService.paragraph(
+            [
+              for (final v in a.verses)
+                if ((v.translation?.trim() ?? '').isNotEmpty)
+                  a.verseCount == 1
+                      ? v.translation!.trim()
+                      : '(${v.number}) ${v.translation!.trim()}'
+            ].join('\n'),
+            fontFamily: '.SF Pro Text',
+            fontSize: translationSize,
+            height: 1.6,
+            color: s.ink.withValues(alpha: 0.94),
+            // Follows the language: a Latin-script translation reads
+            // from the left, Urdu from the right.
+            align: a.translationRtl ? TextAlign.right : TextAlign.left,
+            maxWidth: contentWidth,
+            rtl: a.translationRtl,
+          )
+        : null;
     final tafsirTitle = a.hasTafsir
         ? AyahShareService.paragraph(
             a.tafsirName ?? 'التفسير',
@@ -666,16 +860,20 @@ class _CardLayout {
       maxWidth: contentWidth - 120,
     );
 
-    // The banner is the SAME ornamental band the Mushaf pages are
-    // headed with — cartouche, doubled keyline and end florets.
-    final bannerHeight = title.height * 2.0;
-
     var height = margin +
         bannerHeight +
         gapAfterBanner +
         verse.height +
         gapAfterVerse +
         reference.height;
+    if (translationBody != null) {
+      height += gapBeforeRule +
+          1 +
+          gapAfterRule +
+          translationTitle!.height +
+          gapTafsirTitle +
+          translationBody.height;
+    }
     if (tafsirBody != null) {
       height += gapBeforeRule +
           1 +
@@ -690,6 +888,8 @@ class _CardLayout {
       surahTitle: title,
       verse: verse,
       reference: reference,
+      translationTitle: translationTitle,
+      translationBody: translationBody,
       tafsirTitle: tafsirTitle,
       tafsirBody: tafsirBody,
       brand: brand,
@@ -754,6 +954,8 @@ class _CardLayout {
     required this.surahTitle,
     required this.verse,
     required this.reference,
+    required this.translationTitle,
+    required this.translationBody,
     required this.tafsirTitle,
     required this.tafsirBody,
     required this.brand,

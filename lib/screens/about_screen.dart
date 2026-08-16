@@ -96,6 +96,13 @@ class AboutScreen extends StatelessWidget {
                   'Qalon, Shubah, ad-Duri'
             ),
             (t('aboutTajweed'), 'quran.com tajweed rule data'),
+            // REQUIRED, not a courtesy: the sura band on a shared ayah
+            // card is this artwork, recoloured — which makes each card
+            // a derivative work under CC BY-SA 4.0. The licence obliges
+            // both the credit and the ShareAlike terms. If the asset
+            // ever goes, this line goes with it; while it is here, this
+            // line must stay.
+            (t('aboutOrnament'), 'Sura border — Hadysylmy,\nCC BY-SA 4.0'),
             (t('aboutTafsir'), 'spa5k/tafsir_api'),
             (t('aboutAudio'), 'islamic.network / everyayah.com'),
             (t('aboutPrayer'), 'Adhan calculation, on-device'),

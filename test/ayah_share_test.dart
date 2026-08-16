@@ -238,6 +238,110 @@ void main() {
     });
   });
 
+  group('translation', () {
+    const translated = ShareableAyah(
+      surahNumber: 8,
+      surahName: 'الأنفال',
+      ayahNumber: 3,
+      ayahText: verse,
+      translationText: 'Those who establish prayer.',
+      translationName: 'English',
+    );
+
+    test('a verse with no translation asked for carries none', () {
+      expect(ayahOnly.hasTranslation, isFalse);
+      expect(AyahShareService.buildText(ayahOnly),
+          isNot(contains('Those who establish')));
+    });
+
+    test('the text form puts the translation under the Arabic', () {
+      final text = AyahShareService.buildText(translated);
+      expect(text, contains('English:'));
+      expect(text, contains('Those who establish prayer.'));
+      // The Arabic leads; the translation follows it.
+      expect(text.indexOf(verse), lessThan(text.indexOf('Those who')));
+    });
+
+    test('the translation sits above the tafsir, not below it', () {
+      // They are different things: one is the verse in another
+      // language, the other is commentary ON it.
+      const both = ShareableAyah(
+        surahNumber: 8,
+        surahName: 'الأنفال',
+        ayahNumber: 3,
+        ayahText: verse,
+        translationText: 'Those who establish prayer.',
+        translationName: 'English',
+        tafsirText: 'الذين يداومون على أداء الصلوات.',
+        tafsirName: 'التفسير الميسر',
+      );
+      final text = AyahShareService.buildText(both);
+      expect(
+          text.indexOf('Those who'), lessThan(text.indexOf('الذين يداومون')));
+    });
+
+    test('a run is translated verse by verse, each one numbered', () {
+      const run = ShareableAyah(
+        surahNumber: 2,
+        surahName: 'البقرة',
+        ayahNumber: 2,
+        ayahText: 'ذَٰلِكَ ٱلْكِتَٰبُ',
+        translationText: 'This is the Book.',
+        translationName: 'English',
+        moreVerses: [
+          ShareVerse(3, 'ٱلَّذِينَ يُؤْمِنُونَ',
+              translation: 'Who believe in the unseen.'),
+        ],
+      );
+      final text = AyahShareService.buildText(run);
+      expect(text, contains('(2) This is the Book.'));
+      expect(text, contains('(3) Who believe in the unseen.'));
+    });
+
+    test('a run only partly covered by the edition still works', () {
+      // alquran.cloud editions do occasionally miss a verse; that must
+      // cost the reader that line, not the whole share.
+      const partial = ShareableAyah(
+        surahNumber: 2,
+        surahName: 'البقرة',
+        ayahNumber: 2,
+        ayahText: 'ذَٰلِكَ ٱلْكِتَٰبُ',
+        translationName: 'English',
+        moreVerses: [
+          ShareVerse(3, 'ٱلَّذِينَ يُؤْمِنُونَ', translation: 'Who believe.'),
+        ],
+      );
+      expect(partial.hasTranslation, isTrue);
+      expect(AyahShareService.buildText(partial), contains('(3) Who believe.'));
+    });
+
+    test('a translation makes the card taller', () {
+      expect(AyahShareService.cardAspect(translated),
+          greaterThan(AyahShareService.cardAspect(ayahOnly)));
+    });
+
+    test('a translated card renders on every ground', () async {
+      for (final bg in kShareBackgrounds) {
+        final bytes = await AyahShareService.renderCard(translated, style: bg);
+        expect(bytes.sublist(0, 4), [0x89, 0x50, 0x4E, 0x47], reason: bg.id);
+      }
+    });
+
+    test('a right-to-left translation renders too', () async {
+      const urdu = ShareableAyah(
+        surahNumber: 8,
+        surahName: 'الأنفال',
+        ayahNumber: 3,
+        ayahText: verse,
+        translationText: 'جو نماز قائم کرتے ہیں۔',
+        translationName: 'اردو',
+        translationRtl: true,
+      );
+      final bytes = await AyahShareService.renderCard(urdu);
+      expect(bytes.sublist(0, 4), [0x89, 0x50, 0x4E, 0x47]);
+    });
+  });
+
   group('warning that a card has grown too tall', () {
     // The hint exists because a messenger scales an image to the bubble
     // WIDTH: past a point, adding verses shrinks all of them rather

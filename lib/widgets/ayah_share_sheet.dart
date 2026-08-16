@@ -102,10 +102,58 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
   /// and it is read on every rebuild to draw the hint.
   bool _tooLong = false;
 
+  /// alquran.cloud edition id for the translation to include, or null
+  /// for none. Defaults to whatever the reader already reads with.
+  String? _translationEdition;
+
+  /// Translation text per ayah number, for the chosen edition.
+  Map<int, String> _translations = {};
+  bool _loadingTranslation = false;
+
   @override
   void initState() {
     super.initState();
     _loadSurahLength();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Someone reading with the German translation on almost certainly
+    // wants to share it in German — so the sheet opens on their own
+    // reading language rather than on nothing.
+    _translationEdition ??= context.read<SettingsService>().translationEdition;
+    if (_translationEdition != null && _translations.isEmpty) {
+      _loadTranslation(_translationEdition!);
+    }
+  }
+
+  /// Fetches the whole surah in [edition] — one call, and it then
+  /// covers however many verses the reader steps through.
+  Future<void> _loadTranslation(String edition) async {
+    setState(() => _loadingTranslation = true);
+    try {
+      final ayahs = await QuranService.getSurahAyahs(widget.surahNumber,
+          translationEdition: edition);
+      if (!mounted) return;
+      setState(() {
+        _translations = {
+          for (final a in ayahs)
+            if ((a.translation ?? '').trim().isNotEmpty)
+              a.numberInSurah: a.translation!.trim()
+        };
+        _loadingTranslation = false;
+      });
+      _remeasure();
+    } catch (_) {
+      if (!mounted) return;
+      // Offline: the card is shared without a translation rather than
+      // failing, exactly as the tafsir behaves.
+      setState(() {
+        _translations = {};
+        _loadingTranslation = false;
+      });
+    }
   }
 
   Future<void> _loadSurahLength() async {
@@ -159,8 +207,7 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
     // out would have the hint miss the very case it exists for. When
     // the tafsir has not been fetched yet there is nothing to measure,
     // and the hint appears once it arrives.
-    final tafsir =
-        _withTafsir ? (widget.tafsirText ?? _fetchedTafsir) : null;
+    final tafsir = _withTafsir ? (widget.tafsirText ?? _fetchedTafsir) : null;
     final tall = AyahShareService.isCardTooTall(
       _payloadSync(tafsirText: tafsir, tafsirName: 'التفسير'),
       style: shareBackgroundById(
@@ -202,16 +249,27 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
 
   /// The verses currently chosen, without touching the network — used
   /// for measuring the card as the reader changes the count.
-  ShareableAyah _payloadSync({String? tafsirText, String? tafsirName}) =>
-      ShareableAyah(
-        surahNumber: widget.surahNumber,
-        surahName: widget.surahName,
-        ayahNumber: widget.ayahNumber,
-        ayahText: widget.ayahText,
-        moreVerses: _extra.take(_count - 1).toList(),
-        tafsirText: tafsirText,
-        tafsirName: tafsirName,
-      );
+  ShareableAyah _payloadSync({String? tafsirText, String? tafsirName}) {
+    final edition = _translationEdition;
+    final name = edition == null
+        ? null
+        : QuranService.translationEditions[edition] ?? edition;
+    return ShareableAyah(
+      surahNumber: widget.surahNumber,
+      surahName: widget.surahName,
+      ayahNumber: widget.ayahNumber,
+      ayahText: widget.ayahText,
+      moreVerses: [
+        for (final v in _extra.take(_count - 1))
+          ShareVerse(v.number, v.text, translation: _translations[v.number])
+      ],
+      translationText: _translations[widget.ayahNumber],
+      translationName: name,
+      translationRtl: edition != null && QuranService.isRtlEdition(edition),
+      tafsirText: tafsirText,
+      tafsirName: tafsirName,
+    );
+  }
 
   Future<ShareableAyah> _payload() async {
     String? tafsirText;
@@ -334,6 +392,63 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
                         style: TextStyle(
                             fontFamily: '.SF Pro Text', color: textColor)),
                     secondary: Icon(Icons.menu_book_rounded, color: accent),
+                  ),
+                  // ── Which translation goes with the verse, if any.
+                  // Applies to BOTH forms: the text share and the card.
+                  Row(
+                    children: [
+                      Icon(Icons.translate_rounded, size: 20, color: accent),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(l('shareTranslation'),
+                            style: TextStyle(
+                                fontFamily: '.SF Pro Text',
+                                fontSize: 15,
+                                color: textColor)),
+                      ),
+                      if (_loadingTranslation)
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: accent),
+                        )
+                      else
+                        DropdownButton<String?>(
+                          value: _translationEdition,
+                          underline: const SizedBox.shrink(),
+                          borderRadius: BorderRadius.circular(12),
+                          style: TextStyle(
+                              fontFamily: '.SF Pro Text',
+                              fontSize: 14,
+                              color: textColor),
+                          items: [
+                            DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text(l('shareNoTranslation')),
+                            ),
+                            for (final e
+                                in QuranService.translationEditions.entries)
+                              DropdownMenuItem<String?>(
+                                value: e.key,
+                                child: Text(e.value),
+                              ),
+                          ],
+                          onChanged: _busy
+                              ? null
+                              : (v) {
+                                  setState(() {
+                                    _translationEdition = v;
+                                    _translations = {};
+                                  });
+                                  if (v != null) {
+                                    _loadTranslation(v);
+                                  } else {
+                                    _remeasure();
+                                  }
+                                },
+                        ),
+                    ],
                   ),
                   // ── How many verses, and the warning when that starts
                   // to make a card nobody can read in a chat.

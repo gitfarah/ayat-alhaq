@@ -1,7 +1,7 @@
 name: quran_app_v1
 description: A Quran reading app for Android and iOS.
 publish_to: 'none'
-version: 1.7.3+84
+version: 1.7.3+85
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -76,6 +76,18 @@ flutter:
     # is never redrawn or recoloured — Apple's guidelines do not allow
     # either.
     - assets/icon/app_store_badge.svg
+    # The app's wordmark, signed into the bottom-right of a shared ayah
+    # card. This is logo_transparent.png with its transparent padding
+    # trimmed off — the original is a 2000x2000 square whose ink covers
+    # a band about a third of that, so drawn to fit a footer it would
+    # have come out tiny with acres of nothing around it.
+    - assets/icon/wordmark.png
+    # Ornamental sura border, headed over the surah name on a shared
+    # card. From Wikipedia: "Sura border" by Hadysylmy, CC BY-SA 4.0.
+    # Recoloured per card ground, which makes each drawn frame a
+    # derivative — so the licence is carried in the About screen's
+    # credits, and the ShareAlike terms travel with it.
+    - assets/icon/sura_border.svg
   fonts:
     # UI everywhere: menus, labels, buttons, surah lists. The '.SF Pro
     # Text' family (referenced directly in code, not registered here)
