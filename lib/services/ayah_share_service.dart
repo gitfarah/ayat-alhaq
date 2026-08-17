@@ -723,28 +723,23 @@ class AyahShareService {
           .map((e) => AyahHitRegion.fromJson(e as Map<String, dynamic>))
           .toList();
 
-      // Every ring on the page, not just this ayah's own — a "band" is
-      // one continuous line-segment of ONE ayah, and the page usually
-      // has several ayat's bands sharing lines with this one.
-      final target = <(double, double)>[]; // this ayah's own bands
-      final others = <(double, double)>[]; // every other ayah's bands
+      AyahHitRegion? region;
       for (final r in regions) {
-        final mine =
-            r.surahNumber == a.surahNumber && r.ayahNumber == a.ayahNumber;
-        for (final ring in r.rings) {
-          var ringMinY = double.infinity, ringMaxY = -double.infinity;
-          for (var i = 1; i < ring.length; i += 2) {
-            if (ring[i] < ringMinY) ringMinY = ring[i];
-            if (ring[i] > ringMaxY) ringMaxY = ring[i];
-          }
-          if (!ringMinY.isFinite) continue;
-          (mine ? target : others).add((ringMinY, ringMaxY));
+        if (r.surahNumber == a.surahNumber && r.ayahNumber == a.ayahNumber) {
+          region = r;
+          break;
         }
       }
-      if (target.isEmpty) return null;
+      if (region == null || region.rings.isEmpty) return null;
 
-      final minY = target.map((b) => b.$1).reduce(math.min);
-      final maxY = target.map((b) => b.$2).reduce(math.max);
+      var minY = double.infinity, maxY = -double.infinity;
+      for (final ring in region.rings) {
+        for (var i = 1; i < ring.length; i += 2) {
+          if (ring[i] < minY) minY = ring[i];
+          if (ring[i] > maxY) maxY = ring[i];
+        }
+      }
+      if (!minY.isFinite || !maxY.isFinite) return null;
 
       final vb = RegExp(
               r'viewBox="\s*(-?[\d.]+)[,\s]+(-?[\d.]+)[,\s]+(-?[\d.]+)[,\s]+(-?[\d.]+)\s*"')
@@ -753,47 +748,26 @@ class AyahShareService {
           vb == null ? f : (double.tryParse(vb.group(g)!) ?? f);
       final vbMinX = n(1, 0), vbMinY = n(2, 0), vbW = n(3, 235);
 
-      // The hit-region a font's shaping engine hands back is snug
-      // around the base letters — it does NOT reach as high as a
-      // shadda+fatha stack or as low as a long final yāʾ, which the
-      // FIRST render of this (a fixed few-pixel pad) clipped. Padding
-      // more instead let the next/previous ayah's own marks bleed into
-      // the strip whenever a neighbour sat close by on the same line.
+      // NO padding, and no cleverness: these bounds ARE the print's own
+      // line boundaries, and the crop must land exactly on them.
       //
-      // The fix uses geometry that is already on the page: stop at the
-      // MIDPOINT between this ayah's own edge and the nearest OTHER
-      // ayah's band beyond it, rather than a fixed distance. That gives
-      // every tall mark of THIS ayah the full gap between print lines
-      // to extend into, while a neighbour's marks — symmetrically
-      // reaching the same midpoint from their own side — are excluded
-      // by construction. At the very first or last line of a page,
-      // where there is no neighbour to split the gap with, it falls
-      // back to the same small pad as before.
-      const edgePad = 4.0;
-      double? nearestAboveMaxY() {
-        double? best;
-        for (final b in others) {
-          if (b.$2 <= minY && (best == null || b.$2 > best)) best = b.$2;
-        }
-        return best;
-      }
-
-      double? nearestBelowMinY() {
-        double? best;
-        for (final b in others) {
-          if (b.$1 >= maxY && (best == null || b.$1 < best)) best = b.$1;
-        }
-        return best;
-      }
-
-      final above = nearestAboveMaxY();
-      final below = nearestBelowMinY();
-      // A real neighbour splits the gap with it; the top/bottom line of
-      // the page, with nothing further to split, keeps the old fixed
-      // pad instead of reaching all the way to the page edge.
-      final stripTop = above != null ? (above + minY) / 2 : minY - edgePad;
-      final stripBottom = below != null ? (maxY + below) / 2 : maxY + edgePad;
-      final stripHeight = stripBottom - stripTop;
+      // The polygons in this dataset are not per-ayah bounding boxes —
+      // they are staircases tracing the text flow, and consecutive
+      // ayat SHARE the y of the line they meet on. On page 2, ayah 3
+      // ends at y=133.88 and ayah 4 runs 101.66..160.15: the line above
+      // ayah 4 closes at exactly 101.66, the value ayah 4 opens with.
+      // The bands tile the page with no gaps between them.
+      //
+      // So any padding at all reaches into the neighbouring line —
+      // which is what the first cut did, leaving slivers of the line
+      // above and below. The second cut tried to be smarter and split
+      // the gap with the nearest neighbouring band, on the assumption
+      // there WAS a gap; with contiguous bands that pushed the top up
+      // to (72.23+101.66)/2 = 86.9, mid-way through the previous line,
+      // and pulled the bottom down into the next one. Both were fixed
+      // by measuring the polygons instead of assuming their shape.
+      final stripTop = minY;
+      final stripHeight = maxY - minY;
       if (stripHeight <= 0) return null;
 
       final info = await vg.loadPicture(SvgStringLoader(svgContent), null);

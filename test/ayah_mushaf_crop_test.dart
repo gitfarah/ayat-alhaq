@@ -15,7 +15,9 @@
 // checked in under test/fixtures/ — the exact artwork the app already
 // fetches and displays live in Mushaf mode, so this adds no new
 // copyright surface, only a cached copy of what ships anyway.
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -127,6 +129,81 @@ void main() {
     );
     final bytes = await AyahShareService.renderCard(run);
     expect(bytes.sublist(0, 4), [0x89, 0x50, 0x4E, 0x47]);
+  });
+
+  // Regression, and the reason this file measures geometry at all.
+  //
+  // Two bad crops shipped before this was understood. The polygons in
+  // this dataset are NOT per-ayah bounding boxes — they are staircases
+  // tracing the text flow, and consecutive ayat share the y of the line
+  // they meet on, so the bands tile the page with no gaps. On page 2:
+  //
+  //   ayah 2  ends at y=102.49        ayah 3  spans  72.23..133.88
+  //   ayah 4  spans  101.66..160.15   ayah 5  spans 158.53..216.20
+  //
+  // The first cut padded by a fixed 4 units and pulled slivers of the
+  // neighbouring lines in. The second "split the gap" with the nearest
+  // band, assuming a gap existed — with contiguous bands that put the
+  // top at (72.23+101.66)/2 = 86.9, halfway through the PREVIOUS line,
+  // so a card for 2:4 carried a whole line of 2:2 and 2:3 above it.
+  //
+  // Both are geometry facts about the shipped fixture, so assert them
+  // directly: any padding at all, in either direction, breaks these.
+  group('crop bounds land exactly on the print\'s own line boundaries', () {
+    List<List<double>> ringsFor(List<dynamic> json, int ayah) =>
+        (json.firstWhere((e) => e['ayahNumber'] == ayah)['polygon'] as String)
+            .split(RegExp(r'[MmZz]'))
+            .map((part) => part
+                .split(RegExp(r'[,\sLlHhVv]+'))
+                .where((s) => s.isNotEmpty)
+                .map(double.tryParse)
+                .whereType<double>()
+                .toList())
+            .where((nums) => nums.length >= 6)
+            .toList();
+
+    late List<dynamic> page2;
+
+    setUpAll(() async {
+      page2 = jsonDecode(await File('test/fixtures/mushaf_v4_page2/002.json')
+          .readAsString()) as List<dynamic>;
+    });
+
+    (double, double) yRange(int ayah) {
+      var lo = double.infinity, hi = -double.infinity;
+      for (final ring in ringsFor(page2, ayah)) {
+        for (var i = 1; i < ring.length; i += 2) {
+          lo = math.min(lo, ring[i]);
+          hi = math.max(hi, ring[i]);
+        }
+      }
+      return (lo, hi);
+    }
+
+    test('an ayah opens exactly where the line above it closes', () {
+      // 2:4 opens at 101.66 — the same y 2:3's own staircase steps down
+      // to. There is no gap to pad into.
+      final (fourTop, _) = yRange(4);
+      final threeRing = ringsFor(page2, 3);
+      final sharedEdge =
+          threeRing.expand((r) => [for (var i = 1; i < r.length; i += 2) r[i]]);
+      expect(sharedEdge, contains(fourTop),
+          reason: 'the line boundary is shared, so the crop must land on it '
+              'exactly rather than padding past it');
+    });
+
+    test('neighbouring ayat overlap in y, so a "gap" to split never exists',
+        () {
+      // 2:3 runs to 133.88 while 2:4 starts at 101.66: they share a
+      // line, and their y ranges genuinely overlap. Splitting the
+      // distance to the nearest non-overlapping band is what reached
+      // back over a whole line of text.
+      final (threeTop, threeBottom) = yRange(3);
+      final (fourTop, fourBottom) = yRange(4);
+      expect(fourTop, lessThan(threeBottom));
+      expect(threeTop, lessThan(fourTop));
+      expect(fourBottom, greaterThan(threeBottom));
+    });
   });
 
   test('the aspect estimate used for the "too long" hint stays text-based', () {
