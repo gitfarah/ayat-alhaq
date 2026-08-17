@@ -196,26 +196,49 @@ class ShareCardLimits {
   static const double tallAspect = 4.0;
 }
 
-/// A crop of the REAL printed Hafs V4 page, for the lines a single ayah
-/// occupies — the picture, and where in the page's own coordinate space
-/// the strip sits.
-class _MushafCrop {
+/// One page's worth of a crop: the page picture, and the slice of it in
+/// the page's own coordinate space that the shared verses occupy.
+class _MushafStrip {
   final ui.Picture picture;
   final double vbMinX, vbMinY, vbW;
-  final double stripTop, stripHeight;
+  final double top, height;
 
-  const _MushafCrop({
+  const _MushafStrip({
     required this.picture,
     required this.vbMinX,
     required this.vbMinY,
     required this.vbW,
-    required this.stripTop,
-    required this.stripHeight,
+    required this.top,
+    required this.height,
   });
 
   /// Height per unit of width once the strip is scaled to fill a card
   /// column edge to edge, the way a printed line always is.
-  double get aspect => stripHeight / vbW;
+  double get aspect => height / vbW;
+}
+
+/// The REAL printed Hafs V4 page art for a shared verse or run — one
+/// strip per PAGE the run crosses, in reading order.
+///
+/// A run is nearly always one strip; it becomes two when the passage
+/// runs over a page turn, and the strips are then stacked with a small
+/// gap rather than butted together, because they are genuinely two
+/// different leaves of the Mushaf and pretending otherwise would
+/// invent a line-break that does not exist.
+class _MushafCrop {
+  final List<_MushafStrip> strips;
+  const _MushafCrop(this.strips);
+
+  /// Card pixels between stacked page-strips.
+  static const double gap = 26.0;
+
+  double heightFor(double width) {
+    var h = 0.0;
+    for (final s in strips) {
+      h += width * s.aspect;
+    }
+    return h + gap * (strips.length - 1);
+  }
 }
 
 /// Offline surah:ayah → Hafs V4 page-number lookup, built once from the
@@ -705,90 +728,132 @@ class AyahShareService {
     }
   }
 
-  /// The crop for a single ayah, or null if anything about it is not
-  /// safe to use — multi-verse shares, a page-spanning ayah, missing
-  /// region data, or no network/cache for that page. Every one of
+  /// The most pages one shared run will be cropped from. A passage
+  /// long enough to cross this many leaves is already far past the
+  /// height at which a messenger shrinks the card to a strip, so it
+  /// takes the text card instead of costing several page fetches.
+  static const int _maxCropPages = 3;
+
+  /// The crop for a verse or a run, or null if anything about it is not
+  /// safe to use — an ayah missing from the layout, missing region
+  /// data, too many pages, or no network/cache for a page. Every one of
   /// those falls back to the text-rendered verse, which always works.
   static Future<_MushafCrop?> _tryMushafCrop(ShareableAyah a) async {
-    if (a.verseCount != 1) return null;
     try {
-      final page = await _V4PageIndex.singlePageOf(a.surahNumber, a.ayahNumber);
-      if (page == null) return null;
-
-      final raw = await _loadV4PageRaw(page);
-      if (raw == null) return null;
-      final (svgContent, jsonContent) = raw;
-
-      final regions = (jsonDecode(jsonContent) as List)
-          .map((e) => AyahHitRegion.fromJson(e as Map<String, dynamic>))
-          .toList();
-
-      AyahHitRegion? region;
-      for (final r in regions) {
-        if (r.surahNumber == a.surahNumber && r.ayahNumber == a.ayahNumber) {
-          region = r;
-          break;
-        }
+      // Group the run's verses by the page they sit on, in reading
+      // order. Nearly always one page; two when the passage crosses a
+      // page turn.
+      final byPage = <int, List<int>>{};
+      for (final v in a.verses) {
+        final page = await _V4PageIndex.singlePageOf(a.surahNumber, v.number);
+        if (page == null) return null;
+        (byPage[page] ??= []).add(v.number);
       }
-      if (region == null || region.rings.isEmpty) return null;
+      if (byPage.isEmpty || byPage.length > _maxCropPages) return null;
 
-      var minY = double.infinity, maxY = -double.infinity;
-      for (final ring in region.rings) {
-        for (var i = 1; i < ring.length; i += 2) {
-          if (ring[i] < minY) minY = ring[i];
-          if (ring[i] > maxY) maxY = ring[i];
-        }
+      final pages = byPage.keys.toList()..sort();
+      final strips = <_MushafStrip>[];
+      for (final page in pages) {
+        final strip = await _stripFor(a.surahNumber, byPage[page]!, page);
+        if (strip == null) return null;
+        strips.add(strip);
       }
-      if (!minY.isFinite || !maxY.isFinite) return null;
-
-      final vb = RegExp(
-              r'viewBox="\s*(-?[\d.]+)[,\s]+(-?[\d.]+)[,\s]+(-?[\d.]+)[,\s]+(-?[\d.]+)\s*"')
-          .firstMatch(svgContent);
-      double n(int g, double f) =>
-          vb == null ? f : (double.tryParse(vb.group(g)!) ?? f);
-      final vbMinX = n(1, 0), vbMinY = n(2, 0), vbW = n(3, 235);
-
-      // NO padding, and no cleverness: these bounds ARE the print's own
-      // line boundaries, and the crop must land exactly on them.
-      //
-      // The polygons in this dataset are not per-ayah bounding boxes —
-      // they are staircases tracing the text flow, and consecutive
-      // ayat SHARE the y of the line they meet on. On page 2, ayah 3
-      // ends at y=133.88 and ayah 4 runs 101.66..160.15: the line above
-      // ayah 4 closes at exactly 101.66, the value ayah 4 opens with.
-      // The bands tile the page with no gaps between them.
-      //
-      // So any padding at all reaches into the neighbouring line —
-      // which is what the first cut did, leaving slivers of the line
-      // above and below. The second cut tried to be smarter and split
-      // the gap with the nearest neighbouring band, on the assumption
-      // there WAS a gap; with contiguous bands that pushed the top up
-      // to (72.23+101.66)/2 = 86.9, mid-way through the previous line,
-      // and pulled the bottom down into the next one. Both were fixed
-      // by measuring the polygons instead of assuming their shape.
-      final stripTop = minY;
-      final stripHeight = maxY - minY;
-      if (stripHeight <= 0) return null;
-
-      final info = await vg.loadPicture(SvgStringLoader(svgContent), null);
-      return _MushafCrop(
-        picture: info.picture,
-        vbMinX: vbMinX,
-        vbMinY: vbMinY,
-        vbW: vbW,
-        stripTop: stripTop,
-        stripHeight: stripHeight,
-      );
+      return _MushafCrop(strips);
     } catch (e) {
       debugPrint('share card: Mushaf crop unavailable ($e)');
       return null;
     }
   }
 
-  /// Draws the crop into the card, scaled to fill [width] edge to edge
-  /// — the way a printed line always is — and recoloured to the card's
-  /// own ink so it reads correctly on all four grounds, the same as the
-  /// rest of the card's non-Quran type.
+  /// One page's strip: the lines [ayahs] occupy on [page], cut on the
+  /// cleanest rows the print offers.
+  static Future<_MushafStrip?> _stripFor(
+      int surah, List<int> ayahs, int page) async {
+    final raw = await _loadV4PageRaw(page);
+    if (raw == null) return null;
+    final (svgContent, jsonContent) = raw;
+
+    final regions = (jsonDecode(jsonContent) as List)
+        .map((e) => AyahHitRegion.fromJson(e as Map<String, dynamic>))
+        .toList();
+
+    // Every y the shared verses touch, and every y everything else on
+    // the page touches. The polygons are staircases, so their corner
+    // y-values are exactly the print's line boundaries.
+    final ourYs = <double>{};
+    final otherYs = <double>{};
+    for (final r in regions) {
+      final mine = r.surahNumber == surah && ayahs.contains(r.ayahNumber);
+      for (final ring in r.rings) {
+        for (var i = 1; i < ring.length; i += 2) {
+          (mine ? ourYs : otherYs).add(ring[i]);
+        }
+      }
+    }
+    if (ourYs.isEmpty) return null;
+
+    final sorted = ourYs.toList()..sort();
+    final minY = sorted.first;
+    final maxY = sorted.last;
+    if (maxY <= minY) return null;
+
+    final vb = RegExp(
+            r'viewBox="\s*(-?[\d.]+)[,\s]+(-?[\d.]+)[,\s]+(-?[\d.]+)[,\s]+(-?[\d.]+)\s*"')
+        .firstMatch(svgContent);
+    double n(int g, double f) =>
+        vb == null ? f : (double.tryParse(vb.group(g)!) ?? f);
+    final vbMinX = n(1, 0), vbMinY = n(2, 0), vbW = n(3, 235);
+
+    // A band's TOP is trustworthy; its BOTTOM is not.
+    //
+    // Measured on the shipped fixtures: on page 2 ayah 4's band ends at
+    // y=160.15, but ayah 5's band — the next line — already begins at
+    // 158.53, and the damma and صلے that ride high above ayah 5's
+    // letters sit in between. Cutting on ayah 4's own bottom therefore
+    // drags those two marks along, which is exactly the "harakat from
+    // the line below" in the report. On page 3 the same pair reads
+    // 82.11 and 82.37: the bottom UNDERSHOOTS instead. The bottoms
+    // disagree with each other by up to a mark's height; the tops
+    // agree with the print every time.
+    //
+    // So the strip ends where the NEXT line begins, taken from that
+    // line's own band top, and only falls back to our own bottom when
+    // there is no next line (last verses on the page, nothing below to
+    // bleed in).
+    //
+    // Rasterising and cutting on the emptiest row was tried in between
+    // and is worse: page 2 has NO empty row between those lines — the
+    // profile bottoms out at 12-14 lit pixels and never reaches zero —
+    // so "emptiest" picked y=162.0, further into ayah 5 than the
+    // nominal bottom it was meant to improve on.
+    final epsilon = vbW * 0.01;
+    final ourLastLineTop =
+        sorted.length >= 2 ? sorted[sorted.length - 2] : minY;
+    double? nextLineTop;
+    for (final y in otherYs) {
+      if (y > ourLastLineTop + epsilon &&
+          (nextLineTop == null || y < nextLineTop)) {
+        nextLineTop = y;
+      }
+    }
+    final top = minY;
+    final bottom = nextLineTop ?? maxY;
+    if (bottom <= top) return null;
+
+    final info = await vg.loadPicture(SvgStringLoader(svgContent), null);
+    return _MushafStrip(
+      picture: info.picture,
+      vbMinX: vbMinX,
+      vbMinY: vbMinY,
+      vbW: vbW,
+      top: top,
+      height: bottom - top,
+    );
+  }
+
+  /// Draws the crop into the card, each page-strip scaled to fill
+  /// [width] edge to edge — the way a printed line always is — and
+  /// recoloured to the card's own ink so it reads on all four grounds.
   ///
   /// The FULL page picture is handed in every time (cropping happens
   /// only via clip + transform here, not by pre-slicing the picture):
@@ -796,19 +861,23 @@ class AyahShareService {
   static void _drawMushafCrop(
       Canvas canvas, _MushafCrop crop, ShareCardStyle style, Offset dst,
       {required double width}) {
-    final scale = width / crop.vbW;
-    final height = crop.stripHeight * scale;
-    canvas.save();
-    canvas.translate(dst.dx, dst.dy);
-    canvas.clipRect(Rect.fromLTWH(0, 0, width, height));
-    canvas.translate(0, -crop.stripTop * scale);
-    canvas.scale(scale);
-    canvas.translate(-crop.vbMinX, -crop.vbMinY);
-    canvas.saveLayer(null,
-        Paint()..colorFilter = ColorFilter.mode(style.ink, BlendMode.srcIn));
-    canvas.drawPicture(crop.picture);
-    canvas.restore();
-    canvas.restore();
+    var y = dst.dy;
+    for (final strip in crop.strips) {
+      final scale = width / strip.vbW;
+      final height = strip.height * scale;
+      canvas.save();
+      canvas.translate(dst.dx, y);
+      canvas.clipRect(Rect.fromLTWH(0, 0, width, height));
+      canvas.translate(0, -strip.top * scale);
+      canvas.scale(scale);
+      canvas.translate(-strip.vbMinX, -strip.vbMinY);
+      canvas.saveLayer(null,
+          Paint()..colorFilter = ColorFilter.mode(style.ink, BlendMode.srcIn));
+      canvas.drawPicture(strip.picture);
+      canvas.restore();
+      canvas.restore();
+      y += height + _MushafCrop.gap;
+    }
   }
 
   /// The ornamental sura band the surah name is headed with.
@@ -1080,7 +1149,7 @@ class _CardLayout {
     // otherwise. Exactly one of [verse]/[mushafCrop] is non-null.
     final verse = crop == null ? _verses(a, s) : null;
     final verseHeight =
-        crop != null ? contentWidth * crop.aspect : verse!.height;
+        crop != null ? crop.heightFor(contentWidth) : verse!.height;
     final reference = AyahShareService.paragraph(
       a.referenceLabel,
       fontFamily: 'QuranHafs',
