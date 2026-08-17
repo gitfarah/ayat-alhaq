@@ -650,7 +650,24 @@ class AyahShareService {
   /// hand). Tajweed colouring in this app is a runtime overlay applied
   /// only to the REFLOWING text view; the page artwork was never
   /// coloured to begin with, so there is nothing to strip.
+  ///
+  /// jsDelivr's GitHub mirror, NOT raw.githubusercontent.com directly.
+  /// Found the hard way: a fresh install has no cached V4 pages, so the
+  /// very first share of an uncached page always needs this fetch to
+  /// succeed — and raw.githubusercontent.com answered every request
+  /// with 429 for a stretch while this was being tested, silently
+  /// falling every share back to the Amiri card with no error surfaced
+  /// anywhere. jsDelivr serves byte-identical content (checked) from a
+  /// CDN built for exactly this traffic pattern and was not rate-
+  /// limited at the same moment raw.githubusercontent.com was.
   static const String _v4Repo =
+      'https://cdn.jsdelivr.net/gh/quranpedia/quran-svg@main/mushafs/hafs/kfqc';
+
+  /// Tried only if jsDelivr itself fails — the exact host that turned
+  /// out to be the problem, but a second independent source is cheap
+  /// insurance against jsDelivr having its own bad day, and costs
+  /// nothing when the first attempt succeeds, which is the normal case.
+  static const String _v4RepoFallback =
       'https://raw.githubusercontent.com/quranpedia/quran-svg/main/mushafs/hafs/kfqc';
 
   static String _pad3(int n) => n.toString().padLeft(3, '0');
@@ -700,14 +717,19 @@ class AyahShareService {
         }
       }
 
-      final results = await Future.wait([
-        http.get(Uri.parse('$_v4Repo/svg/${_pad3(page)}.svg')),
-        http.get(Uri.parse('$_v4Repo/json/${_pad3(page)}.json')),
-      ]).timeout(const Duration(seconds: 12));
-      if (results[0].statusCode != 200 || results[1].statusCode != 200) {
-        return null;
+      Future<(String, String)?> fetchFrom(String repo) async {
+        final results = await Future.wait([
+          http.get(Uri.parse('$repo/svg/${_pad3(page)}.svg')),
+          http.get(Uri.parse('$repo/json/${_pad3(page)}.json')),
+        ]).timeout(const Duration(seconds: 12));
+        if (results[0].statusCode != 200 || results[1].statusCode != 200) {
+          return null;
+        }
+        return (results[0].body, results[1].body);
       }
-      final pair = (results[0].body, results[1].body);
+
+      final pair = await fetchFrom(_v4Repo) ?? await fetchFrom(_v4RepoFallback);
+      if (pair == null) return null;
       _v4PageMemCache[page] = pair;
 
       if (!kIsWeb) {
