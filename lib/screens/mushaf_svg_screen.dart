@@ -1628,7 +1628,16 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     // the pages sit straight on it with no card, no border and no
     // rounded corners, so a future setting can repaint every edition at
     // once by changing this single value.
-    final bgColor = AppColors.mushafBackground(s.mushafBackground, isDark);
+    //
+    // In dark mode the reading surface itself goes true black rather
+    // than the tinted-paper night colour used elsewhere (e.g. the
+    // colour swatches in Settings): a pure black frame around the page
+    // is what actually helps focus in a dark room, and it only applies
+    // here — the tint is still what a reader picks and sees previewed
+    // in Settings.
+    final bgColor = isDark
+        ? Colors.black
+        : AppColors.mushafBackground(s.mushafBackground, isDark);
     final textColor = isDark ? AppColors.darkText : AppColors.textPrimary;
 
     // (Re)create the controller when wide-mode flips — index math
