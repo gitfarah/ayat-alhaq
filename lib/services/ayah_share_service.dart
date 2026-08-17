@@ -5,7 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_svg/flutter_svg.dart' show SvgStringLoader, vg;
 import 'package:gal/gal.dart';
 import 'package:http/http.dart' as http;
@@ -13,7 +13,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../theme.dart';
-import 'mushaf_svg_service.dart' show AyahHitRegion;
 
 /// One verse of a shared run: its number within the surah, its text, and
 /// the translation of THAT verse when one was asked for.
@@ -196,104 +195,57 @@ class ShareCardLimits {
   static const double tallAspect = 4.0;
 }
 
-/// One page's worth of a crop: the page picture, and the slice of it in
-/// the page's own coordinate space that the shared verses occupy.
-class _MushafStrip {
-  final ui.Picture picture;
-  final double vbMinX, vbMinY, vbW;
-  final double top, height;
-
-  const _MushafStrip({
-    required this.picture,
-    required this.vbMinX,
-    required this.vbMinY,
-    required this.vbW,
-    required this.top,
-    required this.height,
-  });
-
-  /// Height per unit of width once the strip is scaled to fill a card
-  /// column edge to edge, the way a printed line always is.
-  double get aspect => height / vbW;
+/// A stretch of the shared text set in ONE page's glyph font.
+///
+/// The KFGQPC page fonts map private-use codepoints to whole WORDS, and
+/// each page has its own font with its own mapping — the same codepoint
+/// is a different word on a different page. So a passage crossing a
+/// page turn is not one string in one font, it is a run per page.
+class _GlyphRun {
+  final String glyphs;
+  final String fontFamily;
+  const _GlyphRun(this.glyphs, this.fontFamily);
 }
 
-/// The REAL printed Hafs V4 page art for a shared verse or run — one
-/// strip per PAGE the run crosses, in reading order.
+/// Reads the shared verses' own WORDS out of the bundled Hafs V4 page
+/// layout (`assets/quran/mushaf_v4_1441h_layout.json`) — the same file
+/// the app's glyph Mushaf mode already ships and reads.
 ///
-/// A run is nearly always one strip; it becomes two when the passage
-/// runs over a page turn, and the strips are then stacked with a small
-/// gap rather than butted together, because they are genuinely two
-/// different leaves of the Mushaf and pretending otherwise would
-/// invent a line-break that does not exist.
-class _MushafCrop {
-  final List<_MushafStrip> strips;
-  const _MushafCrop(this.strips);
+/// Every word in that file carries its "surah:ayah" tag, which is what
+/// makes it possible to take one ayah and nothing else. Cropping the
+/// printed page could never do that: an ayah that begins mid-line
+/// shares those lines with its neighbours, and no horizontal cut
+/// separates them.
+class _V4Layout {
+  /// The words of [ayahs] (of one surah) in reading order, each with
+  /// the page whose font defines it. Empty if the reference is not in
+  /// the layout at all.
+  static Future<List<({int page, String glyph})>> wordsFor(
+      int surah, Set<int> ayahs) async {
+    // Decoded per share rather than cached: the decoded structure is
+    // tens of megabytes of Dart objects for a 1.5 MB file, and a share
+    // is a rare, user-initiated action. rootBundle keeps the STRING
+    // cached, so this is a parse and not a disk read.
+    final raw =
+        await rootBundle.loadString('assets/quran/mushaf_v4_1441h_layout.json');
+    final pages =
+        (jsonDecode(raw) as Map<String, dynamic>)['pages'] as List<dynamic>;
 
-  /// Card pixels between stacked page-strips.
-  static const double gap = 26.0;
-
-  double heightFor(double width) {
-    var h = 0.0;
-    for (final s in strips) {
-      h += width * s.aspect;
-    }
-    return h + gap * (strips.length - 1);
-  }
-}
-
-/// Offline surah:ayah → Hafs V4 page-number lookup, built once from the
-/// SAME bundled layout the app already ships for the QCF glyph-text
-/// pipeline (`assets/quran/mushaf_v4_1441h_layout.json`) — no network
-/// needed just to find which page an ayah starts on.
-///
-/// Also flags every ayah that SPANS a page break. A crop is a strip of
-/// ONE page; an ayah whose tail lands on the next page would come out
-/// silently truncated, which is a far worse failure than not offering
-/// the real-page card at all. [MushafCrop] refuses those and the caller
-/// falls back to the text-rendered card, which has no such limit.
-class _V4PageIndex {
-  static Future<({Map<int, int> firstPage, Set<int> spansPageBreak})>? _future;
-
-  static int _key(int surah, int ayah) => surah * 1000 + ayah;
-
-  static Future<({Map<int, int> firstPage, Set<int> spansPageBreak})> _load() {
-    return _future ??= () async {
-      final raw = await rootBundle
-          .loadString('assets/quran/mushaf_v4_1441h_layout.json');
-      final pages =
-          (jsonDecode(raw) as Map<String, dynamic>)['pages'] as List<dynamic>;
-
-      final firstPage = <int, int>{};
-      final pagesForKey = <int, Set<int>>{};
-      for (final p in pages) {
-        final pageNum = p['p'] as int;
-        for (final line in p['l'] as List<dynamic>) {
-          final words = line['w'] as List<dynamic>?;
-          if (words == null) continue;
-          for (final w in words) {
-            final parts = (w[1] as String).split(':');
-            final key = _key(int.parse(parts[0]), int.parse(parts[1]));
-            firstPage.putIfAbsent(key, () => pageNum);
-            (pagesForKey[key] ??= {}).add(pageNum);
-          }
+    final out = <({int page, String glyph})>[];
+    for (final p in pages) {
+      final pageNum = p['p'] as int;
+      for (final line in p['l'] as List<dynamic>) {
+        final words = line['w'] as List<dynamic>?;
+        if (words == null) continue;
+        for (final w in words) {
+          final parts = (w[1] as String).split(':');
+          if (int.parse(parts[0]) != surah) continue;
+          if (!ayahs.contains(int.parse(parts[1]))) continue;
+          out.add((page: pageNum, glyph: w[0] as String));
         }
       }
-      final spans = {
-        for (final e in pagesForKey.entries)
-          if (e.value.length > 1) e.key
-      };
-      return (firstPage: firstPage, spansPageBreak: spans);
-    }();
-  }
-
-  /// The page an ayah STARTS on, or null if it is not in the layout
-  /// (should not happen for a real Quranic reference) or it spans a
-  /// page break — either way, the caller should fall back to text.
-  static Future<int?> singlePageOf(int surah, int ayah) async {
-    final idx = await _load();
-    final key = _key(surah, ayah);
-    if (idx.spansPageBreak.contains(key)) return null;
-    return idx.firstPage[key];
+    }
+    return out;
   }
 }
 
@@ -432,12 +384,12 @@ class AyahShareService {
   static Future<Uint8List> renderCard(ShareableAyah a,
       {ShareCardStyle? style}) async {
     final s = style ?? kShareBackgrounds.first;
-    // Tried first, and quietly dropped for anything it cannot safely
-    // handle yet (a run, a page-spanning ayah, no cache and no
-    // network) — see [_tryMushafCrop]. Every one of those falls back
-    // to the same Amiri-set verse the card has always used.
-    final crop = await _tryMushafCrop(a);
-    final l = _CardLayout(a, s, crop: crop);
+    // Tried first, and quietly dropped for anything it cannot do — a
+    // reference missing from the layout, a page font that will not load
+    // or will not draw. Every one of those falls back to the same
+    // Amiri-set verse the card has always used.
+    final glyphs = await _tryMushafGlyphs(a);
+    final l = _CardLayout(a, s, glyphRuns: glyphs);
     final height = l.height;
 
     final recorder = ui.PictureRecorder();
@@ -486,12 +438,9 @@ class AyahShareService {
             clear.top + (clear.height - l.surahTitle.height) / 2));
     y += l.bannerHeight + _CardLayout.gapAfterBanner;
 
-    if (l.mushafCrop != null) {
-      _drawMushafCrop(canvas, l.mushafCrop!, s, Offset(_CardLayout.margin, y),
-          width: _CardLayout.contentWidth);
-    } else {
-      canvas.drawParagraph(l.verse!, Offset(_CardLayout.margin, y));
-    }
+    // Mushaf glyphs or Amiri text — either way it is one paragraph by
+    // the time it reaches here.
+    canvas.drawParagraph(l.verse, Offset(_CardLayout.margin, y));
     y += l.verseHeight + _CardLayout.gapAfterVerse;
     canvas.drawParagraph(l.reference, Offset(_CardLayout.margin, y));
     y += l.reference.height;
@@ -639,266 +588,162 @@ class AyahShareService {
     canvas.restore();
   }
 
-  /// Fixed source: Hafs V4 only, plain print. The four riwayat
-  /// (Warsh/Qalon/Shubah/Douri) do not share this page layout, and a
-  /// reader sharing from one of them gets the SAME V4 crop everyone
-  /// else does rather than a mismatched one from their own edition —
-  /// the ayah is the point, not which print it was tapped from.
+  /// Fixed source: Hafs V4, and the PLAIN cut of it rather than the
+  /// tajweed one.
   ///
-  /// "Plain print" is not a choice made here: quranpedia's V4 SVG has
-  /// exactly one fill colour in the whole page (#231f20, checked by
-  /// hand). Tajweed colouring in this app is a runtime overlay applied
-  /// only to the REFLOWING text view; the page artwork was never
-  /// coloured to begin with, so there is nothing to strip.
+  /// The four riwayat (Warsh/Qalon/Shubah/Douri) have no such layout, so
+  /// a reader sharing from one of them gets the same V4 setting everyone
+  /// else does — the ayah is the point, not which print it was tapped
+  /// from.
   ///
-  /// jsDelivr's GitHub mirror, NOT raw.githubusercontent.com directly.
-  /// Found the hard way: a fresh install has no cached V4 pages, so the
-  /// very first share of an uncached page always needs this fetch to
-  /// succeed — and raw.githubusercontent.com answered every request
-  /// with 429 for a stretch while this was being tested, silently
-  /// falling every share back to the Amiri card with no error surfaced
-  /// anywhere. jsDelivr serves byte-identical content (checked) from a
-  /// CDN built for exactly this traffic pattern and was not rate-
-  /// limited at the same moment raw.githubusercontent.com was.
-  static const String _v4Repo =
-      'https://cdn.jsdelivr.net/gh/quranpedia/quran-svg@main/mushafs/hafs/kfqc';
+  /// "Plain" is a real choice here, unlike in the crop this replaced:
+  /// QUL publishes both cuts, and the tajweed one carries COLR/CPAL
+  /// tables (95 KB for page 2, against 51 KB for the plain cut, both
+  /// checked by hand) that would paint the card's verse in tajweed
+  /// colours whatever ink the card asked for.
+  static const String _v4FontBase =
+      'https://static-cdn.tarteel.ai/qul/fonts/quran_fonts/v4/ttf';
 
-  /// Tried only if jsDelivr itself fails — the exact host that turned
-  /// out to be the problem, but a second independent source is cheap
-  /// insurance against jsDelivr having its own bad day, and costs
-  /// nothing when the first attempt succeeds, which is the normal case.
-  static const String _v4RepoFallback =
-      'https://raw.githubusercontent.com/quranpedia/quran-svg/main/mushafs/hafs/kfqc';
+  /// Page number → the Flutter font family its glyphs are registered
+  /// under, once loaded. Registration is process-wide and permanent, so
+  /// this only ever grows, and a second share of the same page is free.
+  static final Map<int, String?> _v4Fonts = {};
 
-  static String _pad3(int n) => n.toString().padLeft(3, '0');
-
-  static final Map<int, (String svg, String json)> _v4PageMemCache = {};
-
-  /// The raw SVG + region JSON for a Hafs V4 page, cheapest source
-  /// first:
-  ///  1. memory, if this session already fetched it;
-  ///  2. the READER'S OWN Mushaf cache, read-only — most readers on the
-  ///     default edition already have some or all of these 604 pages on
-  ///     disk from ordinary browsing or a bulk download, so a share
-  ///     often costs nothing;
-  ///  3. this feature's OWN cache folder, separate from the reader's —
-  ///     writing here rather than into their cache means a share can
-  ///     never race a bulk-download clear or an edition switch;
-  ///  4. the network, cached into (3) for next time.
-  /// Null if none of that produces both files — offline with an
-  /// uncached page, most likely — and the caller falls back to text.
-  static Future<(String svg, String json)?> _loadV4PageRaw(int page) async {
-    final cached = _v4PageMemCache[page];
-    if (cached != null) return cached;
-
-    Future<(String, String)?> tryDir(Directory dir) async {
-      final svgF = File('${dir.path}/${_pad3(page)}.svg');
-      final jsonF = File('${dir.path}/${_pad3(page)}.json');
-      if (await svgF.exists() && await jsonF.exists()) {
-        return (await svgF.readAsString(), await jsonF.readAsString());
-      }
-      return null;
-    }
-
+  /// The family name for [page]'s glyph font, or null if it cannot be
+  /// had or does not activate. Cheapest source first: memory, this
+  /// feature's own cache folder, then the network.
+  ///
+  /// Kept in its OWN cache folder rather than shared with
+  /// MushafV2Service's: that one holds the TAJWEED cut under the same
+  /// page numbers, and mixing the two would silently hand one of them
+  /// the other's bytes.
+  static Future<String?> _v4FontFor(int page) async {
+    if (_v4Fonts.containsKey(page)) return _v4Fonts[page];
     try {
+      Uint8List? bytes;
+      Directory? dir;
       if (!kIsWeb) {
         final docs = await getApplicationDocumentsDirectory();
-        final readerCache =
-            await tryDir(Directory('${docs.path}/mushaf_pages/hafs'));
-        if (readerCache != null) {
-          _v4PageMemCache[page] = readerCache;
-          return readerCache;
-        }
-        final ownCache =
-            await tryDir(Directory('${docs.path}/share_card_v4_cache'));
-        if (ownCache != null) {
-          _v4PageMemCache[page] = ownCache;
-          return ownCache;
+        dir = Directory('${docs.path}/share_card_v4_fonts');
+        final f = File('${dir.path}/p$page.ttf');
+        if (await f.exists()) {
+          final cached = await f.readAsBytes();
+          if (_looksLikeFont(cached)) bytes = cached;
         }
       }
 
-      Future<(String, String)?> fetchFrom(String repo) async {
-        final results = await Future.wait([
-          http.get(Uri.parse('$repo/svg/${_pad3(page)}.svg')),
-          http.get(Uri.parse('$repo/json/${_pad3(page)}.json')),
-        ]).timeout(const Duration(seconds: 12));
-        if (results[0].statusCode != 200 || results[1].statusCode != 200) {
-          return null;
+      if (bytes == null) {
+        final res = await http
+            .get(Uri.parse('$_v4FontBase/p$page.ttf?v=3.1'))
+            .timeout(const Duration(seconds: 20));
+        if (res.statusCode != 200 || !_looksLikeFont(res.bodyBytes)) {
+          return _v4Fonts[page] = null;
         }
-        return (results[0].body, results[1].body);
-      }
-
-      final pair = await fetchFrom(_v4Repo) ?? await fetchFrom(_v4RepoFallback);
-      if (pair == null) return null;
-      _v4PageMemCache[page] = pair;
-
-      if (!kIsWeb) {
-        try {
-          final docs = await getApplicationDocumentsDirectory();
-          final dir = Directory('${docs.path}/share_card_v4_cache')
-            ..createSync(recursive: true);
-          await File('${dir.path}/${_pad3(page)}.svg').writeAsString(pair.$1);
-          await File('${dir.path}/${_pad3(page)}.json').writeAsString(pair.$2);
-        } catch (_) {
-          // Cache write failed — the page still shares fine this once.
+        bytes = res.bodyBytes;
+        if (dir != null) {
+          try {
+            dir.createSync(recursive: true);
+            await File('${dir.path}/p$page.ttf').writeAsBytes(bytes);
+          } catch (_) {
+            // Cache write failed — this share still works.
+          }
         }
       }
-      return pair;
+
+      // The length is in the family name so a re-downloaded or changed
+      // font can never be masked by an already-registered family.
+      final family = 'ShareV4_${page}_${bytes.length}';
+      await (FontLoader(family)
+            ..addFont(Future.value(ByteData.sublistView(bytes))))
+          .load();
+      return _v4Fonts[page] = family;
     } catch (e) {
-      debugPrint('share card: Hafs V4 page $page unavailable ($e)');
-      return null;
+      debugPrint('share card: V4 page font $page unavailable ($e)');
+      return _v4Fonts[page] = null;
     }
   }
 
-  /// The most pages one shared run will be cropped from. A passage
-  /// long enough to cross this many leaves is already far past the
-  /// height at which a messenger shrinks the card to a strip, so it
-  /// takes the text card instead of costing several page fetches.
-  static const int _maxCropPages = 3;
-
-  /// The crop for a verse or a run, or null if anything about it is not
-  /// safe to use — an ayah missing from the layout, missing region
-  /// data, too many pages, or no network/cache for a page. Every one of
-  /// those falls back to the text-rendered verse, which always works.
-  static Future<_MushafCrop?> _tryMushafCrop(ShareableAyah a) async {
-    try {
-      // Group the run's verses by the page they sit on, in reading
-      // order. Nearly always one page; two when the passage crosses a
-      // page turn.
-      final byPage = <int, List<int>>{};
-      for (final v in a.verses) {
-        final page = await _V4PageIndex.singlePageOf(a.surahNumber, v.number);
-        if (page == null) return null;
-        (byPage[page] ??= []).add(v.number);
-      }
-      if (byPage.isEmpty || byPage.length > _maxCropPages) return null;
-
-      final pages = byPage.keys.toList()..sort();
-      final strips = <_MushafStrip>[];
-      for (final page in pages) {
-        final strip = await _stripFor(a.surahNumber, byPage[page]!, page);
-        if (strip == null) return null;
-        strips.add(strip);
-      }
-      return _MushafCrop(strips);
-    } catch (e) {
-      debugPrint('share card: Mushaf crop unavailable ($e)');
-      return null;
-    }
+  static bool _looksLikeFont(Uint8List bytes) {
+    if (bytes.length < 10000) return false;
+    final tag = String.fromCharCodes(bytes.take(4));
+    final trueType =
+        bytes[0] == 0 && bytes[1] == 1 && bytes[2] == 0 && bytes[3] == 0;
+    return trueType || tag == 'OTTO' || tag == 'true';
   }
 
-  /// One page's strip: the lines [ayahs] occupy on [page], cut on the
-  /// cleanest rows the print offers.
-  static Future<_MushafStrip?> _stripFor(
-      int surah, List<int> ayahs, int page) async {
-    final raw = await _loadV4PageRaw(page);
-    if (raw == null) return null;
-    final (svgContent, jsonContent) = raw;
-
-    final regions = (jsonDecode(jsonContent) as List)
-        .map((e) => AyahHitRegion.fromJson(e as Map<String, dynamic>))
-        .toList();
-
-    // Every y the shared verses touch, and every y everything else on
-    // the page touches. The polygons are staircases, so their corner
-    // y-values are exactly the print's line boundaries.
-    final ourYs = <double>{};
-    final otherYs = <double>{};
-    for (final r in regions) {
-      final mine = r.surahNumber == surah && ayahs.contains(r.ayahNumber);
-      for (final ring in r.rings) {
-        for (var i = 1; i < ring.length; i += 2) {
-          (mine ? ourYs : otherYs).add(ring[i]);
-        }
-      }
-    }
-    if (ourYs.isEmpty) return null;
-
-    final sorted = ourYs.toList()..sort();
-    final minY = sorted.first;
-    final maxY = sorted.last;
-    if (maxY <= minY) return null;
-
-    final vb = RegExp(
-            r'viewBox="\s*(-?[\d.]+)[,\s]+(-?[\d.]+)[,\s]+(-?[\d.]+)[,\s]+(-?[\d.]+)\s*"')
-        .firstMatch(svgContent);
-    double n(int g, double f) =>
-        vb == null ? f : (double.tryParse(vb.group(g)!) ?? f);
-    final vbMinX = n(1, 0), vbMinY = n(2, 0), vbW = n(3, 235);
-
-    // A band's TOP is trustworthy; its BOTTOM is not.
-    //
-    // Measured on the shipped fixtures: on page 2 ayah 4's band ends at
-    // y=160.15, but ayah 5's band — the next line — already begins at
-    // 158.53, and the damma and صلے that ride high above ayah 5's
-    // letters sit in between. Cutting on ayah 4's own bottom therefore
-    // drags those two marks along, which is exactly the "harakat from
-    // the line below" in the report. On page 3 the same pair reads
-    // 82.11 and 82.37: the bottom UNDERSHOOTS instead. The bottoms
-    // disagree with each other by up to a mark's height; the tops
-    // agree with the print every time.
-    //
-    // So the strip ends where the NEXT line begins, taken from that
-    // line's own band top, and only falls back to our own bottom when
-    // there is no next line (last verses on the page, nothing below to
-    // bleed in).
-    //
-    // Rasterising and cutting on the emptiest row was tried in between
-    // and is worse: page 2 has NO empty row between those lines — the
-    // profile bottoms out at 12-14 lit pixels and never reaches zero —
-    // so "emptiest" picked y=162.0, further into ayah 5 than the
-    // nominal bottom it was meant to improve on.
-    final epsilon = vbW * 0.01;
-    final ourLastLineTop =
-        sorted.length >= 2 ? sorted[sorted.length - 2] : minY;
-    double? nextLineTop;
-    for (final y in otherYs) {
-      if (y > ourLastLineTop + epsilon &&
-          (nextLineTop == null || y < nextLineTop)) {
-        nextLineTop = y;
-      }
-    }
-    final top = minY;
-    final bottom = nextLineTop ?? maxY;
-    if (bottom <= top) return null;
-
-    final info = await vg.loadPicture(SvgStringLoader(svgContent), null);
-    return _MushafStrip(
-      picture: info.picture,
-      vbMinX: vbMinX,
-      vbMinY: vbMinY,
-      vbW: vbW,
-      top: top,
-      height: bottom - top,
-    );
-  }
-
-  /// Draws the crop into the card, each page-strip scaled to fill
-  /// [width] edge to edge — the way a printed line always is — and
-  /// recoloured to the card's own ink so it reads on all four grounds.
+  /// Whether [family] actually draws [sample], rather than silently
+  /// falling through to a system face.
   ///
-  /// The FULL page picture is handed in every time (cropping happens
-  /// only via clip + transform here, not by pre-slicing the picture):
-  /// Skia clips cheaply, and it is one `drawPicture` call either way.
-  static void _drawMushafCrop(
-      Canvas canvas, _MushafCrop crop, ShareCardStyle style, Offset dst,
-      {required double width}) {
-    var y = dst.dy;
-    for (final strip in crop.strips) {
-      final scale = width / strip.vbW;
-      final height = strip.height * scale;
-      canvas.save();
-      canvas.translate(dst.dx, y);
-      canvas.clipRect(Rect.fromLTWH(0, 0, width, height));
-      canvas.translate(0, -strip.top * scale);
-      canvas.scale(scale);
-      canvas.translate(-strip.vbMinX, -strip.vbMinY);
-      canvas.saveLayer(null,
-          Paint()..colorFilter = ColorFilter.mode(style.ink, BlendMode.srcIn));
-      canvas.drawPicture(strip.picture);
-      canvas.restore();
-      canvas.restore();
-      y += height + _MushafCrop.gap;
+  /// These glyphs live in the private use area, so a font that failed to
+  /// register does not throw — it renders tofu, or nothing, and the card
+  /// would go out with the verse missing. Comparing the drawn width
+  /// against a family that certainly does not exist is the same check
+  /// MushafV2Service makes before trusting a page font.
+  static bool _fontDraws(String family, String sample) {
+    double widthIn(String f) {
+      final p = ui.ParagraphBuilder(ui.ParagraphStyle(
+        textDirection: TextDirection.rtl,
+        fontFamily: f,
+        fontSize: 40,
+      ))
+        ..addText(sample);
+      return (p.build()
+            ..layout(const ui.ParagraphConstraints(width: double.infinity)))
+          .maxIntrinsicWidth;
+    }
+
+    final drawn = widthIn(family);
+    final missing = widthIn('__no_such_family_for_share_card__');
+    if (drawn <= 0) return false;
+    return (drawn - missing).abs() > missing * 0.04;
+  }
+
+  /// The shared verses set in the Mushaf's own glyphs, or null to fall
+  /// back to the text card.
+  ///
+  /// This REPLACED cropping the printed page, which could not do the
+  /// job: an ayah beginning mid-line shares that line with its
+  /// neighbours, so a horizontal crop of "its" lines necessarily
+  /// carried a piece of the ayah before it and the one after. Setting
+  /// the ayah's OWN words is exact — the layout tags every word with
+  /// its surah:ayah — and it is the same calligraphy, because these are
+  /// the very glyphs the printed page is made of.
+  static Future<List<_GlyphRun>?> _tryMushafGlyphs(ShareableAyah a) async {
+    try {
+      final words = await _V4Layout.wordsFor(
+          a.surahNumber, {for (final v in a.verses) v.number});
+      if (words.isEmpty) return null;
+
+      // One run per page, in reading order, because each page's font
+      // maps the same codepoints to different words.
+      final runs = <_GlyphRun>[];
+      final buffer = StringBuffer();
+      int? runPage;
+
+      Future<bool> closeRun() async {
+        final page = runPage;
+        if (page == null || buffer.isEmpty) return true;
+        final family = await _v4FontFor(page);
+        if (family == null || !_fontDraws(family, buffer.toString())) {
+          return false;
+        }
+        runs.add(_GlyphRun(buffer.toString(), family));
+        buffer.clear();
+        return true;
+      }
+
+      for (final w in words) {
+        if (runPage != w.page) {
+          if (!await closeRun()) return null;
+          runPage = w.page;
+        }
+        buffer.write(w.glyph);
+      }
+      if (!await closeRun()) return null;
+      return runs.isEmpty ? null : runs;
+    } catch (e) {
+      debugPrint('share card: Mushaf glyphs unavailable ($e)');
+      return null;
     }
   }
 
@@ -1100,13 +945,20 @@ class _CardLayout {
   static const double translationSize = 50.0;
   static const double ayahMarkSize = 52.0;
 
+  /// The Mushaf glyph setting. A page of the real print fits 15 lines
+  /// across 235 units; scaled to this card's column that is roughly
+  /// this size, so a single-line ayah comes out at about the weight it
+  /// has on the page, and longer passages step down from there.
+  static const double glyphMaxSize = 76.0;
+  static const double glyphMinSize = 34.0;
+  static const double glyphLineHeight = 1.9;
+  static const int _glyphMaxLines = 7;
+
   final ui.Paragraph surahTitle;
 
-  /// Null when [mushafCrop] is what gets drawn instead — the two are
-  /// mutually exclusive, and [verseHeight] is the one either side of
-  /// the drawing code should actually read.
-  final ui.Paragraph? verse;
-  final _MushafCrop? mushafCrop;
+  /// The verse block: the Mushaf's own glyphs when they could be had,
+  /// the Amiri setting otherwise. One paragraph either way.
+  final ui.Paragraph verse;
   final double verseHeight;
 
   final ui.Paragraph reference;
@@ -1123,7 +975,8 @@ class _CardLayout {
   final double bannerHeight;
   final double height;
 
-  factory _CardLayout(ShareableAyah a, ShareCardStyle s, {_MushafCrop? crop}) {
+  factory _CardLayout(ShareableAyah a, ShareCardStyle s,
+      {List<_GlyphRun>? glyphRuns}) {
     // The name is SET, not typed: "surah005" is a ligature in the
     // surah-name font and comes out as the calligraphic
     // "سُورَةُ المَائِدَة" a printed Mushaf heads its pages with.
@@ -1166,12 +1019,13 @@ class _CardLayout {
       title = setName(titleSize);
     }
 
-    // Real Mushaf art when it is available and safe (see
-    // [AyahShareService._tryMushafCrop]); the Amiri-set paragraph
-    // otherwise. Exactly one of [verse]/[mushafCrop] is non-null.
-    final verse = crop == null ? _verses(a, s) : null;
-    final verseHeight =
-        crop != null ? crop.heightFor(contentWidth) : verse!.height;
+    // The Mushaf's own glyphs when they could be had (see
+    // [AyahShareService._tryMushafGlyphs]); the Amiri setting
+    // otherwise.
+    final verse = glyphRuns != null && glyphRuns.isNotEmpty
+        ? _mushafVerses(glyphRuns, s)
+        : _verses(a, s);
+    final verseHeight = verse.height;
     final reference = AyahShareService.paragraph(
       a.referenceLabel,
       fontFamily: 'QuranHafs',
@@ -1276,7 +1130,6 @@ class _CardLayout {
     return _CardLayout._(
       surahTitle: title,
       verse: verse,
-      mushafCrop: crop,
       verseHeight: verseHeight,
       reference: reference,
       translationTitle: translationTitle,
@@ -1288,6 +1141,51 @@ class _CardLayout {
       bannerHeight: bannerHeight,
       height: height,
     );
+  }
+
+  /// The shared verses in the Mushaf's OWN glyphs, wrapped to the card.
+  ///
+  /// Set at the largest size that still fits the column in at most
+  /// [_glyphMaxLines] lines, so a short ayah is printed large — like
+  /// the single centred line the reference sets — while a long one
+  /// steps down rather than overflowing. The size is found by
+  /// measuring, because these are word-glyphs whose widths have no
+  /// relation to character counts.
+  ///
+  /// The ayah-end medallion needs no special handling here: in this
+  /// layout it IS one of the ayah's words, so selecting the ayah's
+  /// words brings its own number with it.
+  static ui.Paragraph _mushafVerses(List<_GlyphRun> runs, ShareCardStyle s) {
+    ui.Paragraph build(double size) {
+      final builder = ui.ParagraphBuilder(ui.ParagraphStyle(
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.rtl,
+        fontSize: size,
+        height: glyphLineHeight,
+      ));
+      for (final run in runs) {
+        builder
+          ..pushStyle(ui.TextStyle(
+            color: s.ink,
+            fontFamily: run.fontFamily,
+            fontSize: size,
+            height: glyphLineHeight,
+          ))
+          ..addText(run.glyphs)
+          ..pop();
+      }
+      return builder.build()
+        ..layout(const ui.ParagraphConstraints(width: contentWidth));
+    }
+
+    var size = glyphMaxSize;
+    var p = build(size);
+    while (size > glyphMinSize &&
+        p.height > glyphLineHeight * size * _glyphMaxLines) {
+      size -= 4;
+      p = build(size);
+    }
+    return p;
   }
 
   /// The verse, or the whole run, in one paragraph.
@@ -1344,7 +1242,6 @@ class _CardLayout {
   const _CardLayout._({
     required this.surahTitle,
     required this.verse,
-    required this.mushafCrop,
     required this.verseHeight,
     required this.reference,
     required this.translationTitle,
