@@ -95,11 +95,23 @@ class MushafBlock {
   /// ligature fonts, not from the page's word glyphs.
   final String glyphs;
 
+  /// [glyphs] split back into its own words — what a WRAP-based
+  /// renderer needs. These fonts map one glyph to one WHOLE WORD, not
+  /// one letter, and the printed page itself never sets them as flowing
+  /// text: every existing renderer places each word as its own element
+  /// with an explicit gap (justified spaceBetween on a printed line, a
+  /// fixed em gap on a centred one — see kCenteredWordGapEm in
+  /// mushaf_svg_screen.dart). [glyphs] alone, concatenated straight
+  /// through with no separator, is missing that gap entirely — which is
+  /// why simply flowing it as one Text ran every word together.
+  final List<String> words;
+
   const MushafBlock({
     required this.kind,
     this.surah = 0,
     this.ayah = 0,
     this.glyphs = '',
+    this.words = const [],
   });
 }
 
@@ -128,6 +140,7 @@ class MushafV2Page {
     int? surah;
     int? ayah;
     final buffer = StringBuffer();
+    final wordBuf = <String>[];
 
     void flush() {
       if (surah != null && buffer.isNotEmpty) {
@@ -136,9 +149,11 @@ class MushafV2Page {
           surah: surah!,
           ayah: ayah!,
           glyphs: buffer.toString(),
+          words: List.of(wordBuf),
         ));
       }
       buffer.clear();
+      wordBuf.clear();
       surah = null;
       ayah = null;
     }
@@ -165,6 +180,7 @@ class MushafV2Page {
               ayah = word.ayah;
             }
             buffer.write(word.glyph);
+            wordBuf.add(word.glyph);
           }
       }
     }

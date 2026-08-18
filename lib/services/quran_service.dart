@@ -128,6 +128,7 @@ class QuranService {
     'ur.jalandhry': 'اردو',
     'es.cortes': 'Español',
     'ru.kuliev': 'Русский',
+    'so.abduh': 'Soomaali',
   };
 
   /// Right-to-left translation languages (script direction, not edition
@@ -158,17 +159,62 @@ class QuranService {
   /// Al-Fatiha (1), where the Basmala IS ayah 1, and At-Tawbah (9),
   /// which has no Basmala at all.
   ///
-  /// When [translationEdition] is set, the translation alone is fetched
-  /// from the network and merged in. If that fetch fails (offline), the
-  /// Arabic text is returned WITHOUT translation instead of failing —
-  /// reading always works.
+  /// Editions served from a BUNDLED file rather than fetched live —
+  /// so far just Somali. Every other translation depends on the
+  /// network the way the app's base Arabic text never has to; this is
+  /// the one language that gets to read offline like everything else,
+  /// using the exact wording supplied for the app rather than
+  /// whatever alquran.cloud's own so.abduh entry happens to serve
+  /// (same translator, but not guaranteed to be byte-identical, and a
+  /// live call for it would fail for the one editions map entry that
+  /// does not need to).
+  static const Map<String, String> _bundledTranslations = {
+    'so.abduh': 'assets/quran/translation_so_abduh.json',
+  };
+
+  /// "surah:ayah" -> translated text, per bundled edition. Loaded and
+  /// cached the first time that edition is actually asked for, not at
+  /// startup — a reader who never opens Somali never pays for it.
+  static final Map<String, Map<String, String>> _bundledTranslationCache = {};
+
+  static Future<Map<String, String>?> _bundledTranslation(
+      String editionId) async {
+    final asset = _bundledTranslations[editionId];
+    if (asset == null) return null;
+    final cached = _bundledTranslationCache[editionId];
+    if (cached != null) return cached;
+    try {
+      final raw = await rootBundle.loadString(asset);
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      final map = {
+        for (final entry in decoded.entries)
+          entry.key: (entry.value as Map<String, dynamic>)['t'] as String,
+      };
+      _bundledTranslationCache[editionId] = map;
+      return map;
+    } catch (_) {
+      // A corrupt or missing bundled file falls back to Arabic only,
+      // same as a failed network fetch does for every other edition.
+      return null;
+    }
+  }
+
+  /// When [translationEdition] is set, the translation is merged in —
+  /// from the bundled file for [_bundledTranslations] editions, or
+  /// fetched from the network otherwise. Either way, a failure (no
+  /// bundled file, offline, API down) returns the Arabic text WITHOUT
+  /// translation instead of failing outright — reading always works.
   static Future<List<Ayah>> getSurahAyahs(int surahNumber,
       {String? translationEdition}) async {
     await _ensureLoaded();
     final tuples = _rawAyahs![surahNumber - 1];
 
     List? translated;
-    if (translationEdition != null) {
+    Map<String, String>? bundled;
+    if (translationEdition != null &&
+        _bundledTranslations.containsKey(translationEdition)) {
+      bundled = await _bundledTranslation(translationEdition);
+    } else if (translationEdition != null) {
       try {
         final response = await http
             .get(Uri.parse('$_baseUrl/surah/$surahNumber/$translationEdition'))
@@ -185,9 +231,11 @@ class QuranService {
       for (var i = 0; i < tuples.length; i++)
         _ayahFromTuple(
           tuples[i],
-          translation: (translated != null && i < translated.length)
-              ? translated[i]['text'] as String?
-              : null,
+          translation: bundled != null
+              ? bundled['$surahNumber:${i + 1}']
+              : (translated != null && i < translated.length)
+                  ? translated[i]['text'] as String?
+                  : null,
         ),
     ];
     if (surahNumber != 1 && surahNumber != 9 && list.isNotEmpty) {

@@ -41,6 +41,12 @@ void main() {
     // In reading order, and with no line break smuggled in — the whole
     // point is that the reader sees a verse, not two half-verses.
     expect(blocks.single.glyphs, 'abcd');
+    // words preserves the SAME split glyphs still carries, in the same
+    // order — what a Wrap-based renderer needs to put an explicit gap
+    // between words instead of running them together (see
+    // MushafBlock.words' doc for why the flat string alone isn't
+    // enough).
+    expect(blocks.single.words, ['a', 'b', 'c', 'd']);
   });
 
   test('two ayahs sharing one printed line are cut apart', () {

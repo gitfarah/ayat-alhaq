@@ -56,6 +56,7 @@ class QuranAudioService extends ChangeNotifier {
   static const Map<String, String> reciters = {
     'qul.mansouralsalimi': 'منصور السالمي',
     'qul.abdurrashidsufi.kisai': 'عبد الرشيد صوفي',
+    'qul.abdulwadudhaneef': 'عبد الودود حنيف',
     'ar.mahermuaiqly': 'ماهر المعيقلي',
     'ar.husary': 'محمود خليل الحصري',
     'ar.abdulsamad': 'عبدالباسط عبدالصمد',
@@ -86,6 +87,7 @@ class QuranAudioService extends ChangeNotifier {
 
   static const String _mansourReciter = 'qul.mansouralsalimi';
   static const String _abdurRashidReciter = 'qul.abdurrashidsufi.kisai';
+  static const String _abdulwadudReciter = 'qul.abdulwadudhaneef';
   static const String _defaultReciter = 'ar.mahermuaiqly';
   static final Map<int, Future<_QulSurahAudio?>> _mansourSurahFutures = {};
   static Future<(Map<String, dynamic>, Map<String, dynamic>)>?
@@ -93,6 +95,8 @@ class QuranAudioService extends ChangeNotifier {
   final Map<int, Future<File?>> _mansourDownloadFutures = {};
   static Future<Map<String, dynamic>>? _abdurRashidDataFuture;
   final Map<int, Future<File?>> _abdurRashidDownloadFutures = {};
+  static Future<Map<String, dynamic>>? _abdulwadudDataFuture;
+  final Map<int, Future<File?>> _abdulwadudDownloadFutures = {};
 
   String _reciter = _defaultReciter;
   String get reciter => _reciter;
@@ -487,6 +491,75 @@ class QuranAudioService extends ChangeNotifier {
     }
   }
 
+  // ── عبد الودود حنيف — the same shape as عبد الرشيد صوفي above: a
+  // bundled per-surah audio_url map (this one supplied directly, not
+  // fetched from an API) with NO segment timing at all — its own
+  // segments.json came back `{}`. So it gets the identical treatment:
+  // whole-surah playback only, with every one of the special cases
+  // below (playAyah, togglePlayPause, playNextAyah, _handleComplete)
+  // mirrored rather than shared, so nothing about the two EXISTING
+  // reciters' behaviour can move by adding a third.
+  static Future<Map<String, dynamic>> _loadAbdulwadudData() =>
+      _abdulwadudDataFuture ??= rootBundle
+          .loadString('assets/quran/abdulwadud_haneef_surahs.json')
+          .then((raw) => jsonDecode(raw) as Map<String, dynamic>);
+
+  Future<String?> _abdulwadudSurahUrl(int surah) async {
+    try {
+      final data = await _loadAbdulwadudData();
+      final surahData = data['$surah'] as Map<String, dynamic>?;
+      final audioUrl = surahData?['audio_url'] as String?;
+      if (audioUrl != null) return audioUrl;
+    } catch (_) {
+      // A running Flutter session may not have rebuilt its asset manifest yet.
+    }
+    final number = surah.toString().padLeft(3, '0');
+    return 'https://download.quranicaudio.com/quran/'
+        'abdulwadood_haneef/$number.mp3';
+  }
+
+  Future<File> _abdulwadudSurahFile(int surah) async {
+    _docsDir ??= await getApplicationDocumentsDirectory();
+    return File(
+      '${_docsDir!.path}${Platform.pathSeparator}audio'
+      '${Platform.pathSeparator}$_abdulwadudReciter'
+      '${Platform.pathSeparator}surah_$surah.mp3',
+    );
+  }
+
+  Future<File?> _ensureAbdulwadudSurahLocal(
+    int surah,
+    String audioUrl,
+  ) {
+    final pending = _abdulwadudDownloadFutures[surah];
+    if (pending != null) return pending;
+    final download = _downloadAbdulwadudSurah(surah, audioUrl);
+    _abdulwadudDownloadFutures[surah] = download;
+    download.whenComplete(() => _abdulwadudDownloadFutures.remove(surah));
+    return download;
+  }
+
+  Future<File?> _downloadAbdulwadudSurah(
+    int surah,
+    String audioUrl,
+  ) async {
+    final file = await _abdulwadudSurahFile(surah);
+    if (await file.exists() && (await file.length()) > 0) return file;
+    try {
+      final response = await http
+          .get(Uri.parse(audioUrl))
+          .timeout(const Duration(minutes: 5));
+      if (response.statusCode != 200 || response.bodyBytes.isEmpty) return null;
+      await file.parent.create(recursive: true);
+      final tmp = File('${file.path}.part');
+      await tmp.writeAsBytes(response.bodyBytes, flush: true);
+      await tmp.rename(file.path);
+      return file;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<File?> _ensureLocal(String reciter, int globalAyah) async {
     final file = await _localFile(reciter, globalAyah);
     if (await file.exists() && (await file.length()) > 0) return file;
@@ -671,9 +744,34 @@ class QuranAudioService extends ChangeNotifier {
     }
   }
 
+  Future<bool> _playAbdulwadudSurah(
+    int globalAyah,
+    MediaItem media,
+  ) async {
+    final (surah, _, _) = surahRangeOf(globalAyah);
+    final audioUrl = await _abdulwadudSurahUrl(surah);
+    if (audioUrl == null) return false;
+    try {
+      Uri audioUri = Uri.parse(audioUrl);
+      if (!kIsWeb) {
+        final file = await _abdulwadudSurahFile(surah);
+        if (await file.exists() && (await file.length()) > 0) {
+          audioUri = Uri.file(file.path);
+        } else {
+          unawaited(_ensureAbdulwadudSurahLocal(surah, audioUrl));
+        }
+      }
+      await _player.setAudioSource(AudioSource.uri(audioUri, tag: media));
+      _player.play();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> playAyah(int globalAyahNumber) async {
     _clearManualClip();
-    if (_reciter == _abdurRashidReciter) {
+    if (_reciter == _abdurRashidReciter || _reciter == _abdulwadudReciter) {
       final (_, first, _) = surahRangeOf(globalAyahNumber);
       globalAyahNumber = first;
     }
@@ -701,11 +799,14 @@ class QuranAudioService extends ChangeNotifier {
       started = await _playMansourAyah(globalAyahNumber, media);
     } else if (reciter == _abdurRashidReciter) {
       started = await _playAbdurRashidSurah(globalAyahNumber, media);
+    } else if (reciter == _abdulwadudReciter) {
+      started = await _playAbdulwadudSurah(globalAyahNumber, media);
     }
 
     if (!started &&
         reciter != _mansourReciter &&
         reciter != _abdurRashidReciter &&
+        reciter != _abdulwadudReciter &&
         !kIsWeb) {
       final file = await _ensureLocal(reciter, globalAyahNumber);
       if (file != null) {
@@ -732,7 +833,8 @@ class QuranAudioService extends ChangeNotifier {
 
     if (!started &&
         reciter != _mansourReciter &&
-        reciter != _abdurRashidReciter) {
+        reciter != _abdurRashidReciter &&
+        reciter != _abdulwadudReciter) {
       for (final url in _urlsFor(reciter, globalAyahNumber)) {
         try {
           await _player
@@ -772,7 +874,7 @@ class QuranAudioService extends ChangeNotifier {
   }
 
   Future<void> togglePlayPause(int globalAyahNumber) async {
-    if (_reciter == _abdurRashidReciter) {
+    if (_reciter == _abdurRashidReciter || _reciter == _abdulwadudReciter) {
       final (_, first, _) = surahRangeOf(globalAyahNumber);
       globalAyahNumber = first;
     }
@@ -820,7 +922,7 @@ class QuranAudioService extends ChangeNotifier {
   Future<void> playNextAyah() async {
     final current = _currentGlobalAyah;
     if (current == null) return;
-    if (_reciter == _abdurRashidReciter) {
+    if (_reciter == _abdurRashidReciter || _reciter == _abdulwadudReciter) {
       final (_, _, last) = surahRangeOf(current);
       if (last < 6236) await playAyah(last + 1);
       return;
@@ -847,7 +949,8 @@ class QuranAudioService extends ChangeNotifier {
 
   Future<void> _handleComplete() async {
     if (_autoAdvance &&
-        _reciter == _abdurRashidReciter &&
+        (_reciter == _abdurRashidReciter ||
+            _reciter == _abdulwadudReciter) &&
         _currentGlobalAyah != null) {
       final (_, _, last) = surahRangeOf(_currentGlobalAyah!);
       if (last < 6236) {

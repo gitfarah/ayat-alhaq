@@ -1350,19 +1350,36 @@ Widget _blockWidget(
               // The verse fills from the RIGHT — where Arabic starts —
               // so a wrapped ayah keeps a straight reading edge instead
               // of drifting in and out on a centred axis.
-              Text(
-                block.glyphs,
-                textAlign: TextAlign.start,
+              //
+              // One WORD per Text, not the whole verse concatenated
+              // into one string: these fonts map a glyph to a whole
+              // word, and neither the printed page nor any other
+              // renderer in this app ever just flows that as plain
+              // text — every one of them places each word as its own
+              // element with an explicit gap between them (see
+              // MushafBlock.words' doc). Skipping that step here is
+              // what ran every word into the next.
+              Wrap(
                 textDirection: TextDirection.rtl,
-                style: TextStyle(
-                  fontFamily: page.fontFamily,
-                  fontSize: fontSize,
-                  // These faces ride high in the em box and carry tall
-                  // marks; anything tighter than this collides the vowel
-                  // signs of one line with the next.
-                  height: 2.0,
-                  color: ink,
-                ),
+                spacing: fontSize * 0.22,
+                runSpacing: fontSize * 0.15,
+                children: [
+                  for (final word in block.words)
+                    Text(
+                      word,
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                        fontFamily: page.fontFamily,
+                        fontSize: fontSize,
+                        // These faces ride high in the em box and carry
+                        // tall marks; anything tighter than this
+                        // collides the vowel signs of one line with the
+                        // next.
+                        height: 2.0,
+                        color: ink,
+                      ),
+                    ),
+                ],
               ),
               if (translation != null) ...[
                 const SizedBox(height: 6),
