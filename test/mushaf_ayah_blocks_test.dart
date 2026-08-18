@@ -131,8 +131,8 @@ void main() {
       expect(MushafV2Service.editionFor('hafs_plain', tajweed: true), 'hafs');
     });
 
-    test('leaves V1 and V2 alone — neither ships a tajweed cut', () {
-      for (final id in ['madinah1421', 'madinah1405']) {
+    test('leaves V1 alone — it ships no tajweed cut', () {
+      for (final id in ['madinah1405']) {
         expect(MushafV2Service.editionFor(id, tajweed: true), id);
         expect(MushafV2Service.editionFor(id, tajweed: false), id);
         expect(MushafV2Service.hasTajweedCut(id), isFalse);

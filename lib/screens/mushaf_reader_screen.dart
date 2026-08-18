@@ -88,6 +88,23 @@ class _MushafReaderScreenState extends State<MushafReaderScreen> {
   /// the legend is currently at — see [_bottomReserve].
   bool _legendExpanded = true;
 
+  /// Whether the CURRENT font cut (whichever [_editionId] resolves to
+  /// right now) is fully cached. Checked once per edition change rather
+  /// than kept live — Mushaf mode's own equivalent is a rare, manual
+  /// action, not something that needs a stream.
+  bool _fullyDownloaded = false;
+  String? _fullyDownloadedFor;
+
+  Future<void> _checkDownloaded(String editionId) async {
+    if (_fullyDownloadedFor == editionId) return;
+    final done = await MushafV2Service.isFullyDownloaded(editionId);
+    if (!mounted) return;
+    setState(() {
+      _fullyDownloaded = done;
+      _fullyDownloadedFor = editionId;
+    });
+  }
+
   void _setBars(bool visible) {
     if (_barsVisible == visible) return;
     setState(() => _barsVisible = visible);
@@ -261,6 +278,8 @@ class _MushafReaderScreenState extends State<MushafReaderScreen> {
         MushafV2Service.hasTajweedCut(settings.mushafEdition);
     final bottomReserve = _bottomReserve(
         legendShowing: legendShowing, audioShowing: audio.hasActiveTrack);
+    final editionId = _editionId(settings);
+    _checkDownloaded(editionId); // guarded — a no-op once already known
 
     return Scaffold(
       backgroundColor: ground,
@@ -354,8 +373,8 @@ class _MushafReaderScreenState extends State<MushafReaderScreen> {
               // now-playing transport the moment a recitation is
               // active.
               audio.hasActiveTrack
-                  ? SafeArea(top: false, child: _nowPlayingBar(isDark, audio))
-                  : SafeArea(top: false, child: _infoBar(isDark)),
+                  ? androidBottomSafeArea(_nowPlayingBar(isDark, audio))
+                  : androidBottomSafeArea(_infoBar(isDark)),
             ]),
           ),
         ),
@@ -411,8 +430,60 @@ class _MushafReaderScreenState extends State<MushafReaderScreen> {
             icon: Icon(Icons.format_size_rounded, size: 21, color: dim),
             onPressed: () => _showFontSizeSheet(settings, isDark),
           ),
+          if (MushafV2Service.supportsFullOfflineDownload)
+            _downloadButton(settings, accent, dim),
         ],
       ),
+    );
+  }
+
+  /// Whole-Mushaf offline download — the reader's own version of the
+  /// control Mushaf mode keeps in its ☰ menu, moved into the header
+  /// here since this screen has no such menu. Downloads whichever font
+  /// cut is CURRENTLY being read (tajweed or plain), matching how every
+  /// edition's download already works — toggling tajweed afterward
+  /// needs its own separate download, the same as switching edition
+  /// does in Mushaf mode.
+  Widget _downloadButton(SettingsService settings, Color accent, Color dim) {
+    final editionId = _editionId(settings);
+    return AnimatedBuilder(
+      animation: MushafV2Service.bulkProgress,
+      builder: (_, __) {
+        final progress = MushafV2Service.bulkProgress.value;
+        final running =
+            progress != null && progress.editionId == editionId;
+        final fraction =
+            running && progress.total > 0 ? progress.done / progress.total : 0.0;
+        // Hardcoded Arabic, not an l10n key — matching Mushaf mode's own
+        // download row in its ☰ menu, which does the same for this
+        // exact feature.
+        return IconButton(
+          tooltip: _fullyDownloaded
+              ? 'المصحف كامل محفوظ دون اتصال ✓'
+              : running
+                  ? 'جارٍ تنزيل المصحف — ${(fraction * 100).round()}٪'
+                  : 'تنزيل المصحف كاملاً دون اتصال',
+          icon: Icon(
+              _fullyDownloaded
+                  ? Icons.offline_pin_rounded
+                  : running
+                      ? Icons.downloading_rounded
+                      : Icons.download_rounded,
+              size: 21,
+              color: _fullyDownloaded ? accent : dim),
+          onPressed: () async {
+            if (_fullyDownloaded) return;
+            if (running) {
+              MushafV2Service.cancelBulkDownload();
+              return;
+            }
+            await MushafV2Service.startBulkDownload(editionId);
+            if (!mounted) return;
+            setState(() => _fullyDownloadedFor = null); // force a re-check
+            _checkDownloaded(editionId);
+          },
+        );
+      },
     );
   }
 
@@ -1249,7 +1320,13 @@ Widget _blockWidget(
                   .withValues(alpha: isDark ? 0.22 : 0.30);
       return InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => onTapAyah(block.surah, block.ayah),
+        // A long press, not a tap — matching Mushaf mode's own ayah
+        // regions. A plain tap here used to open the sheet on almost
+        // any touch (this block is most of the screen), which is also
+        // what the background's own tap-to-hide-chrome gesture wants;
+        // long press leaves that alone and reserves itself for a
+        // reader who deliberately holds on a verse.
+        onLongPress: () => onTapAyah(block.surah, block.ayah),
         child: Container(
           decoration: tint == null
               ? null

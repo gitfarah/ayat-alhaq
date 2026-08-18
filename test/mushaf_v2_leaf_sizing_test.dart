@@ -213,20 +213,18 @@ void main() {
       }
     });
 
-    test('the allowances run V1 > V2 > V4, as the fonts draw', () {
-      // Reported from the phone: V4 reads right, V2 is small, V1 is
-      // smaller still. The budgets must follow that order.
+    test('the allowances run V1 > V4, as the fonts draw', () {
+      // Reported from the phone: V4 reads right, V1 draws smaller and
+      // must get more room. (V2/1421H sat between them here until it
+      // was removed as an edition — see MushafSvgService.editions.)
       double h(String e) => mushafV2HeightFraction(
           isTablet: false, isOpeningPage: false, editionId: e);
       double w(String e) =>
           mushafV2WidthFactor(isTablet: false, editionId: e);
 
-      expect(h('madinah1405'), greaterThan(h('madinah1421')),
-          reason: 'V1 must get more room than V2');
-      expect(h('madinah1421'), greaterThan(h('hafs')),
-          reason: 'V2 was reported small next to V4 and must get more room');
-      expect(w('madinah1405'), greaterThanOrEqualTo(w('madinah1421')));
-      expect(w('madinah1421'), greaterThanOrEqualTo(w('hafs')));
+      expect(h('madinah1405'), greaterThan(h('hafs')),
+          reason: 'V1 must get more room than V4');
+      expect(w('madinah1405'), greaterThanOrEqualTo(w('hafs')));
     });
 
     test('nothing is allowed to overflow the leaf it is measured into', () {
@@ -254,5 +252,5 @@ void main() {
   });
 }
 
-/// The three glyph editions, by the ids MushafSvgService uses.
-const _editions = ['hafs', 'madinah1421', 'madinah1405'];
+/// The glyph editions, by the ids MushafSvgService uses.
+const _editions = ['hafs', 'madinah1405'];

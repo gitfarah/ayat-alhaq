@@ -223,13 +223,15 @@ class MushafV2Service {
       fontBase: 'https://static-cdn.tarteel.ai/qul/fonts/quran_fonts/v4/ttf',
       fontLabel: 'KFGQPC V4 (plain)',
     ),
-    'madinah1421': _MushafGlyphConfig(
-      id: 'madinah1421',
-      cacheKey: 'v2',
-      layoutAsset: 'assets/quran/mushaf_v2_1421h_layout.json',
-      fontBase: 'https://static-cdn.tarteel.ai/qul/fonts/quran_fonts/v2/ttf',
-      fontLabel: 'KFGQPC V2',
-    ),
+    // 'madinah1421' (KFGQPC V2, 1421H) used to sit here — removed from
+    // the edition picker (mushaf_svg_service.dart's `editions` list) as
+    // no longer needed, and dropped from this map too: an id that can
+    // never be selected has no reason to keep a live config entry. Any
+    // STALE persisted selection still resolves safely — _config's own
+    // `?? _configs['hafs']!` fallback below. The bundled layout asset
+    // itself (assets/quran/mushaf_v2_1421h_layout.json) and its own
+    // structural test are left alone; deleting bundled data is a
+    // separate call from taking the edition out of the app.
     'madinah1405': _MushafGlyphConfig(
       id: 'madinah1405',
       cacheKey: 'v1',

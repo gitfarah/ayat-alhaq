@@ -28,10 +28,10 @@ void main() {
     });
 
     test('every other glyph edition stays fully opaque', () {
-      // V4 (KFGQPC Hafs) and V2 (1421H) were never part of the
-      // complaint — a blanket "lighten every edition" fix would be
-      // wrong, this must stay scoped to V1 alone.
-      for (final id in ['hafs', 'madinah1421']) {
+      // V4 (KFGQPC Hafs) was never part of the complaint — a blanket
+      // "lighten every edition" fix would be wrong, this must stay
+      // scoped to V1 alone.
+      for (final id in ['hafs', 'hafs_plain']) {
         expect(mushafGlyphInkOpacity(id), 1.0, reason: id);
       }
     });

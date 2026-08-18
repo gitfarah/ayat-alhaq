@@ -140,19 +140,16 @@ class MushafSvgService {
   /// The editions offered in the app. The three riwayat share the
   /// `kfqc` page layout; `text` is not artwork at all (see [isText]).
   static const List<MushafEdition> editions = [
-    // The two Hafs editions are named for what tells them APART on
-    // screen — the V4 pages carry tajweed colouring, the V2 pages are
-    // plain ink — rather than for their print years, which meant
-    // nothing to anyone reading the picker. The year still shows in the
-    // hint underneath.
+    // V4 is named for what tells it apart on screen — its tajweed
+    // colouring — rather than for its print year, which meant nothing
+    // to anyone reading the picker. The year still shows in the hint
+    // underneath. (The plain-ink V2 1421H edition that used to sit
+    // beside it here was removed — its own "Hafs without colour" need
+    // is now covered by V4's own plain cut, via the tajweed switch.)
     MushafEdition(
         'hafs', 'مصحف حفص بالتجويد', 'Musahf Hafs with Tajweed',
         hintAr: 'مصحف المدينة النبوية — طبعة ١٤٤١ هـ',
         hintEn: 'KFGQPC V4 page layout — 1441H print',
-        isGlyph: true),
-    MushafEdition('madinah1421', 'مصحف حفص', 'Musahf Hafs',
-        hintAr: 'مصحف المدينة النبوية — طبعة ١٤٢١ هـ',
-        hintEn: 'KFGQPC V2 page layout — 1421H print',
         isGlyph: true),
     MushafEdition(
         'madinah1405', 'مصحف المدينة حفص ١٤٠٥ هـ', 'Midinah Hafs Musahf 1405 H',

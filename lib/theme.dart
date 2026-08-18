@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
+import 'package:flutter/material.dart';
 
 /// "Sacred Clarity" design system
 class AppColors {
@@ -346,3 +347,18 @@ class AppTheme {
     ).apply(bodyColor: AppColors.darkText, displayColor: AppColors.darkText),
   );
 }
+
+/// Reserves the bottom safe-area inset only on Android, where a
+/// visible gesture pill or 3-button bar genuinely needs it. iOS's own
+/// home-indicator strip does not — Apple's own guidance is that
+/// ordinary content may run right up to it — and reserving the same
+/// padding there just left a bare gap under whatever control this
+/// wraps, with nothing needing the room.
+///
+/// `defaultTargetPlatform` rather than `dart:io`'s `Platform`: some of
+/// this app's storage code is web-compiled, and `dart:io` does not
+/// exist there.
+Widget androidBottomSafeArea(Widget child) =>
+    defaultTargetPlatform == TargetPlatform.android
+        ? SafeArea(top: false, child: child)
+        : child;

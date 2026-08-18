@@ -59,30 +59,32 @@ void main() {
       expect(MushafSvgService.editions.any((e) => e.id == 'text'), isFalse,
           reason: 'the reflowing view must not be offered as an edition');
 
-      MushafSvgService.setEdition('madinah1421');
+      MushafSvgService.setEdition('madinah1405');
       MushafSvgService.setEdition('text');
       expect(MushafSvgService.edition.id, 'hafs',
           reason: 'a stale "text" preference must fall back to Hafs');
       MushafSvgService.setEdition('hafs');
     });
 
-    test('V4 Hafs, V2 1421H and V1 1405H lead the menu', () {
+    test('a stale "madinah1421" preference falls back to Hafs too', () {
+      // V2/1421H was removed as an edition (its "Hafs without colour"
+      // need is now covered by V4's own plain cut via the tajweed
+      // switch) — setEdition's own orElse fallback is what carries
+      // anyone whose saved preference still names it.
+      MushafSvgService.setEdition('madinah1405');
+      MushafSvgService.setEdition('madinah1421');
+      expect(MushafSvgService.edition.id, 'hafs',
+          reason: 'a stale "madinah1421" preference must fall back to Hafs');
+      MushafSvgService.setEdition('hafs');
+    });
+
+    test('V4 Hafs and V1 1405H lead the menu', () {
       expect(MushafSvgService.editions[0].id, 'hafs');
       expect(MushafSvgService.editions[0].nameEn, 'Musahf Hafs with Tajweed');
       expect(MushafSvgService.editions[0].isGlyph, isTrue);
-      expect(MushafSvgService.editions[1].id, 'madinah1421');
-      expect(MushafSvgService.editions[1].nameEn, 'Musahf Hafs');
+      expect(MushafSvgService.editions[1].id, 'madinah1405');
+      expect(MushafSvgService.editions[1].nameEn, 'Midinah Hafs Musahf 1405 H');
       expect(MushafSvgService.editions[1].isGlyph, isTrue);
-      expect(MushafSvgService.editions[2].id, 'madinah1405');
-      expect(MushafSvgService.editions[2].nameEn, 'Midinah Hafs Musahf 1405 H');
-      expect(MushafSvgService.editions[2].isGlyph, isTrue);
-    });
-    test('the 1421H Madinah edition is a live printed-page view', () {
-      MushafSvgService.setEdition('madinah1421');
-      expect(MushafSvgService.edition.isGlyph, isTrue);
-      expect(MushafSvgService.edition.isArtwork, isFalse);
-      expect(MushafSvgService.supportsFullOfflineDownload, isFalse);
-      MushafSvgService.setEdition('hafs');
     });
 
     test('the 1405H Madinah edition is a live printed-page view', () {

@@ -192,7 +192,6 @@ double mushafV2LeafWidth({
 /// [[quran-mushaf-line-spread]].
 const Map<String, ({double width, double height})> _phoneGlyphBudget = {
   'madinah1405': (width: 0.99, height: 0.97), // KFGQPC V1 — draws smallest
-  'madinah1421': (width: 0.99, height: 0.95), // KFGQPC V2 — draws small
   'hafs': (width: 0.98, height: 0.93), //        KFGQPC V4 — reads right
 };
 
@@ -1003,7 +1002,6 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         'warsh' => Icons.import_contacts_rounded,
         'qalon' => Icons.collections_bookmark_rounded,
         'text' => Icons.format_size_rounded,
-        'madinah1421' => Icons.auto_stories_rounded,
         'madinah1405' => Icons.auto_stories_outlined,
         _ => Icons.menu_book_rounded,
       };
@@ -1765,7 +1763,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                         setState(() => _legendExpanded = !_legendExpanded),
                   ),
                 if (audio.hasActiveTrack)
-                  SafeArea(top: false, child: _buildAudioBar(audio, isDark)),
+                  androidBottomSafeArea(_buildAudioBar(audio, isDark)),
               ]),
             ),
           ),
@@ -2489,27 +2487,18 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                             color: s.tajweed ? AppColors.gold : textColor)),
                     onPressed: () => s.setTajweed(!s.tajweed));
               }),
+            // The page number used to sit here as plain text; the page
+            // itself already carries it (MushafPageFooter's own printed-
+            // style badge), so the top bar's copy was just repeating
+            // what the reader is already looking at.
             Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                      _wide && _pageNum + 1 <= 604
-                          ? 'صفحة ${_ar(_pageNum)} — ${_ar(_pageNum + 1)}'
-                          : 'صفحة ${_ar(_pageNum)}',
-                      style: TextStyle(
-                          fontFamily: '.SF Pro Text',
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                          color: textColor)),
-                  if (_isCachedOffline) ...[
-                    const SizedBox(width: 8),
-                    Icon(Icons.offline_pin_rounded,
-                        size: 16,
-                        color: AppColors.primary.withValues(alpha: 0.6)),
-                  ],
-                ],
-              ),
+              child: _isCachedOffline
+                  ? Center(
+                      child: Icon(Icons.offline_pin_rounded,
+                          size: 16,
+                          color: AppColors.primary.withValues(alpha: 0.6)),
+                    )
+                  : const SizedBox.shrink(),
             ),
             _buildEditionButton(isDark, textColor),
             IconButton(
