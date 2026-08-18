@@ -31,7 +31,15 @@ class TafsirService {
   /// Every slug verified against the CDN's editions.json; every
   /// cloudEdition verified against alquran.cloud type=tafsir list.
   /// IDs are stable — they are stored in SharedPreferences.
+  ///
+  /// [editions.first] is the app-wide default (the tafsir screen and
+  /// the ayah share sheet both fall back to it), so its position here
+  /// IS the default-edition setting, not just display order.
   static const List<TafsirEdition> editions = [
+    TafsirEdition(
+        id: 98,
+        name: 'المختصر في تفسير القرآن الكريم',
+        cdnSlug: 'ar-tafsir-al-mukhtasar'),
     TafsirEdition(
         id: 16,
         name: 'التفسير الميسر',
@@ -70,6 +78,12 @@ class TafsirService {
         cloudEdition: 'ar.miqbas'),
   ];
 
+  /// Same value as `editions.first.id`, kept as its own constant only
+  /// because a parameter default must be a compile-time constant — a
+  /// list lookup isn't one. Change the default edition by reordering
+  /// [editions]; update this alongside it.
+  static const int defaultEditionId = 98;
+
   static TafsirEdition? editionById(int id) {
     for (final e in editions) {
       if (e.id == id) return e;
@@ -83,7 +97,7 @@ class TafsirService {
   /// Tafsir text for one ayah: downloaded copy first, then the CDN,
   /// then alquran.cloud as a last resort.
   static Future<String> getTafsir(int surahNumber, int ayahNumber,
-      {int tafsirId = 16}) async {
+      {int tafsirId = defaultEditionId}) async {
     final edition = editionById(tafsirId) ?? editions.first;
 
     // 1. Local download.

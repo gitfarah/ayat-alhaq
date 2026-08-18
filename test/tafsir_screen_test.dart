@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:quran_app_v1/screens/tafsir_screen.dart';
 import 'package:quran_app_v1/services/ayah_insight_service.dart';
 import 'package:quran_app_v1/services/settings_service.dart';
+import 'package:quran_app_v1/services/tafsir_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -148,10 +149,14 @@ void main() {
         TextDirection.rtl);
 
     // Geometry, not just intent: the selected name must actually render
-    // to the RIGHT of the chevron.
+    // to the RIGHT of the chevron. The screen opens on the app-wide
+    // default edition (editions.first), not a hardcoded name — deriving
+    // it here means this assertion survives the default changing.
     final nameX = tester
         .getCenter(find
-            .descendant(of: picker, matching: find.text('التفسير الميسر'))
+            .descendant(
+                of: picker,
+                matching: find.text(TafsirService.editions.first.name))
             .first)
         .dx;
     final chevronX =
