@@ -35,7 +35,7 @@ void main() {
     // fetch one (flutter test fakes HttpClient), which is exactly the
     // fallback case worth testing.
     tempDocs = await Directory.systemTemp.createTemp('ayah_glyph_test_docs');
-    final fontDir = Directory('${tempDocs.path}/share_card_v4_fonts')
+    final fontDir = Directory('${tempDocs.path}/mushaf_v4_plain_fonts')
       ..createSync();
     for (final p in [2, 3]) {
       await File('test/fixtures/v4_fonts/p$p.ttf')

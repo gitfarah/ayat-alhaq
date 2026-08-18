@@ -371,6 +371,8 @@ class _AyahShareSheetState extends State<_AyahShareSheet> {
               label: _count == 1
                   ? '${widget.surahName} — آية ${_ar(widget.ayahNumber)}'
                   : '${widget.surahName} — ${l('shareVerseRange').replaceFirst('@from', _ar(widget.ayahNumber)).replaceFirst('@to', _ar(widget.ayahNumber + _count - 1))}',
+              surahNumber: widget.surahNumber,
+              ayahNumber: widget.ayahNumber,
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),

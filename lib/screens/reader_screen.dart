@@ -445,6 +445,8 @@ class _ReaderScreenState extends State<ReaderScreen>
             AyahSheetHeader(
               ayahText: ayah.text,
               label: '${widget.surah.name} — آية ${_ar(ayah.numberInSurah)}',
+              surahNumber: widget.surah.number,
+              ayahNumber: ayah.numberInSurah,
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),

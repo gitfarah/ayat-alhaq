@@ -150,12 +150,17 @@ class QuranAudioService extends ChangeNotifier {
 
   /// Playback position expressed relative to the ayah being recited.
   ///
-  /// [clipStart] is set only when a whole-surah recording is being
-  /// clipped BY HAND to one ayah, which happens on web alone: on mobile
-  /// a ClippingAudioSource already reports clip-relative positions, and
-  /// every per-ayah reciter plays a file that is the ayah entire. So on
-  /// a phone this is null for every reciter, and the position must pass
-  /// straight through.
+  /// [clipStart] is set only for Mansour al-Salimi, on every platform:
+  /// his ayahs are all slices of one whole-surah recording, clipped BY
+  /// HAND rather than with a ClippingAudioSource. A ClippingAudioSource
+  /// per ayah would do this for us automatically, but re-loading the
+  /// SAME surah file into a fresh one for every ayah is what caused a
+  /// little stutter-and-click between consecutive ayahs, so the surah
+  /// loads once and every ayah after the first is reached with a seek
+  /// instead — see [_setManualClip]. Every other reciter plays a file
+  /// that is the ayah entire (or, for عبد الرشيد الصوفي, the whole
+  /// surah played straight through as one track), so this stays null
+  /// for them and the position passes straight through.
   ///
   /// Collapsing that null case together with "before the clip starts"
   /// into one `||` returned zero for BOTH — which pinned the scrubber,
@@ -190,24 +195,66 @@ class QuranAudioService extends ChangeNotifier {
     _manualClipEnd = null;
   }
 
-  Future<void> _finishManualClip(Duration start, Duration end) async {
-    if (_manualClipStart != start || _manualClipEnd != end) return;
-    await _manualClipSubscription?.cancel();
-    _manualClipSubscription = null;
+  /// Fires once playback crosses the armed clip's end. Tries first to
+  /// just keep going: if the reader is auto-advancing straight into the
+  /// very next ayah of the SAME surah recording already loaded, that
+  /// ayah is reached by relabelling the clip boundaries in place —
+  /// no [_player.seek], no [_player.pause]. A seek is a hard splice in
+  /// the decoded audio and is what produced an audible click at every
+  /// single ayah boundary even once reloads were eliminated: any seek
+  /// at all, correct destination or not, clicks. Only a real jump —
+  /// autoAdvance off, a non-sequential resolver, or the surah itself
+  /// changing — falls back to pausing and handing off to
+  /// [_handleComplete], which is the one place a seek is unavoidable.
+  Future<void> _onManualClipEnded() async {
+    final current = _currentGlobalAyah;
+    if (current != null && _autoAdvance) {
+      final next = nextAyahResolver?.call(current) ??
+          (current < 6236 ? current + 1 : null);
+      if (next != null && next == current + 1) {
+        final (nextSurah, _, _) = surahRangeOf(next);
+        if (nextSurah == _loadedMansourSurah) {
+          final clip = await _mansourClip(next);
+          if (clip != null) {
+            _currentGlobalAyah = next;
+            _manualClipStart = clip.start;
+            _manualClipEnd = clip.end;
+            _armManualClipBoundary(clip.end);
+            notifyListeners();
+            return;
+          }
+        }
+      }
+    }
     await _player.pause();
-    await _player.seek(start);
     await _handleComplete();
   }
 
-  Future<void> _setManualWebClip(Duration start, Duration end) async {
+  /// Watches [_player.positionStream] for playback crossing [end] and
+  /// hands off to [_onManualClipEnded]. Guarded against firing twice for
+  /// the same boundary if more than one position tick arrives before
+  /// the subscription is torn down.
+  void _armManualClipBoundary(Duration end) {
+    _manualClipSubscription = _player.positionStream.listen((position) {
+      if (position < end) return;
+      final sub = _manualClipSubscription;
+      if (sub == null) return;
+      _manualClipSubscription = null;
+      sub.cancel();
+      unawaited(_onManualClipEnded());
+    });
+  }
+
+  /// Points the player at one ayah's slice of a surah recording that is
+  /// already loaded in full, without touching the audio source — just a
+  /// seek, plus [_armManualClipBoundary] to stop (or chain onward) once
+  /// playback crosses [end].
+  Future<void> _setManualClip(Duration start, Duration end) async {
+    _manualClipSubscription?.cancel();
     _manualClipStart = start;
     _manualClipEnd = end;
     await _player.seek(start);
-    _manualClipSubscription = _player.positionStream.listen((position) {
-      if (position >= end && _manualClipSubscription != null) {
-        unawaited(_finishManualClip(start, end));
-      }
-    });
+    _armManualClipBoundary(end);
   }
 
   QuranAudioService() {
@@ -556,39 +603,45 @@ class QuranAudioService extends ChangeNotifier {
     );
   }
 
+  /// The surah currently sitting in [_player] for the Mansour reciter,
+  /// so consecutive ayahs of it can be reached with a seek rather than
+  /// a full reload. Null whenever the loaded source is something else
+  /// (a different reciter, or nothing yet) — see [playAyah].
+  int? _loadedMansourSurah;
+
   Future<bool> _playMansourAyah(
     int globalAyah,
     MediaItem media,
   ) async {
     final clip = await _mansourClip(globalAyah);
     if (clip == null) return false;
+    final (surah, _, _) = surahRangeOf(globalAyah);
     try {
-      Uri audioUri = Uri.parse(clip.audioUrl);
-      if (!kIsWeb) {
-        final (surah, _, _) = surahRangeOf(globalAyah);
-        final file = await _mansourSurahFile(surah);
-        if (await file.exists() && (await file.length()) > 0) {
-          audioUri = Uri.file(file.path);
-        } else {
-          unawaited(_ensureMansourSurahLocal(surah, clip.audioUrl));
+      // One file holds the whole surah; every ayah in it is just a
+      // slice of the SAME recording. Setting a fresh ClippingAudioSource
+      // for every single ayah — as this used to do — tore down and
+      // rebuilt the player's decode pipeline each time, which is what
+      // produced the little stutter-and-click heard between consecutive
+      // ayahs. Loading only happens when the surah itself changes;
+      // moving between its ayahs is a plain seek (see _setManualClip).
+      if (_loadedMansourSurah != surah) {
+        Uri audioUri = Uri.parse(clip.audioUrl);
+        if (!kIsWeb) {
+          final file = await _mansourSurahFile(surah);
+          if (await file.exists() && (await file.length()) > 0) {
+            audioUri = Uri.file(file.path);
+          } else {
+            unawaited(_ensureMansourSurahLocal(surah, clip.audioUrl));
+          }
         }
-      }
-      if (kIsWeb) {
         await _player.setAudioSource(AudioSource.uri(audioUri, tag: media));
-        await _setManualWebClip(clip.start, clip.end);
-      } else {
-        await _player.setAudioSource(
-          ClippingAudioSource(
-            child: AudioSource.uri(audioUri),
-            start: clip.start,
-            end: clip.end,
-            tag: media,
-          ),
-        );
+        _loadedMansourSurah = surah;
       }
+      await _setManualClip(clip.start, clip.end);
       _player.play();
       return true;
     } catch (_) {
+      _loadedMansourSurah = null;
       return false;
     }
   }
@@ -630,6 +683,12 @@ class QuranAudioService extends ChangeNotifier {
     notifyListeners();
 
     final reciter = _reciter;
+    // Whatever gets loaded below for a non-Mansour reciter replaces the
+    // player's audio source, so the surah cached for Mansour's gapless
+    // seeking (see _playMansourAyah) is no longer what's actually
+    // loaded — forget it, or switching back later would seek a source
+    // that isn't there instead of reloading it.
+    if (reciter != _mansourReciter) _loadedMansourSurah = null;
     final media = _mediaItemFor(globalAyahNumber, await _appArtUri());
     var started = false;
     // Kept so a failure can say what actually went wrong. Reporting every

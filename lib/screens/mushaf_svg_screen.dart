@@ -28,6 +28,7 @@ import '../widgets/mushaf_page_furniture.dart';
 import '../widgets/reciter_picker.dart';
 import '../widgets/surah_banner_painter.dart';
 import '../widgets/surah_frame.dart';
+import '../widgets/tajweed_legend_bar.dart';
 import 'ayah_search_screen.dart';
 import 'tafsir_screen.dart';
 
@@ -107,9 +108,8 @@ const double kReflowZoom = 1.15;
 /// They keep pinch's original meaning (drawing the artwork wider),
 /// which is why this cannot simply key off the zoom level.
 bool mushafShowsReflow({required String editionId, required double zoom}) {
-  final edition = MushafSvgService.editions
-      .where((e) => e.id == editionId)
-      .firstOrNull;
+  final edition =
+      MushafSvgService.editions.where((e) => e.id == editionId).firstOrNull;
   if (edition == null || !edition.isGlyph) return false;
   return zoom >= kReflowZoom;
 }
@@ -275,6 +275,17 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// and disposed with the screen.
   final Map<int, Future<List<PageAyah>>> _textFutures = {};
   final Map<int, Future<List<MushafV2Page>>> _v2Futures = {};
+
+  /// The ground the cached page futures above were built for. A colour
+  /// font is loaded with its palette baked in, so a page fetched for the
+  /// light ground is the WRONG font once the reader turns dark — the
+  /// cache has to be dropped on the flip, not just repainted.
+  bool? _v2Ground;
+
+  /// The tajweed choice the cached page futures above were built under
+  /// — see [_v2Ground]; a colour font vs. its plain cut are two
+  /// different files, not two styles of the same one.
+  bool? _v2Tajweed;
   final Map<int, LongPressGestureRecognizer> _textRecognizers = {};
 
   /// Measured fit sizes for the reflowing pages, keyed by page and box.
@@ -291,6 +302,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
   bool _isCachedOffline = false;
   bool _barsVisible = true;
+  bool _legendExpanded = true;
   List<Bookmark> _bookmarks = [];
   List<Highlight> _highlights = [];
   QuranAudioService? _audioService;
@@ -315,8 +327,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   /// Whether the printed leaf is currently standing in for its
   /// reflowing text. See [mushafShowsReflow] for why this is limited to
   /// the Hafs glyph editions.
-  bool get _showsReflow => mushafShowsReflow(
-      editionId: MushafSvgService.edition.id, zoom: _zoom);
+  bool get _showsReflow =>
+      mushafShowsReflow(editionId: MushafSvgService.edition.id, zoom: _zoom);
 
   /// Whether what is on screen REFLOWS to the width rather than
   /// overflowing it.
@@ -424,8 +436,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
   Future<void> _onPageSettled(int basePage) async {
     if (!mounted) return;
     setState(() => _pageNum = basePage);
-    context.read<SettingsService>().saveLastRead(
-        page: basePage, mode: SettingsService.modeMushaf);
+    context
+        .read<SettingsService>()
+        .saveLastRead(page: basePage, mode: SettingsService.modeMushaf);
     KhatmaService.markPageRead(basePage);
     if (_wide && basePage + 1 <= 604) KhatmaService.markPageRead(basePage + 1);
 
@@ -437,10 +450,19 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
 
     if (MushafSvgService.edition.isGlyph) {
       final step = _wide ? 2 : 1;
-      final editionId = MushafSvgService.edition.id;
-      MushafV2Service.preload(basePage + step, editionId: editionId);
-      MushafV2Service.preload(basePage + step + 1, editionId: editionId);
-      MushafV2Service.preload(basePage - 1, editionId: editionId);
+      final settings = context.read<SettingsService>();
+      final editionId = MushafV2Service.editionFor(MushafSvgService.edition.id,
+          tajweed: settings.tajweed);
+      // Warmed for the ground the reader is actually on: a colour font
+      // carries its own palette, so preloading the light cut would just
+      // make the dark one download again when the page arrives.
+      final dark = settings.isDarkIn(context);
+      MushafV2Service.preload(basePage + step,
+          editionId: editionId, darkPalette: dark);
+      MushafV2Service.preload(basePage + step + 1,
+          editionId: editionId, darkPalette: dark);
+      MushafV2Service.preload(basePage - 1,
+          editionId: editionId, darkPalette: dark);
       final center = _indexForPage(basePage);
       _v2Futures.removeWhere((k, _) => (k - center).abs() > 3);
       final cached =
@@ -548,15 +570,13 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
     const base = 'اضغط مطولاً على أي آية لعرض خياراتها، '
         'واضغط ضغطة سريعة لإظهار أو إخفاء الأشرطة';
     const reflow = '، واقرص بإصبعيك لعرض النص المتجاوب';
-    final text =
-        MushafSvgService.edition.isGlyph ? '$base$reflow' : base;
+    final text = MushafSvgService.edition.isGlyph ? '$base$reflow' : base;
 
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         duration: const Duration(seconds: 6),
         content: Text(text,
             textDirection: TextDirection.rtl,
-            style:
-                const TextStyle(fontFamily: '.SF Pro Text', height: 1.6))));
+            style: const TextStyle(fontFamily: '.SF Pro Text', height: 1.6))));
   }
 
   /// One-time offer (per install) to download the whole Mushaf for
@@ -877,33 +897,9 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     Navigator.pop(context);
                     _jumpDialog();
                   }),
-              // Only the REFLOWED text can be coloured by rule: a
-              // printed leaf is artwork or page glyphs, and V4 carries
-              // its own tajweed colours in the font. Offered while the
-              // reader is actually looking at reflowed text, so the
-              // switch is never shown against a page it cannot change.
-              if (_showsReflow)
-                Builder(builder: (_) {
-                  final s = context.watch<SettingsService>();
-                  return SwitchListTile(
-                    value: s.tajweed,
-                    activeThumbColor: AppColors.gold,
-                    secondary: Icon(Icons.palette_rounded, color: iconColor),
-                    title: Text(L10n.of(context)('tajweedLbl'),
-                        style: TextStyle(
-                            fontFamily: '.SF Pro Text', color: textColor)),
-                    subtitle: Text(
-                        L10n.of(context)(
-                            s.tajweed ? 'tajweedOn' : 'tajweedOff'),
-                        style: TextStyle(
-                            fontFamily: '.SF Pro Text',
-                            fontSize: 12,
-                            color: isDark
-                                ? AppColors.darkTextSec
-                                : AppColors.textSecondary)),
-                    onChanged: (v) => s.setTajweed(v),
-                  );
-                }),
+              // Moved out to the top bar, next to search — a reader
+              // reaches for this mid-reading, not just when navigating
+              // via this menu. See the icon button in _buildTopBar.
               if (_supportsFullOfflineDownload)
                 // AnimatedBuilder rather than the plain Builder this
                 // used to be: a showModalBottomSheet's builder runs ONCE
@@ -914,8 +910,10 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                 // the progress notifiers directly keeps this row live
                 // for as long as the sheet stays open.
                 AnimatedBuilder(
-                  animation: Listenable.merge(
-                      [MushafSvgService.bulkProgress, MushafV2Service.bulkProgress]),
+                  animation: Listenable.merge([
+                    MushafSvgService.bulkProgress,
+                    MushafV2Service.bulkProgress
+                  ]),
                   builder: (_, __) {
                     final prog = _currentBulkProgress;
                     final subColor = isDark
@@ -942,7 +940,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                                         : 'تنزيل المصحف كاملاً دون اتصال'),
                                 textDirection: TextDirection.rtl,
                                 style: TextStyle(
-                                    fontFamily: '.SF Pro Text', color: textColor)),
+                                    fontFamily: '.SF Pro Text',
+                                    color: textColor)),
                             subtitle: prog != null
                                 ? Text(
                                     '${_ar(prog.$1)} من ${_ar(prog.$2)} صفحة — اضغط للإيقاف',
@@ -980,8 +979,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                                   minHeight: 6,
                                   backgroundColor:
                                       iconColor.withValues(alpha: 0.15),
-                                  valueColor:
-                                      AlwaysStoppedAnimation(iconColor),
+                                  valueColor: AlwaysStoppedAnimation(iconColor),
                                 ),
                               ),
                             ),
@@ -1221,173 +1219,174 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-            _ayahSheetHeader(region),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                          playingThis
-                              ? Icons.pause_circle_rounded
-                              : Icons.play_circle_rounded,
-                          color: isDark
-                              ? AppColors.darkPrimary
-                              : AppColors.primary),
-                      title: Text(
-                          playingThis
-                              ? l('pauseRecitation')
-                              : l('playRecitation'),
-                          textDirection: TextDirection.rtl,
-                          style: TextStyle(
-                              fontFamily: '.SF Pro Text',
-                              color: isDark
-                                  ? AppColors.darkText
-                                  : AppColors.textPrimary)),
-                      onTap: () async {
-                        Navigator.pop(context);
-                        // First-ever playback: pick a reciter once; the
-                        // choice then sticks until changed on purpose.
-                        if (!mounted) return;
-                        final ok =
-                            await ensureReciterChosen(context, audio, isDark);
-                        if (!ok) return;
-                        await audio.togglePlayPause(globalAyah);
-                        // Playback failures only set audio.error — surface it.
-                        if (mounted && audio.error != null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(audio.error!)));
-                        }
-                      }),
-                  ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.menu_book_rounded,
-                          color: isDark
-                              ? AppColors.darkPrimary
-                              : AppColors.primary),
-                      title: Text(l('tafsir'),
-                          textDirection: TextDirection.rtl,
-                          style: TextStyle(
-                              fontFamily: '.SF Pro Text',
-                              color: isDark
-                                  ? AppColors.darkText
-                                  : AppColors.textPrimary)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(
+              _ayahSheetHeader(region),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                            playingThis
+                                ? Icons.pause_circle_rounded
+                                : Icons.play_circle_rounded,
+                            color: isDark
+                                ? AppColors.darkPrimary
+                                : AppColors.primary),
+                        title: Text(
+                            playingThis
+                                ? l('pauseRecitation')
+                                : l('playRecitation'),
+                            textDirection: TextDirection.rtl,
+                            style: TextStyle(
+                                fontFamily: '.SF Pro Text',
+                                color: isDark
+                                    ? AppColors.darkText
+                                    : AppColors.textPrimary)),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          // First-ever playback: pick a reciter once; the
+                          // choice then sticks until changed on purpose.
+                          if (!mounted) return;
+                          final ok =
+                              await ensureReciterChosen(context, audio, isDark);
+                          if (!ok) return;
+                          await audio.togglePlayPause(globalAyah);
+                          // Playback failures only set audio.error — surface it.
+                          if (mounted && audio.error != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(audio.error!)));
+                          }
+                        }),
+                    ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.menu_book_rounded,
+                            color: isDark
+                                ? AppColors.darkPrimary
+                                : AppColors.primary),
+                        title: Text(l('tafsir'),
+                            textDirection: TextDirection.rtl,
+                            style: TextStyle(
+                                fontFamily: '.SF Pro Text',
+                                color: isDark
+                                    ? AppColors.darkText
+                                    : AppColors.textPrimary)),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => TafsirScreen(
+                                        surahNumber: region.surahNumber,
+                                        surahName:
+                                            _surahName(region.surahNumber),
+                                        ayahNumber: region.ayahNumber,
+                                      )));
+                        }),
+                    ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                            bookmark != null
+                                ? Icons.bookmark_rounded
+                                : Icons.bookmark_add_rounded,
+                            color: bookmark != null
+                                ? AppColors.highlight(bookmark.color)
+                                : (isDark
+                                    ? AppColors.darkPrimary
+                                    : AppColors.primary)),
+                        title: Text(l('bookmark'),
+                            textDirection: TextDirection.rtl,
+                            style: TextStyle(
+                                fontFamily: '.SF Pro Text',
+                                color: isDark
+                                    ? AppColors.darkText
+                                    : AppColors.textPrimary)),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _showBookmarkPicker(region);
+                        }),
+                    ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.draw_rounded,
+                            color: AppColors.secondary),
+                        title: Text(l('highlightAyah'),
+                            textDirection: TextDirection.rtl,
+                            style: TextStyle(
+                                fontFamily: '.SF Pro Text',
+                                color: isDark
+                                    ? AppColors.darkText
+                                    : AppColors.textPrimary)),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _showHighlightPicker(region);
+                        }),
+                    // Note on this ayah — lives on the colour mark, so writing
+                    // one on an unmarked ayah marks it too.
+                    ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                            existingHighlight?.hasNote == true
+                                ? Icons.sticky_note_2_rounded
+                                : Icons.note_add_outlined,
+                            color: AppColors.secondary),
+                        title: Text(
+                            existingHighlight?.hasNote == true
+                                ? l('editNote')
+                                : l('addNote'),
+                            textDirection: TextDirection.rtl,
+                            style: TextStyle(
+                                fontFamily: '.SF Pro Text',
+                                color: isDark
+                                    ? AppColors.darkText
+                                    : AppColors.textPrimary)),
+                        subtitle: existingHighlight?.hasNote == true
+                            ? Text(existingHighlight!.note!,
+                                textDirection: TextDirection.rtl,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontFamily: '.SF Pro Text',
+                                    fontSize: 12,
+                                    color: isDark
+                                        ? AppColors.darkTextSec
+                                        : AppColors.textSecondary))
+                            : null,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _editNote(region);
+                        }),
+                    ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.ios_share_rounded,
+                            color: AppColors.accent),
+                        title: Text(l('shareAyah'),
+                            textDirection: TextDirection.rtl,
+                            style: TextStyle(
+                                fontFamily: '.SF Pro Text',
+                                color: isDark
+                                    ? AppColors.darkText
+                                    : AppColors.textPrimary)),
+                        onTap: () async {
+                          Navigator.pop(context);
+                          // An SVG page carries hit polygons, not words —
+                          // the verse has to be fetched before it can be
+                          // shared.
+                          final text = await QuranService.getAyahText(
+                              region.surahNumber, region.ayahNumber);
+                          if (!mounted) return;
+                          showAyahShareSheet(
                             context,
-                            MaterialPageRoute(
-                                builder: (_) => TafsirScreen(
-                                      surahNumber: region.surahNumber,
-                                      surahName: _surahName(region.surahNumber),
-                                      ayahNumber: region.ayahNumber,
-                                    )));
-                      }),
-                  ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                          bookmark != null
-                              ? Icons.bookmark_rounded
-                              : Icons.bookmark_add_rounded,
-                          color: bookmark != null
-                              ? AppColors.highlight(bookmark.color)
-                              : (isDark
-                                  ? AppColors.darkPrimary
-                                  : AppColors.primary)),
-                      title: Text(l('bookmark'),
-                          textDirection: TextDirection.rtl,
-                          style: TextStyle(
-                              fontFamily: '.SF Pro Text',
-                              color: isDark
-                                  ? AppColors.darkText
-                                  : AppColors.textPrimary)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showBookmarkPicker(region);
-                      }),
-                  ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.draw_rounded,
-                          color: AppColors.secondary),
-                      title: Text(l('highlightAyah'),
-                          textDirection: TextDirection.rtl,
-                          style: TextStyle(
-                              fontFamily: '.SF Pro Text',
-                              color: isDark
-                                  ? AppColors.darkText
-                                  : AppColors.textPrimary)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showHighlightPicker(region);
-                      }),
-                  // Note on this ayah — lives on the colour mark, so writing
-                  // one on an unmarked ayah marks it too.
-                  ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                          existingHighlight?.hasNote == true
-                              ? Icons.sticky_note_2_rounded
-                              : Icons.note_add_outlined,
-                          color: AppColors.secondary),
-                      title: Text(
-                          existingHighlight?.hasNote == true
-                              ? l('editNote')
-                              : l('addNote'),
-                          textDirection: TextDirection.rtl,
-                          style: TextStyle(
-                              fontFamily: '.SF Pro Text',
-                              color: isDark
-                                  ? AppColors.darkText
-                                  : AppColors.textPrimary)),
-                      subtitle: existingHighlight?.hasNote == true
-                          ? Text(existingHighlight!.note!,
-                              textDirection: TextDirection.rtl,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                  fontFamily: '.SF Pro Text',
-                                  fontSize: 12,
-                                  color: isDark
-                                      ? AppColors.darkTextSec
-                                      : AppColors.textSecondary))
-                          : null,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _editNote(region);
-                      }),
-                  ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.ios_share_rounded,
-                          color: AppColors.accent),
-                      title: Text(l('shareAyah'),
-                          textDirection: TextDirection.rtl,
-                          style: TextStyle(
-                              fontFamily: '.SF Pro Text',
-                              color: isDark
-                                  ? AppColors.darkText
-                                  : AppColors.textPrimary)),
-                      onTap: () async {
-                        Navigator.pop(context);
-                        // An SVG page carries hit polygons, not words —
-                        // the verse has to be fetched before it can be
-                        // shared.
-                        final text = await QuranService.getAyahText(
-                            region.surahNumber, region.ayahNumber);
-                        if (!mounted) return;
-                        showAyahShareSheet(
-                          context,
-                          surahNumber: region.surahNumber,
-                          surahName: _surahName(region.surahNumber),
-                          ayahNumber: region.ayahNumber,
-                          ayahText: text,
-                        );
-                      }),
-                ],
+                            surahNumber: region.surahNumber,
+                            surahName: _surahName(region.surahNumber),
+                            ayahNumber: region.ayahNumber,
+                            ayahText: text,
+                          );
+                        }),
+                  ],
+                ),
               ),
-            ),
             ],
           ),
         ),
@@ -1405,6 +1404,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         ayahText: snap.data,
         label:
             '${_surahName(region.surahNumber)} — آية ${_ar(region.ayahNumber)}',
+        surahNumber: region.surahNumber,
+        ayahNumber: region.ayahNumber,
       ),
     );
   }
@@ -1640,6 +1641,16 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         : AppColors.mushafBackground(s.mushafBackground, isDark);
     final textColor = isDark ? AppColors.darkText : AppColors.textPrimary;
 
+    // A colour font's palette is baked into the loaded family, so pages
+    // built for the other ground have to be thrown away, not restyled.
+    // The tajweed cut is a different FONT FILE from the plain one under
+    // the same edition id, so a switch there has to drop the cache too.
+    if (_v2Ground != isDark || _v2Tajweed != s.tajweed) {
+      _v2Ground = isDark;
+      _v2Tajweed = s.tajweed;
+      _v2Futures.clear();
+    }
+
     // (Re)create the controller when wide-mode flips — index math
     // differs between single pages and 2-page spreads.
     final wide = _isWideScreen(context);
@@ -1727,15 +1738,35 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
               offset: _barsVisible ? Offset.zero : const Offset(0, 1.1),
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOut,
-              // Bottom inset taken here, or the player's controls sit
-              // under the system navigation bar and read as part of it.
-              // The reader's own bottom bar already does this.
-              child: SafeArea(
-                top: false,
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                if (audio.hasActiveTrack) _buildAudioBar(audio, isDark),
-                ]),
-              ),
+              // The legend is read-only text, not a control — it sits
+              // flush against the true bottom edge with no reserved
+              // inset. Only the audio TRANSPORT gets SafeArea, and only
+              // when it is actually showing: those are real buttons a
+              // thumb needs clear of the gesture-nav strip, which the
+              // legend never needed padding for in the first place —
+              // that reserved inset showing with nothing else below it
+              // (tajweed on, nothing playing) was exactly what read as
+              // a stray empty band.
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                // Shown whenever tajweed is actually on screen — exact
+                // colours on the reflowed page (this legend IS
+                // TajweedService's own palette), a general key to the
+                // same rule categories on the V4 glyph page (that font
+                // bakes in its own hues; see TajweedLegendBar's doc for
+                // why this isn't claimed to be a pixel match).
+                if (s.tajweed &&
+                    (_showsReflow ||
+                        MushafV2Service.hasTajweedCut(
+                            MushafSvgService.edition.id)))
+                  TajweedLegendBar(
+                    isDark: isDark,
+                    expanded: _legendExpanded,
+                    onToggle: () =>
+                        setState(() => _legendExpanded = !_legendExpanded),
+                  ),
+                if (audio.hasActiveTrack)
+                  SafeArea(top: false, child: _buildAudioBar(audio, isDark)),
+              ]),
             ),
           ),
         ]),
@@ -1845,6 +1876,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     Expanded(child: _buildSinglePage(pages[0], isDark)),
                   ]),
                 );
+          // Rolled back: trying to reclaim this strip (conditionally,
+          // then unconditionally) either made the font size flicker on
+          // every tap or pushed the page under the notch/status bar
+          // permanently — both worse than the plain fixed top inset
+          // this always was. Back to the default (top: true).
           return SafeArea(child: content);
         },
       ),
@@ -1867,6 +1903,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         onTap: () => _setBars(!_barsVisible),
         onScaleStart: _onScaleStart,
         onScaleUpdate: _onScaleUpdate,
+        // Rolled back to the plain default (top: true) — see the glyph
+        // branch below for why this was reverted.
         child: SafeArea(
           child: !_wide || base + 1 > 604
               ? _buildTextPage(base, isDark)
@@ -1878,13 +1916,16 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
       );
     }
 
-    final editionId = MushafSvgService.edition.id;
+    final editionId = MushafV2Service.editionFor(MushafSvgService.edition.id,
+        tajweed: context.read<SettingsService>().tajweed);
     final future = _v2Futures[index] ??= () async {
-      final first = await MushafV2Service.getPage(base, editionId: editionId);
+      final first = await MushafV2Service.getPage(base,
+          editionId: editionId, darkPalette: isDark);
       if (!_wide || base + 1 > 604) return [first];
       return [
         first,
-        await MushafV2Service.getPage(base + 1, editionId: editionId),
+        await MushafV2Service.getPage(base + 1,
+            editionId: editionId, darkPalette: isDark),
       ];
     }();
 
@@ -1926,10 +1967,14 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     ElevatedButton.icon(
                       onPressed: () {
                         MushafV2Service.getPage(base,
-                            retry: true, editionId: editionId);
+                            retry: true,
+                            editionId: editionId,
+                            darkPalette: isDark);
                         if (_wide && base + 1 <= 604) {
                           MushafV2Service.getPage(base + 1,
-                              retry: true, editionId: editionId);
+                              retry: true,
+                              editionId: editionId,
+                              darkPalette: isDark);
                         }
                         setState(() => _v2Futures.remove(index));
                       },
@@ -1968,6 +2013,11 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                     ],
                   ),
                 );
+          // Rolled back: trying to reclaim this strip (conditionally,
+          // then unconditionally) either made the font size flicker on
+          // every tap or pushed the page under the notch/status bar
+          // permanently — both worse than the plain fixed top inset
+          // this always was. Back to the default (top: true).
           return SafeArea(child: content);
         },
       ),
@@ -1987,7 +2037,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
         // Phones take a much thinner inset than tablets: it stacks on
         // top of the leaf fraction and the layout's own usable-width
         // inset, and all three together were shrinking the script.
-        padding: EdgeInsets.symmetric(horizontal: isTablet ? 8 : 2, vertical: 2),
+        padding:
+            EdgeInsets.symmetric(horizontal: isTablet ? 8 : 2, vertical: 2),
         child: _buildV2GlyphLayout(page, isDark),
       );
       return Center(
@@ -2303,53 +2354,18 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           ),
         );
 
-    Widget glyphText(String glyph) {
-      final text = rawGlyph(glyph);
-      // V4's COLR font already paints the cream medallion and its black
-      // numeral correctly. Keep it untouched in both themes; applying the
-      // dark-mode white silhouette makes that numeral disappear.
-      if (word.isAyahEnd && page.usesColorFont) return text;
-
-      if (!isDark || !page.usesColorFont) return text;
-
-      // KFGQPC V4 is a COLR font: its embedded black palette ignores
-      // TextStyle.color. Lay the original Tajweed colors over a white glyph
-      // silhouette, making black pixels transparent in the colored layer.
-      return Stack(
-        alignment: Alignment.center,
-        children: [
-          ColorFiltered(
-            colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-            child: rawGlyph(glyph),
-          ),
-          ColorFiltered(
-            colorFilter: const ColorFilter.matrix(<double>[
-              1,
-              0,
-              0,
-              0,
-              0,
-              0,
-              1,
-              0,
-              0,
-              0,
-              0,
-              0,
-              1,
-              0,
-              0,
-              1,
-              1,
-              1,
-              0,
-              0,
-            ]),
-            child: text,
-          ),
-        ],
-      );
-    }
+    // Used to stack a white silhouette under a black-pixels-knocked-out
+    // copy of the SAME glyph here, because the font's baked-in COLR
+    // palette used to be the fixed LIGHT one regardless of theme (a
+    // colour font ignores TextStyle.color, so that was the only lever
+    // available). MushafV2Service now loads an actual DARK-ground CPAL
+    // palette for this font in dark mode (see its darkPalette param and
+    // _repaletteForDark) — page.fontFamily already carries the right
+    // colours, tajweed included. Compositing the old two-layer hack on
+    // top of that was painting the same letter twice: two overlapping,
+    // not-quite-aligned anti-aliased edges, which is what was reading
+    // as "very bold" once tajweed was on in dark mode.
+    Widget glyphText(String glyph) => rawGlyph(glyph);
 
     final text = glyphText(word.glyph);
     final codepoints = word.glyph.runes.toList();
@@ -2430,7 +2446,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   // The full, unscoped search — same reach as the home
                   // screen's (every surah name, every ayah in the
                   // Quran). Only the RESULT handling is Mushaf-specific:
-                  // it comes back here rather than opening ReaderScreen,
+                  // it comes back here rather than opening the reader,
                   // so picking a result jumps to its page on the SAME
                   // edition instead of leaving the Mushaf.
                   final result = await Navigator.push<AyahSearchResult>(
@@ -2448,6 +2464,31 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   setState(() => _searchTargetGlobalAyah = global);
                   _loadPage(page);
                 }),
+            // Same icon as the ayah-by-ayah reader's tajweed switch —
+            // one look either place. Out here next to search rather
+            // than buried in the ☰ menu: unlike the menu's other rows
+            // (go-to-surah/juz/page), this is something a reader
+            // reaches for mid-reading, not just when navigating.
+            if (_showsReflow ||
+                MushafV2Service.hasTajweedCut(MushafSvgService.edition.id))
+              Builder(builder: (_) {
+                final s = context.watch<SettingsService>();
+                return IconButton(
+                    tooltip: L10n.of(context)(
+                        s.tajweed ? 'tajweedOn' : 'tajweedOff'),
+                    icon: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                            color: (s.tajweed
+                                    ? AppColors.gold
+                                    : AppColors.primary)
+                                .withValues(alpha: 0.15),
+                            shape: BoxShape.circle),
+                        child: Icon(Icons.palette_outlined,
+                            size: 16,
+                            color: s.tajweed ? AppColors.gold : textColor)),
+                    onPressed: () => s.setTajweed(!s.tajweed));
+              }),
             Expanded(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -2703,41 +2744,41 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (final block in blocks) ...[
-                    // A surah that BEGINS on this page gets its name band
-                    // and the Basmala, as the printed page does.
-                    if (block.first.numberInSurah == 1) ...[
-                      _textSurahHeader(
-                          block.first.surahNumber, isDark, fontSize),
-                      if (block.first.surahNumber != 1 &&
-                          block.first.surahNumber != 9)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Text(QuranService.basmala,
-                              textAlign: TextAlign.center,
-                              textDirection: TextDirection.rtl,
-                              style: TextStyle(
-                                  fontFamily: 'QuranHafs',
-                                  fontSize: fontSize * 0.92,
-                                  height: 1.9,
-                                  color: isDark
-                                      ? AppColors.darkPrimary
-                                      : AppColors.primary)),
-                        ),
-                    ],
-                    Text.rich(
-                      TextSpan(children: [
-                        for (final a in block)
-                          ..._ayahSpans(a, isDark, fontSize),
-                      ]),
-                      // Justified edge to edge, like the printed page.
-                      textAlign: TextAlign.justify,
-                      textDirection: TextDirection.rtl,
-                      style: TextStyle(
-                          fontFamily: 'QuranHafs',
-                          fontSize: fontSize,
-                          height: 2.0,
-                          color: ink),
-                    ),
+                      // A surah that BEGINS on this page gets its name band
+                      // and the Basmala, as the printed page does.
+                      if (block.first.numberInSurah == 1) ...[
+                        _textSurahHeader(
+                            block.first.surahNumber, isDark, fontSize),
+                        if (block.first.surahNumber != 1 &&
+                            block.first.surahNumber != 9)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Text(QuranService.basmala,
+                                textAlign: TextAlign.center,
+                                textDirection: TextDirection.rtl,
+                                style: TextStyle(
+                                    fontFamily: 'QuranHafs',
+                                    fontSize: fontSize * 0.92,
+                                    height: 1.9,
+                                    color: isDark
+                                        ? AppColors.darkPrimary
+                                        : AppColors.primary)),
+                          ),
+                      ],
+                      Text.rich(
+                        TextSpan(children: [
+                          for (final a in block)
+                            ..._ayahSpans(a, isDark, fontSize),
+                        ]),
+                        // Justified edge to edge, like the printed page.
+                        textAlign: TextAlign.justify,
+                        textDirection: TextDirection.rtl,
+                        style: TextStyle(
+                            fontFamily: 'QuranHafs',
+                            fontSize: fontSize,
+                            height: 2.0,
+                            color: ink),
+                      ),
                       const SizedBox(height: 6),
                     ],
                   ],
@@ -2829,8 +2870,8 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
           textDirection: TextDirection.rtl,
           textAlign: TextAlign.justify,
           text: TextSpan(
-            style: TextStyle(
-                fontFamily: 'QuranHafs', fontSize: size, height: 2.0),
+            style:
+                TextStyle(fontFamily: 'QuranHafs', fontSize: size, height: 2.0),
             children: [
               for (final a in block) ...[
                 TextSpan(text: a.text),
@@ -3323,8 +3364,7 @@ class _MushafSvgScreenState extends State<MushafSvgScreen>
                                         fontSize: 11,
                                         color: subColor,
                                         fontFamily: '.SF Pro Text')),
-                                Text(
-                                    '-${_formatDuration(duration - position)}',
+                                Text('-${_formatDuration(duration - position)}',
                                     style: TextStyle(
                                         fontSize: 11,
                                         color: subColor,

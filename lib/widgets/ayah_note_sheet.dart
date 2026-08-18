@@ -4,6 +4,7 @@ import '../l10n/app_strings.dart';
 import '../services/highlight_service.dart';
 import '../services/settings_service.dart';
 import '../theme.dart';
+import 'mushaf_verse_text.dart';
 
 /// Note editor for a single marked ayah, shared by the Mushaf, the
 /// responsive reader and the Highlights tab so a note reads and edits
@@ -242,8 +243,10 @@ class _NoteSheetState extends State<_NoteSheet> {
                 if (widget.ayahText != null &&
                     widget.ayahText!.trim().isNotEmpty) ...[
                   const SizedBox(height: 10),
-                  Text(
-                    widget.ayahText!,
+                  MushafVerseText(
+                    surahNumber: widget.surahNumber,
+                    ayahNumbers: [widget.ayahNumber],
+                    fallbackText: widget.ayahText!,
                     textAlign: TextAlign.right,
                     textDirection: TextDirection.rtl,
                     maxLines: 3,

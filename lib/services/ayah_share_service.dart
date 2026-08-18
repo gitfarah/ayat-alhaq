@@ -1,18 +1,17 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show FontLoader, rootBundle;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_svg/flutter_svg.dart' show SvgStringLoader, vg;
 import 'package:gal/gal.dart';
-import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../theme.dart';
+import 'mushaf_glyph_service.dart';
 
 /// One verse of a shared run: its number within the surah, its text, and
 /// the translation of THAT verse when one was asked for.
@@ -193,60 +192,6 @@ class ShareCardLimits {
   /// the card longer. Four screens' worth is where a verse stops being
   /// readable in the preview.
   static const double tallAspect = 4.0;
-}
-
-/// A stretch of the shared text set in ONE page's glyph font.
-///
-/// The KFGQPC page fonts map private-use codepoints to whole WORDS, and
-/// each page has its own font with its own mapping — the same codepoint
-/// is a different word on a different page. So a passage crossing a
-/// page turn is not one string in one font, it is a run per page.
-class _GlyphRun {
-  final String glyphs;
-  final String fontFamily;
-  const _GlyphRun(this.glyphs, this.fontFamily);
-}
-
-/// Reads the shared verses' own WORDS out of the bundled Hafs V4 page
-/// layout (`assets/quran/mushaf_v4_1441h_layout.json`) — the same file
-/// the app's glyph Mushaf mode already ships and reads.
-///
-/// Every word in that file carries its "surah:ayah" tag, which is what
-/// makes it possible to take one ayah and nothing else. Cropping the
-/// printed page could never do that: an ayah that begins mid-line
-/// shares those lines with its neighbours, and no horizontal cut
-/// separates them.
-class _V4Layout {
-  /// The words of [ayahs] (of one surah) in reading order, each with
-  /// the page whose font defines it. Empty if the reference is not in
-  /// the layout at all.
-  static Future<List<({int page, String glyph})>> wordsFor(
-      int surah, Set<int> ayahs) async {
-    // Decoded per share rather than cached: the decoded structure is
-    // tens of megabytes of Dart objects for a 1.5 MB file, and a share
-    // is a rare, user-initiated action. rootBundle keeps the STRING
-    // cached, so this is a parse and not a disk read.
-    final raw =
-        await rootBundle.loadString('assets/quran/mushaf_v4_1441h_layout.json');
-    final pages =
-        (jsonDecode(raw) as Map<String, dynamic>)['pages'] as List<dynamic>;
-
-    final out = <({int page, String glyph})>[];
-    for (final p in pages) {
-      final pageNum = p['p'] as int;
-      for (final line in p['l'] as List<dynamic>) {
-        final words = line['w'] as List<dynamic>?;
-        if (words == null) continue;
-        for (final w in words) {
-          final parts = (w[1] as String).split(':');
-          if (int.parse(parts[0]) != surah) continue;
-          if (!ayahs.contains(int.parse(parts[1]))) continue;
-          out.add((page: pageNum, glyph: w[0] as String));
-        }
-      }
-    }
-    return out;
-  }
 }
 
 /// Turns an ayah into something the OS share sheet can carry: either
@@ -482,7 +427,9 @@ class AyahShareService {
     // never crowd each other however wide the card's type runs.
     y += _CardLayout.gapBeforeRule;
     final footerTop = y;
-    const logoSize = 84.0;
+    // Was 84 — the signature read as the loudest thing on the card,
+    // ahead of the verse it was signing. A signature belongs quiet.
+    const logoSize = 56.0;
     final logo = await _loadLogo();
     const brandRight = _width - _CardLayout.margin;
 
@@ -494,8 +441,9 @@ class AyahShareService {
       // The mark is a LOCKUP — the Arabic name over a Latin subtitle —
       // so its height is shared between two lines of type. Sized off
       // the logo tile beside it rather than off the old name's cap
-      // height, or the subtitle comes out as a smudge.
-      const markHeight = 88.0;
+      // height, or the subtitle comes out as a smudge. Was 88, scaled
+      // down with logoSize above.
+      const markHeight = 58.0;
       final markWidth = wordmark.width * markHeight / wordmark.height;
       markLeft = brandRight - markWidth;
       final dst = Rect.fromLTWH(markLeft,
@@ -588,164 +536,13 @@ class AyahShareService {
     canvas.restore();
   }
 
-  /// Fixed source: Hafs V4, and the PLAIN cut of it rather than the
-  /// tajweed one.
-  ///
-  /// The four riwayat (Warsh/Qalon/Shubah/Douri) have no such layout, so
-  /// a reader sharing from one of them gets the same V4 setting everyone
-  /// else does — the ayah is the point, not which print it was tapped
-  /// from.
-  ///
-  /// "Plain" is a real choice here, unlike in the crop this replaced:
-  /// QUL publishes both cuts, and the tajweed one carries COLR/CPAL
-  /// tables (95 KB for page 2, against 51 KB for the plain cut, both
-  /// checked by hand) that would paint the card's verse in tajweed
-  /// colours whatever ink the card asked for.
-  static const String _v4FontBase =
-      'https://static-cdn.tarteel.ai/qul/fonts/quran_fonts/v4/ttf';
-
-  /// Page number → the Flutter font family its glyphs are registered
-  /// under, once loaded. Registration is process-wide and permanent, so
-  /// this only ever grows, and a second share of the same page is free.
-  static final Map<int, String?> _v4Fonts = {};
-
-  /// The family name for [page]'s glyph font, or null if it cannot be
-  /// had or does not activate. Cheapest source first: memory, this
-  /// feature's own cache folder, then the network.
-  ///
-  /// Kept in its OWN cache folder rather than shared with
-  /// MushafV2Service's: that one holds the TAJWEED cut under the same
-  /// page numbers, and mixing the two would silently hand one of them
-  /// the other's bytes.
-  static Future<String?> _v4FontFor(int page) async {
-    if (_v4Fonts.containsKey(page)) return _v4Fonts[page];
-    try {
-      Uint8List? bytes;
-      Directory? dir;
-      if (!kIsWeb) {
-        final docs = await getApplicationDocumentsDirectory();
-        dir = Directory('${docs.path}/share_card_v4_fonts');
-        final f = File('${dir.path}/p$page.ttf');
-        if (await f.exists()) {
-          final cached = await f.readAsBytes();
-          if (_looksLikeFont(cached)) bytes = cached;
-        }
-      }
-
-      if (bytes == null) {
-        final res = await http
-            .get(Uri.parse('$_v4FontBase/p$page.ttf?v=3.1'))
-            .timeout(const Duration(seconds: 20));
-        if (res.statusCode != 200 || !_looksLikeFont(res.bodyBytes)) {
-          return _v4Fonts[page] = null;
-        }
-        bytes = res.bodyBytes;
-        if (dir != null) {
-          try {
-            dir.createSync(recursive: true);
-            await File('${dir.path}/p$page.ttf').writeAsBytes(bytes);
-          } catch (_) {
-            // Cache write failed — this share still works.
-          }
-        }
-      }
-
-      // The length is in the family name so a re-downloaded or changed
-      // font can never be masked by an already-registered family.
-      final family = 'ShareV4_${page}_${bytes.length}';
-      await (FontLoader(family)
-            ..addFont(Future.value(ByteData.sublistView(bytes))))
-          .load();
-      return _v4Fonts[page] = family;
-    } catch (e) {
-      debugPrint('share card: V4 page font $page unavailable ($e)');
-      return _v4Fonts[page] = null;
-    }
-  }
-
-  static bool _looksLikeFont(Uint8List bytes) {
-    if (bytes.length < 10000) return false;
-    final tag = String.fromCharCodes(bytes.take(4));
-    final trueType =
-        bytes[0] == 0 && bytes[1] == 1 && bytes[2] == 0 && bytes[3] == 0;
-    return trueType || tag == 'OTTO' || tag == 'true';
-  }
-
-  /// Whether [family] actually draws [sample], rather than silently
-  /// falling through to a system face.
-  ///
-  /// These glyphs live in the private use area, so a font that failed to
-  /// register does not throw — it renders tofu, or nothing, and the card
-  /// would go out with the verse missing. Comparing the drawn width
-  /// against a family that certainly does not exist is the same check
-  /// MushafV2Service makes before trusting a page font.
-  static bool _fontDraws(String family, String sample) {
-    double widthIn(String f) {
-      final p = ui.ParagraphBuilder(ui.ParagraphStyle(
-        textDirection: TextDirection.rtl,
-        fontFamily: f,
-        fontSize: 40,
-      ))
-        ..addText(sample);
-      return (p.build()
-            ..layout(const ui.ParagraphConstraints(width: double.infinity)))
-          .maxIntrinsicWidth;
-    }
-
-    final drawn = widthIn(family);
-    final missing = widthIn('__no_such_family_for_share_card__');
-    if (drawn <= 0) return false;
-    return (drawn - missing).abs() > missing * 0.04;
-  }
-
   /// The shared verses set in the Mushaf's own glyphs, or null to fall
-  /// back to the text card.
-  ///
-  /// This REPLACED cropping the printed page, which could not do the
-  /// job: an ayah beginning mid-line shares that line with its
-  /// neighbours, so a horizontal crop of "its" lines necessarily
-  /// carried a piece of the ayah before it and the one after. Setting
-  /// the ayah's OWN words is exact — the layout tags every word with
-  /// its surah:ayah — and it is the same calligraphy, because these are
-  /// the very glyphs the printed page is made of.
-  static Future<List<_GlyphRun>?> _tryMushafGlyphs(ShareableAyah a) async {
-    try {
-      final words = await _V4Layout.wordsFor(
-          a.surahNumber, {for (final v in a.verses) v.number});
-      if (words.isEmpty) return null;
-
-      // One run per page, in reading order, because each page's font
-      // maps the same codepoints to different words.
-      final runs = <_GlyphRun>[];
-      final buffer = StringBuffer();
-      int? runPage;
-
-      Future<bool> closeRun() async {
-        final page = runPage;
-        if (page == null || buffer.isEmpty) return true;
-        final family = await _v4FontFor(page);
-        if (family == null || !_fontDraws(family, buffer.toString())) {
-          return false;
-        }
-        runs.add(_GlyphRun(buffer.toString(), family));
-        buffer.clear();
-        return true;
-      }
-
-      for (final w in words) {
-        if (runPage != w.page) {
-          if (!await closeRun()) return null;
-          runPage = w.page;
-        }
-        buffer.write(w.glyph);
-      }
-      if (!await closeRun()) return null;
-      return runs.isEmpty ? null : runs;
-    } catch (e) {
-      debugPrint('share card: Mushaf glyphs unavailable ($e)');
-      return null;
-    }
-  }
+  /// back to the text card. Thin wrapper over [MushafGlyphService],
+  /// shared with the inline reading surfaces (MushafVerseText) so
+  /// there is exactly one place that knows how to load a page's font.
+  static Future<List<MushafGlyphRun>?> _tryMushafGlyphs(ShareableAyah a) =>
+      MushafGlyphService.runsFor(
+          a.surahNumber, [for (final v in a.verses) v.number]);
 
   /// The ornamental sura band the surah name is headed with.
   ///
@@ -976,7 +773,7 @@ class _CardLayout {
   final double height;
 
   factory _CardLayout(ShareableAyah a, ShareCardStyle s,
-      {List<_GlyphRun>? glyphRuns}) {
+      {List<MushafGlyphRun>? glyphRuns}) {
     // The name is SET, not typed: "surah005" is a ligature in the
     // surah-name font and comes out as the calligraphic
     // "سُورَةُ المَائِدَة" a printed Mushaf heads its pages with.
@@ -1155,7 +952,8 @@ class _CardLayout {
   /// The ayah-end medallion needs no special handling here: in this
   /// layout it IS one of the ayah's words, so selecting the ayah's
   /// words brings its own number with it.
-  static ui.Paragraph _mushafVerses(List<_GlyphRun> runs, ShareCardStyle s) {
+  static ui.Paragraph _mushafVerses(
+      List<MushafGlyphRun> runs, ShareCardStyle s) {
     ui.Paragraph build(double size) {
       final builder = ui.ParagraphBuilder(ui.ParagraphStyle(
         textAlign: TextAlign.center,

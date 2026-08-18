@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_strings.dart';
 import '../services/bookmark_service.dart';
@@ -7,7 +7,7 @@ import '../services/quran_service.dart';
 import '../services/settings_service.dart';
 import '../theme.dart';
 import 'mushaf_svg_screen.dart';
-import 'reader_screen.dart';
+import 'mushaf_reader_screen.dart';
 
 class BookmarksScreen extends StatefulWidget {
   const BookmarksScreen({super.key});
@@ -48,8 +48,8 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     await BookmarkService.deleteBookmarkByAyah(b.surahNumber, b.ayahNumber);
     await _load();
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(L10n.of(context)('deletedBookmark'))));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(L10n.of(context)('deletedBookmark'))));
     }
   }
 
@@ -70,8 +70,8 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
       await Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (_) =>
-                  ReaderScreen(surah: s, targetAyah: b.ayahNumber)));
+              builder: (_) => MushafReaderScreen(
+                  targetSurah: s.number, targetAyah: b.ayahNumber)));
       await _load();
     } catch (_) {}
   }
@@ -92,7 +92,9 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                 onPressed: _confirmClear,
                 child: Text(l('clearAll'),
                     style: const TextStyle(
-                        color: Colors.red, fontFamily: '.SF Pro Text', fontSize: 13))),
+                        color: Colors.red,
+                        fontFamily: '.SF Pro Text',
+                        fontSize: 13))),
         ],
       ),
       body: _loading
@@ -200,24 +202,23 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
   Widget _empty(bool isDark) {
     final l = L10n.of(context);
     return Center(
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(Icons.bookmark_border_rounded,
-            size: 72,
-            color: isDark ? AppColors.darkTextSec : Colors.grey.shade300),
-        const SizedBox(height: 16),
-        Text(l('noBookmarks'),
-            style: TextStyle(
-                fontSize: 18,
-                fontFamily: '.SF Pro Text',
-                color:
-                    isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
-        const SizedBox(height: 8),
-        Text(l('noBookmarksHint'),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: isDark ? AppColors.darkTextSec : AppColors.textLight,
-                fontFamily: '.SF Pro Text',
-                fontSize: 13)),
-      ]));
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(Icons.bookmark_border_rounded,
+          size: 72,
+          color: isDark ? AppColors.darkTextSec : Colors.grey.shade300),
+      const SizedBox(height: 16),
+      Text(l('noBookmarks'),
+          style: TextStyle(
+              fontSize: 18,
+              fontFamily: '.SF Pro Text',
+              color: isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
+      const SizedBox(height: 8),
+      Text(l('noBookmarksHint'),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              color: isDark ? AppColors.darkTextSec : AppColors.textLight,
+              fontFamily: '.SF Pro Text',
+              fontSize: 13)),
+    ]));
   }
 }

@@ -5,14 +5,14 @@ import '../models/surah.dart';
 import '../services/quran_service.dart';
 import '../services/settings_service.dart';
 import '../theme.dart';
-import 'reader_screen.dart';
+import 'mushaf_reader_screen.dart';
 
 /// Full-text search across all ayahs and surah names — the WHOLE
 /// Quran, every time. Used identically from the home screen, the
 /// Mushaf and the reader, so a search means the same thing and reaches
 /// the same results no matter which screen it was opened from.
 ///
-/// By default tapping a result opens it in [ReaderScreen]. Pass
+/// By default tapping a result opens it in [MushafReaderScreen]. Pass
 /// [returnResultToCaller] to instead pop the picked [AyahSearchResult]
 /// back to the caller — what the Mushaf and the reader both do, so
 /// picking a result can jump to it IN PLACE (the same page, the same
@@ -110,8 +110,8 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
       Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (_) =>
-                  ReaderScreen(surah: surah, targetAyah: r.numberInSurah)));
+              builder: (_) => MushafReaderScreen(
+                  targetSurah: surah.number, targetAyah: r.numberInSurah)));
     } catch (_) {}
   }
 
@@ -143,7 +143,7 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
           onTap: () {
             // Same contract as an ayah result: a caller that asked for
             // the result back (the Mushaf, the reader) gets it back —
-            // opening ReaderScreen directly here would silently break
+            // opening the reader directly here would silently break
             // out of whichever mode the search was opened from. Ayah 1
             // stands in for "the surah itself", the same as tapping its
             // home-screen card would land on.
@@ -157,8 +157,11 @@ class _AyahSearchScreenState extends State<AyahSearchScreen> {
                       text: ''));
               return;
             }
-            Navigator.push(context,
-                MaterialPageRoute(builder: (_) => ReaderScreen(surah: s)));
+            Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => MushafReaderScreen(
+                        targetSurah: s.number, targetAyah: 1)));
           },
           leading: Icon(Icons.menu_book_rounded, color: primary, size: 22),
           title: Text(s.name,

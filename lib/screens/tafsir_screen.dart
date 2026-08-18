@@ -10,6 +10,7 @@ import '../services/tafsir_service.dart';
 import '../l10n/app_strings.dart';
 import '../theme.dart';
 import '../widgets/ayah_share_sheet.dart';
+import '../widgets/mushaf_verse_text.dart';
 
 /// The ayah study screen: tafsir plus the linguistic works — الإعراب،
 /// التصريف، المعنى، القراءات — and the المتشابهات cross-references.
@@ -937,8 +938,10 @@ class _TafsirScreenState extends State<TafsirScreen>
             for (var i = 0; i < run.length; i++)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  run[i].text,
+                child: MushafVerseText(
+                  surahNumber: run[i].surahNumber,
+                  ayahNumbers: [run[i].numberInSurah],
+                  fallbackText: run[i].text,
                   textAlign: TextAlign.right,
                   textDirection: TextDirection.rtl,
                   style: TextStyle(

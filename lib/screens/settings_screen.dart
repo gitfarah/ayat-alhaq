@@ -7,7 +7,7 @@ import '../services/mushaf_svg_service.dart';
 import '../services/prayer_service.dart';
 import '../services/quran_audio_service.dart';
 import '../services/tafsir_service.dart';
-import '../services/tajweed_service.dart';
+import '../widgets/tajweed_legend_bar.dart';
 import '../theme.dart';
 import '../services/app_review_service.dart';
 import 'about_screen.dart';
@@ -653,34 +653,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (s.tajweed) ...[
                 const SizedBox(height: 4),
                 // Legend so the colours are learnable, not guesswork.
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.start,
-                  children: [
-                    for (final rule in TajweedService.legendOrder)
-                      Row(mainAxisSize: MainAxisSize.min, children: [
-                        Container(
-                          width: 13,
-                          height: 13,
-                          decoration: BoxDecoration(
-                            color: TajweedService.ruleColors[rule],
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          TajweedService.ruleNames[_lang]?[rule] ??
-                              TajweedService.ruleNames['en']![rule]!,
-                          style: TextStyle(
-                              fontFamily: '.SF Pro Text',
-                              fontSize: 13,
-                              color: isDark
-                                  ? AppColors.darkText
-                                  : AppColors.textPrimary),
-                        ),
-                      ]),
-                  ],
+                // Shared with the on-page legend bar (TajweedLegendBar)
+                // so both name the same rules in the same colours.
+                TajweedLegendChips(
+                  lang: _lang,
+                  textColor: isDark ? AppColors.darkText : AppColors.textPrimary,
                 ),
               ],
               const SizedBox(height: 10),

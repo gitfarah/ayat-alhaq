@@ -14,8 +14,8 @@ import '../theme.dart';
 import '../widgets/prayer_sky.dart';
 import '../widgets/prayer_visuals.dart';
 import '../widgets/surah_name_text.dart';
-import 'reader_screen.dart';
 import 'settings_screen.dart';
+import 'mushaf_reader_screen.dart';
 import 'mushaf_svg_screen.dart';
 import 'prayer_tools_screen.dart';
 
@@ -296,9 +296,18 @@ class _HomeScreenState extends State<HomeScreen>
               Directionality(
                 textDirection: TextDirection.ltr,
                 child: Row(children: [
+                  // The two icons are ONE glyph (Icons.swipe_vertical_rounded
+                  // — a hand swiping between two chevrons), turned 90°
+                  // for the page-flip mode: a swipe icon rotated between
+                  // its directions is how several icon sets already draw
+                  // "swipe this way" pairs, and it reads as one visual
+                  // family here rather than two unrelated pictograms —
+                  // Mushaf pages turn sideways, the ayah reader scrolls
+                  // down.
                   Expanded(
                       child: _ModeBtn(
-                          icon: Icons.menu_book_rounded,
+                          icon: Icons.swipe_vertical_rounded,
+                          iconTurns: 1,
                           label: 'المصحف',
                           sub: 'قراءة بالصفحات',
                           color: AppColors.primary,
@@ -313,9 +322,17 @@ class _HomeScreenState extends State<HomeScreen>
                                             _surahPage[surah.number] ?? 1)));
                           })),
                   const SizedBox(width: 14),
+                  // The verse-by-verse way to read — same naming
+                  // ("الآيات" / "قراءة متجاوبة") the reflowing
+                  // ReaderScreen carried, kept as-is even though this
+                  // now opens the Mushaf's own glyphs re-cut into
+                  // per-ayah blocks: it is the same READING HABIT this
+                  // button has always stood for (continuous, verse by
+                  // verse, not page-bound), just built differently
+                  // underneath.
                   Expanded(
                       child: _ModeBtn(
-                          icon: Icons.format_align_right_rounded,
+                          icon: Icons.swipe_vertical_rounded,
                           label: 'الآيات',
                           sub: 'قراءة متجاوبة',
                           color: AppColors.accent,
@@ -325,8 +342,9 @@ class _HomeScreenState extends State<HomeScreen>
                             Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (_) =>
-                                        ReaderScreen(surah: surah)));
+                                    builder: (_) => MushafReaderScreen(
+                                        initialPage:
+                                            _surahPage[surah.number] ?? 1)));
                           })),
                 ]),
               ),
@@ -526,8 +544,9 @@ class _HomeScreenState extends State<HomeScreen>
             Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (_) => ReaderScreen(
-                        surah: surah, targetAyah: r.numberInSurah)));
+                    builder: (_) => MushafReaderScreen(
+                        targetSurah: surah.number,
+                        targetAyah: r.numberInSurah)));
           },
           title: Text(r.text,
               maxLines: 2,
@@ -656,7 +675,10 @@ class _HomeScreenState extends State<HomeScreen>
           MaterialPageRoute(
             builder: (_) => mushaf
                 ? MushafSvgScreen(startPage: page)
-                : ReaderScreen(surah: surah!, targetAyah: s.lastAyah),
+                : MushafReaderScreen(
+                    initialPage: _surahPage[surah!.number] ?? 1,
+                    targetSurah: surah.number,
+                    targetAyah: s.lastAyah ?? 1),
           ),
         );
 
@@ -1322,12 +1344,17 @@ class _PrayerTimesBannerState extends State<_PrayerTimesBanner>
 
 class _ModeBtn extends StatelessWidget {
   final IconData icon;
+
+  /// Quarter turns applied to [icon] — how the horizontal/vertical pair
+  /// below is built from a single glyph rather than two.
+  final int iconTurns;
   final String label, sub;
   final Color color;
   final bool isDark;
   final VoidCallback onTap;
   const _ModeBtn(
       {required this.icon,
+      this.iconTurns = 0,
       required this.label,
       required this.sub,
       required this.color,
@@ -1345,13 +1372,16 @@ class _ModeBtn extends StatelessWidget {
         child: Column(children: [
           // The light theme's deep emerald/gold are too dark to read on
           // the dark sheet — swap to their bright dark-theme variants.
-          Icon(icon,
-              size: 36,
-              color: isDark
-                  ? (color == AppColors.primary
-                      ? AppColors.darkPrimary
-                      : AppColors.darkSecondary)
-                  : color),
+          RotatedBox(
+            quarterTurns: iconTurns,
+            child: Icon(icon,
+                size: 36,
+                color: isDark
+                    ? (color == AppColors.primary
+                        ? AppColors.darkPrimary
+                        : AppColors.darkSecondary)
+                    : color),
+          ),
           const SizedBox(height: 8),
           Text(label,
               style: TextStyle(

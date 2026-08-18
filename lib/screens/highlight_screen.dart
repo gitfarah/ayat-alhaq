@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_strings.dart';
 import '../services/highlight_service.dart';
@@ -8,7 +8,7 @@ import '../services/settings_service.dart';
 import '../theme.dart';
 import '../widgets/ayah_note_sheet.dart';
 import 'mushaf_svg_screen.dart';
-import 'reader_screen.dart';
+import 'mushaf_reader_screen.dart';
 
 class HighlightsScreen extends StatefulWidget {
   const HighlightsScreen({super.key});
@@ -102,8 +102,8 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
       await Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (_) =>
-                  ReaderScreen(surah: s, targetAyah: h.ayahNumber)));
+              builder: (_) => MushafReaderScreen(
+                  targetSurah: s.number, targetAyah: h.ayahNumber)));
       await _load();
     } catch (_) {}
   }
@@ -112,8 +112,8 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
     await HighlightService.deleteHighlight(h.surahNumber, h.ayahNumber);
     await _load();
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(L10n.of(context)('deletedHighlight'))));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(L10n.of(context)('deletedHighlight'))));
     }
   }
 
@@ -225,8 +225,9 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
                                     ],
                                   ),
                                   trailing: IconButton(
-                                    tooltip:
-                                        h.hasNote ? l('editNote') : l('addNote'),
+                                    tooltip: h.hasNote
+                                        ? l('editNote')
+                                        : l('addNote'),
                                     icon: Icon(
                                         h.hasNote
                                             ? Icons.sticky_note_2_rounded
@@ -254,8 +255,7 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
         children: [
           _Chip(
               label: l('all'),
-              color:
-                  isDark ? AppColors.darkTextSec : AppColors.textSecondary,
+              color: isDark ? AppColors.darkTextSec : AppColors.textSecondary,
               selected: _filter == null,
               onTap: () => setState(() => _filter = null)),
           ...AppColors.highlights.entries.map((e) => _Chip(
@@ -276,25 +276,24 @@ class _HighlightsScreenState extends State<HighlightsScreen> {
   Widget _empty(bool isDark) {
     final l = L10n.of(context);
     return Center(
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(Icons.highlight_outlined,
-            size: 72,
-            color: isDark ? AppColors.darkTextSec : Colors.grey.shade300),
-        const SizedBox(height: 16),
-        Text(l('noHighlights'),
-            style: TextStyle(
-                fontSize: 18,
-                fontFamily: '.SF Pro Text',
-                color:
-                    isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
-        const SizedBox(height: 8),
-        Text(l('noHighlightsHint'),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: isDark ? AppColors.darkTextSec : AppColors.textLight,
-                fontFamily: '.SF Pro Text',
-                fontSize: 13)),
-      ]));
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(Icons.highlight_outlined,
+          size: 72,
+          color: isDark ? AppColors.darkTextSec : Colors.grey.shade300),
+      const SizedBox(height: 16),
+      Text(l('noHighlights'),
+          style: TextStyle(
+              fontSize: 18,
+              fontFamily: '.SF Pro Text',
+              color: isDark ? AppColors.darkTextSec : AppColors.textSecondary)),
+      const SizedBox(height: 8),
+      Text(l('noHighlightsHint'),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              color: isDark ? AppColors.darkTextSec : AppColors.textLight,
+              fontFamily: '.SF Pro Text',
+              fontSize: 13)),
+    ]));
   }
 }
 

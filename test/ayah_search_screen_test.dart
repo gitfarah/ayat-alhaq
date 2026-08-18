@@ -7,7 +7,7 @@
 //     filter survives anywhere in this screen any more);
 //   - returnResultToCaller, which lets the Mushaf and the reader jump to
 //     a result IN PLACE instead of always being dumped into a fresh
-//     ReaderScreen — covering BOTH an ayah result and a SURAH result,
+//     MushafReaderScreen — covering BOTH an ayah result and a SURAH result,
 //     since the surah-tile branch is the newly-added one.
 
 import 'package:flutter/material.dart';
@@ -16,7 +16,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:quran_app_v1/screens/ayah_search_screen.dart';
-import 'package:quran_app_v1/screens/reader_screen.dart';
+import 'package:quran_app_v1/screens/mushaf_reader_screen.dart';
 import 'package:quran_app_v1/services/quran_audio_service.dart';
 import 'package:quran_app_v1/services/quran_service.dart';
 import 'package:quran_app_v1/services/settings_service.dart';
@@ -34,7 +34,7 @@ void main() {
   tearDown(() => TestWidgetsFlutterBinding.instance.focusManager.primaryFocus
       ?.unfocus());
 
-  // Both providers: the default result-tap path pushes ReaderScreen,
+  // Both providers: the default result-tap path pushes MushafReaderScreen,
   // which reads QuranAudioService for its play/pause row — omitting it
   // throws a ProviderNotFoundException on that push, which surfaced
   // as unrelated-looking finder failures in whatever ran next before
@@ -105,30 +105,30 @@ void main() {
 
   group('default: opens the reader, like tapping a home-screen result',
       () {
-    testWidgets('an ayah result pushes ReaderScreen', (tester) async {
+    testWidgets('an ayah result pushes MushafReaderScreen', (tester) async {
       await tester.pumpWidget(host(const AyahSearchScreen()));
       await typeAndSettle(tester, 'الحمد لله رب العالمين');
 
       await tester.tap(find.byType(ListTile).first);
       await settle(tester);
 
-      expect(find.byType(ReaderScreen), findsOneWidget);
+      expect(find.byType(MushafReaderScreen), findsOneWidget);
     });
 
-    testWidgets('a surah result pushes ReaderScreen too', (tester) async {
+    testWidgets('a surah result pushes MushafReaderScreen too', (tester) async {
       await tester.pumpWidget(host(const AyahSearchScreen()));
       await typeAndSettle(tester, 'الفاتحة');
 
       await tester.tap(find.byType(ListTile).first);
       await settle(tester);
 
-      expect(find.byType(ReaderScreen), findsOneWidget);
+      expect(find.byType(MushafReaderScreen), findsOneWidget);
     });
   });
 
   group('returnResultToCaller: the Mushaf/reader "stay in place" path',
       () {
-    testWidgets('an ayah result pops an AyahSearchResult, no ReaderScreen',
+    testWidgets('an ayah result pops an AyahSearchResult, no MushafReaderScreen',
         (tester) async {
       const query = 'الحمد لله رب العالمين';
       final expected = (await QuranService.searchAyahs(query)).first;
@@ -157,7 +157,7 @@ void main() {
       await tester.tap(find.byType(ListTile).first);
       await settle(tester);
 
-      expect(find.byType(ReaderScreen), findsNothing,
+      expect(find.byType(MushafReaderScreen), findsNothing,
           reason: 'the caller asked for the result back, not a navigation');
       expect(popped, isNotNull);
       expect(popped!.surahNumber, expected.surahNumber);
@@ -169,7 +169,7 @@ void main() {
         (tester) async {
       // This is the newly-added branch: _surahTile ignored
       // returnResultToCaller entirely before this change and always
-      // pushed ReaderScreen, which would have silently thrown a reader
+      // pushed MushafReaderScreen, which would have silently thrown a reader
       // opened FROM the Mushaf out of the Mushaf.
       const query = 'الفاتحة';
       final expected = (await QuranService.searchSurahs(query)).first;
@@ -198,7 +198,7 @@ void main() {
       await tester.tap(find.byType(ListTile).first);
       await settle(tester);
 
-      expect(find.byType(ReaderScreen), findsNothing);
+      expect(find.byType(MushafReaderScreen), findsNothing);
       expect(popped, isNotNull);
       expect(popped!.surahNumber, expected.number);
       expect(popped!.numberInSurah, 1,

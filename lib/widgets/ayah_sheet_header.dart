@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import 'mushaf_verse_text.dart';
 
 /// The green panel at the top of an ayah's options sheet: the ayah
 /// itself, centred and in the Mushaf face, so the sheet opens on the
@@ -19,6 +20,13 @@ class AyahSheetHeader extends StatelessWidget {
   /// Where the ayah sits, e.g. "النساء — آية ١".
   final String label;
 
+  /// Optional: lets the panel quietly upgrade [ayahText] to the
+  /// Mushaf's own printed glyphs once they load. Omit either (as every
+  /// caller did before this existed) and the panel renders exactly as
+  /// it always has, on [ayahText] alone.
+  final int? surahNumber;
+  final int? ayahNumber;
+
   // The panel is the same green in light and dark: it is a quoted
   // verse, not a piece of the surrounding surface.
 
@@ -26,6 +34,8 @@ class AyahSheetHeader extends StatelessWidget {
     super.key,
     required this.ayahText,
     required this.label,
+    this.surahNumber,
+    this.ayahNumber,
   });
 
   @override
@@ -64,8 +74,11 @@ class AyahSheetHeader extends StatelessWidget {
               // direction ﴿ (the OPENING bracket, despite its Unicode
               // name "ornate RIGHT parenthesis") lands on the right —
               // where Arabic reading starts — and ﴾ closes on the left.
-              child: Text(
-                '﴿$text﴾',
+              child: MushafVerseText(
+                surahNumber: surahNumber,
+                ayahNumbers: ayahNumber != null ? [ayahNumber!] : null,
+                fallbackText: text,
+                ornateBrackets: true,
                 textAlign: TextAlign.center,
                 textDirection: TextDirection.rtl,
                 // A few ayahs run for a whole page; the sheet shows the
