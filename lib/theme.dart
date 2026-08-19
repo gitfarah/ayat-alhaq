@@ -95,6 +95,7 @@ class AppColors {
   /// to keep the same hue while reading comfortably in the dark.
   static const Map<String, (Color, Color)> mushafBackgrounds = {
     'parchment': (Color(0xFFFAF3E0), Color(0xFF1B2420)),
+    'white': (Color(0xFFFFFFFF), Color(0xFF1A1A1A)),
     'yellow': (Color(0xFFFFF8D9), Color(0xFF262212)),
     'blue': (Color(0xFFEAF3FB), Color(0xFF141E28)),
     'pink': (Color(0xFFFCEDF2), Color(0xFF241820)),

@@ -135,8 +135,7 @@ class _MushafReaderScreenState extends State<MushafReaderScreen> {
       // +1/-1 across surah boundaries for free: global ayah numbers run
       // 1..6236 straight through the whole Quran, the same numbering
       // QuranAudioService already plays from.
-      audio.nextAyahResolver = (current) =>
-          current < 6236 ? current + 1 : null;
+      audio.nextAyahResolver = (current) => current < 6236 ? current + 1 : null;
       _audioSvc = audio;
       audio.removeListener(_followAudio);
       audio.addListener(_followAudio);
@@ -175,8 +174,7 @@ class _MushafReaderScreenState extends State<MushafReaderScreen> {
   /// READER made should clear it.
   bool _programmaticPageChange = false;
 
-  Future<void> _goToTarget() =>
-      _jumpTo(widget.targetSurah, widget.targetAyah);
+  Future<void> _goToTarget() => _jumpTo(widget.targetSurah, widget.targetAyah);
 
   Future<void> _jumpTo(int? surah, int? ayah, {bool animate = false}) async {
     if (surah == null || ayah == null) return;
@@ -281,104 +279,117 @@ class _MushafReaderScreenState extends State<MushafReaderScreen> {
     final editionId = _editionId(settings);
     _checkDownloaded(editionId); // guarded — a no-op once already known
 
-    return Scaffold(
-      backgroundColor: ground,
-      body: Stack(children: [
-        // ── The pages: ALWAYS full-bleed, same as Mushaf mode. The
-        // chrome floats on top and never resizes the page, so hiding it
-        // is what actually hands the reader the extra room — trimming
-        // the bars' own padding while they stay permanently on screen
-        // would not.
-        Positioned.fill(
-          child: SafeArea(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => _setBars(!_barsVisible),
-              child: PageView.builder(
-                controller: _pageCtrl,
-                reverse: true,
-                itemCount: MushafV2Service.totalPages,
-                onPageChanged: (i) => setState(() {
-                  _page = i + 1;
-                  // A flip [_jumpTo] itself started keeps its target;
-                  // one the reader made by swiping clears it — landing
-                  // mid-page on a swipe the reader made themselves
-                  // would be a surprise.
-                  if (_programmaticPageChange) {
-                    _programmaticPageChange = false;
-                  } else {
-                    _targetSurah = null;
-                    _targetAyah = null;
-                  }
-                }),
-                itemBuilder: (_, i) => _GlyphReaderPage(
-                  page: i + 1,
-                  editionId: _editionId(settings),
-                  fontSize: settings.fontSize,
-                  translationEdition: settings.translationEdition,
-                  isDark: isDark,
-                  bottomReserve: bottomReserve,
-                  highlights: _highlights,
-                  bookmarks: _bookmarks,
-                  playingGlobalAyah: settings.recitationHighlight
-                      ? audio.currentGlobalAyah
-                      : null,
-                  targetSurah: i + 1 == _page ? _targetSurah : null,
-                  targetAyah: i + 1 == _page ? _targetAyah : null,
-                  onTapAyah: _showAyahOptions,
+    // The Mushaf keeps its original fixed layout and page-turn direction
+    // regardless of the app's UI language — same reasoning, same fix,
+    // as mushaf_svg_screen.dart. Without this, `reverse: true` below is
+    // read against whatever the AMBIENT text direction is: under this
+    // app's own Arabic UI (RTL), a plain PageView already turns pages
+    // right-to-left with reverse:false, so adding reverse:true on top
+    // of that flipped it a second time — backwards, a left swipe for
+    // the next page, the opposite of how an Arabic book turns. Forcing
+    // LTR here first makes `reverse: true` mean the same fixed thing
+    // regardless of the reader's own app-language setting.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Scaffold(
+        backgroundColor: ground,
+        body: Stack(children: [
+          // ── The pages: ALWAYS full-bleed, same as Mushaf mode. The
+          // chrome floats on top and never resizes the page, so hiding
+          // it is what actually hands the reader the extra room —
+          // trimming the bars' own padding while they stay permanently
+          // on screen would not.
+          Positioned.fill(
+            child: SafeArea(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _setBars(!_barsVisible),
+                child: PageView.builder(
+                  controller: _pageCtrl,
+                  reverse: true,
+                  itemCount: MushafV2Service.totalPages,
+                  onPageChanged: (i) => setState(() {
+                    _page = i + 1;
+                    // A flip [_jumpTo] itself started keeps its target;
+                    // one the reader made by swiping clears it — landing
+                    // mid-page on a swipe the reader made themselves
+                    // would be a surprise.
+                    if (_programmaticPageChange) {
+                      _programmaticPageChange = false;
+                    } else {
+                      _targetSurah = null;
+                      _targetAyah = null;
+                    }
+                  }),
+                  itemBuilder: (_, i) => _GlyphReaderPage(
+                    page: i + 1,
+                    editionId: _editionId(settings),
+                    fontSize: settings.fontSize,
+                    translationEdition: settings.translationEdition,
+                    isDark: isDark,
+                    bottomReserve: bottomReserve,
+                    highlights: _highlights,
+                    bookmarks: _bookmarks,
+                    playingGlobalAyah: settings.recitationHighlight
+                        ? audio.currentGlobalAyah
+                        : null,
+                    targetSurah: i + 1 == _page ? _targetSurah : null,
+                    targetAyah: i + 1 == _page ? _targetAyah : null,
+                    onTapAyah: _showAyahOptions,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: AnimatedSlide(
-            offset: _barsVisible ? Offset.zero : const Offset(0, -1.1),
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-            child: SafeArea(
-              bottom: false,
-              child: Container(
-                  color: ground, child: _topBar(settings, isDark)),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: AnimatedSlide(
+              offset: _barsVisible ? Offset.zero : const Offset(0, -1.1),
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              child: SafeArea(
+                bottom: false,
+                child:
+                    Container(color: ground, child: _topBar(settings, isDark)),
+              ),
             ),
           ),
-        ),
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: AnimatedSlide(
-            offset: _barsVisible ? Offset.zero : const Offset(0, 1.1),
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-            // Same restructuring as Mushaf mode's equivalent overlay:
-            // only the interactive now-playing TRANSPORT gets its own
-            // SafeArea. The legend and the plain page/juz/hizb strip are
-            // read-only text — wrapping them in the same reserved inset
-            // left a stray empty band under the legend when it was the
-            // last thing on screen (nothing playing).
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              if (legendShowing)
-                TajweedLegendBar(
-                  isDark: isDark,
-                  expanded: _legendExpanded,
-                  onToggle: () =>
-                      setState(() => _legendExpanded = !_legendExpanded),
-                ),
-              // The same slot swaps content, exactly like the reader
-              // mode this replaced: page/juz/hizb normally, the
-              // now-playing transport the moment a recitation is
-              // active.
-              audio.hasActiveTrack
-                  ? androidBottomSafeArea(_nowPlayingBar(isDark, audio))
-                  : androidBottomSafeArea(_infoBar(isDark)),
-            ]),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: AnimatedSlide(
+              offset: _barsVisible ? Offset.zero : const Offset(0, 1.1),
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              // Same restructuring as Mushaf mode's equivalent overlay:
+              // only the interactive now-playing TRANSPORT gets its own
+              // SafeArea. The legend and the plain page/juz/hizb strip are
+              // read-only text — wrapping them in the same reserved inset
+              // left a stray empty band under the legend when it was the
+              // last thing on screen (nothing playing).
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                if (legendShowing)
+                  TajweedLegendBar(
+                    isDark: isDark,
+                    expanded: _legendExpanded,
+                    onToggle: () =>
+                        setState(() => _legendExpanded = !_legendExpanded),
+                  ),
+                // The same slot swaps content, exactly like the reader
+                // mode this replaced: page/juz/hizb normally, the
+                // now-playing transport the moment a recitation is
+                // active.
+                audio.hasActiveTrack
+                    ? androidBottomSafeArea(_nowPlayingBar(isDark, audio))
+                    : androidBottomSafeArea(_infoBar(isDark)),
+              ]),
+            ),
           ),
-        ),
-      ]),
+        ]),
+      ),
     );
   }
 
@@ -450,10 +461,10 @@ class _MushafReaderScreenState extends State<MushafReaderScreen> {
       animation: MushafV2Service.bulkProgress,
       builder: (_, __) {
         final progress = MushafV2Service.bulkProgress.value;
-        final running =
-            progress != null && progress.editionId == editionId;
-        final fraction =
-            running && progress.total > 0 ? progress.done / progress.total : 0.0;
+        final running = progress != null && progress.editionId == editionId;
+        final fraction = running && progress.total > 0
+            ? progress.done / progress.total
+            : 0.0;
         // Hardcoded Arabic, not an l10n key — matching Mushaf mode's own
         // download row in its ☰ menu, which does the same for this
         // exact feature.
